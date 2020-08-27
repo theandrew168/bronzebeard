@@ -1,3 +1,5 @@
+import struct
+
 # References:
 # https://man7.org/linux/man-pages/man5/elf.5.html
 # https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
@@ -6,7 +8,10 @@ class ELF:
 
     def __init__(self, code):
         self.code = code
-        self.code_pages = (len(code) // 4096) + 1
+        self.strtab_size = 17
+        self.sht_offset = 0x1000 + len(self.code) + self.strtab_size
+        if self.sht_offset % 8 != 0:
+            self.sht_offset += (8 - (self.sht_offset % 8))
 
     def build(self):
         elf = bytearray()
@@ -24,7 +29,7 @@ class ELF:
         elf.extend(b'\x01\x00\x00\x00')  # version: 1
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # entry point: 0x401000
         elf.extend(b'\x40\x00\x00\x00\x00\x00\x00\x00')  # program header table offset: 0x40 (64 bytes)
-        elf.extend(b'\x20\x10\x00\x00\x00\x00\x00\x00')  # section header table offset: 0x1020 (4128 bytes)
+        elf.extend(struct.pack('<Q', self.sht_offset))  # section header table offset
         elf.extend(b'\x00\x00\x00\x00')  # flags: <none>
         elf.extend(b'\x40\x00')  # header size: 0x40 (64 bytes)
         elf.extend(b'\x38\x00')  # program header entry size: 0x38 (56 bytes)
@@ -49,18 +54,17 @@ class ELF:
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x1000 (4096 bytes)
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # virtual address: 0x401000
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # physical address: 0x401000
-        elf.extend(b'\x0c\x00\x00\x00\x00\x00\x00\x00')  # file size: 0x0c (12 bytes)
-        elf.extend(b'\x0c\x00\x00\x00\x00\x00\x00\x00')  # mem size: 0x0c (12 bytes)
+        elf.extend(struct.pack('<Q', len(self.code)))  # file size
+        elf.extend(struct.pack('<Q', len(self.code)))  # mem size
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # alignment: 0x1000 (4096 bytes)
 
         # Padding to page size alignment
         while len(elf) < 4096:
             elf.extend(b'\x00')
 
-        # Code (12 bytes)
-        elf.extend(b'\xb8\x3c\x00\x00\x00')  # mov $60, %rax
-        elf.extend(b'\xbf\x2a\x00\x00\x00')  # mov $42, %rdi
-        elf.extend(b'\x0f\x05')              # syscall
+        # Code
+        elf.extend(self.code)
+        # TODO: do I need alignment here?
 
         # Data (empty)
 
@@ -69,7 +73,7 @@ class ELF:
         elf.extend(b'\x2e\x73\x68\x73\x74\x72\x74\x61\x62\x00')  # .shstrtab (10 bytes)
         elf.extend(b'\x2e\x74\x65\x78\x74\x00')  # .text (6 bytes)
 
-        # Padding to 64-bit (8 byte) alignment
+        # ??? Padding to 64-bit (8 byte) alignment ???
         while len(elf) % 8 != 0:
             elf.extend(b'\x00')
 
@@ -91,7 +95,7 @@ class ELF:
         elf.extend(b'\x06\x00\x00\x00\x00\x00\x00\x00')  # flags: alloc / execute
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # address: 0x401000
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x1000 (4096 bytes)
-        elf.extend(b'\x0c\x00\x00\x00\x00\x00\x00\x00')  # size: 0x0c (12 bytes)
+        elf.extend(struct.pack('<Q', len(self.code)))  # size
         elf.extend(b'\x00\x00\x00\x00')  # link: 0
         elf.extend(b'\x00\x00\x00\x00')  # info: 0
         elf.extend(b'\x01\x00\x00\x00\x00\x00\x00\x00')  # alignment: 1 (no constraints)
@@ -102,7 +106,7 @@ class ELF:
         elf.extend(b'\x03\x00\x00\x00')  # type: strtab
         elf.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')  # flags: <none>
         elf.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')  # address: 0x00
-        elf.extend(b'\x0c\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x100c (4108 bytes)
+        elf.extend(struct.pack('<Q', 0x1000 + len(self.code)))  # offset
         elf.extend(b'\x11\x00\x00\x00\x00\x00\x00\x00')  # size: 0x11 (17 bytes)
         elf.extend(b'\x00\x00\x00\x00')  # link: 0
         elf.extend(b'\x00\x00\x00\x00')  # info: 0
