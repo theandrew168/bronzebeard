@@ -8,24 +8,27 @@ from bronzebeard.elf import ELF
 # User-level applications use as integer registers for passing the sequence:
 # %rdi, %rsi, %rdx, %rcx, %r8 and %r9
 
-code = bytearray()
+with Function("_start", tuple()) as start:
+    # get current break addr (it'll be in rax)
+    MOV(rax, 12)
+    MOV(rdi, 0)
+    SYSCALL()
 
-# get current break addr (it'll be in rax)
-code.extend(MOV(rax, 12).encode())
-code.extend(MOV(rdi, 0).encode())
-code.extend(SYSCALL().encode())
+    # extend by 30000 bytes and re-brk
+    MOV(rdi, rax)
+    ADD(rdi, 30000)
+    MOV(rax, 12)
+    SYSCALL()
 
-# extend by 30000 bytes and re-break
-code.extend(MOV(rdi, rax).encode())
-code.extend(ADD(rdi, 30000).encode())
-code.extend(MOV(rax, 12).encode())
-code.extend(SYSCALL().encode())
+    # exit
+    MOV(rax, 60)
+    MOV(rdi, 42)
+    SYSCALL()
 
-# exit
-code.extend(MOV(rax, 60).encode())
-code.extend(MOV(rdi, 42).encode())
-code.extend(SYSCALL().encode())
+    # unreachable return to make Function happy
+    RETURN()
 
+code = start.finalize(abi.detect()).encode().load().code_segment
 elf = ELF(code)
 with open('output.elf', 'wb') as f:
     f.write(elf.build())
