@@ -17,7 +17,7 @@ class ELF:
         elf = bytearray()
 
         # ELF header (64 bytes)
-        elf.extend(b'\x7f\x45\x4c\x46')  # ident magic: constant signature
+        elf.extend(b'\x7f\x45\x4c\x46')  # ident magic: 0x7f ELF
         elf.extend(b'\x02')  # itent class: 64 bit
         elf.extend(b'\x01')  # itent data: little endian
         elf.extend(b'\x01')  # itent version: 1
