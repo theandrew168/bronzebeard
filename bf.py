@@ -28,13 +28,17 @@ with Function("_start", tuple()) as start:
     MOV(rax, 12)
     SYSCALL()
 
+# not necessary because brk clears memory by default
 #    # init all cells to zero
 #    MOV(r14, r13)
+#    ADD(r14, 30000)
 #    loop_start = Label('loop_start')
 #    LABEL(loop_start)
 #    MOV([r14], 0)
-#    CMP(r13, r14)
+#    DEC(r14)
+#    CMP(r14, r13)
 #    JNE(loop_start)
+#    MOV([r13], 0)
 
     for c in source:
         if chr(c) == '>':
