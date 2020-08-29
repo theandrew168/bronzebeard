@@ -1,8 +1,10 @@
 import os
+import sys
 
 from peachpy import *
 from peachpy.x86_64 import *
 
+sys.path[0:0] = ['.', '..']
 from bronzebeard.elf import ELF
 
 # User-level applications use as integer registers for passing the sequence:

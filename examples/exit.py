@@ -1,8 +1,10 @@
 import os
+import sys
 
 from peachpy import *
 from peachpy.x86_64 import *
 
+sys.path[0:0] = ['.', '..']
 from bronzebeard.elf import ELF
 
 # User-level applications use as integer registers for passing the sequence:
@@ -18,7 +20,7 @@ with Function("_start", tuple()) as start:
     RETURN()
 
 code = start.finalize(abi.detect()).encode().load().code_segment
-elf = ELF(func)
+elf = ELF(code)
 with open('output.elf', 'wb') as f:
     f.write(elf.build())
 
