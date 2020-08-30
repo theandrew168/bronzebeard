@@ -89,7 +89,7 @@ class PE:
         pe.extend(b'\x64\x86')  # machine: 0x8664 (x86-64)
         pe.extend(b'\x02\x00')  # section count: 0x02 (2 sections)
         pe.extend(b'\x00\x00\x00\x00')  # time date stamp: 0x00
-        pe.extend(b'\x00\x00\x00\x00')  # ptr to symbol table: 0x00
+        pe.extend(b'\x00\x00\x00\x00')  # symbol table ptr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # symbol count: 0x00
         pe.extend(b'\xf0\x00')  # optional header size: 0xf0 (240 bytes)
         pe.extend(b'\x2f\x02')  # characteristics: ???
@@ -124,89 +124,120 @@ class PE:
         pe.extend(b'\x00\x00\x10\x00\x00\x00\x00\x00')  # heap reserve size: 0x100000
         pe.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # heap commit size: 0x1000
         pe.extend(b'\x00\x00\x00\x00')  # loader flags: 0x00
-        pe.extend(b'\x10\x00\x00\x00')  # Data dirs count: 0x10 (16 data dirs)
+        pe.extend(b'\x10\x00\x00\x00')  # data dirs count: 0x10 (16 data dirs)
 
-        # Data directory 0 (8 bytes)
+        # Data directory 0 - export (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 1 (8 bytes)
+        # Data directory 1 - import (8 bytes)
         pe.extend(b'\x00\x20\x00\x00')  # addr: 0x2000
         pe.extend(b'\x14\x00\x00\x00')  # size: 0x14 (20 bytes)
 
-        # Data directory 2 (8 bytes)
+        # Data directory 2 - resource (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 3 (8 bytes)
+        # Data directory 3 - exception (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 4 (8 bytes)
+        # Data directory 4 - security (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 5 (8 bytes)
+        # Data directory 5 - basereloc (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 6 (8 bytes)
+        # Data directory 6 - debug (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 7 (8 bytes)
+        # Data directory 7 - copyright (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 8 (8 bytes)
+        # Data directory 8 - globalptr (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 9 (8 bytes)
+        # Data directory 9 - tls (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 10 (8 bytes)
+        # Data directory 10 - load config (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 11 (8 bytes)
+        # Data directory 11 - <unused> (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 12 (8 bytes)
+        # Data directory 12 - <unused> (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 13 (8 bytes)
+        # Data directory 13 - <unused> (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 14 (8 bytes)
+        # Data directory 14 - <unused> (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-        # Data directory 15 (8 bytes)
+        # Data directory 15 - <unused> (8 bytes)
         pe.extend(b'\x00\x00\x00\x00')  # addr: 0x00
         pe.extend(b'\x00\x00\x00\x00')  # size: 0x00 (0 bytes)
 
-#                                    2e 74 65 78 74 00 00 00  |        .text...|
-# 00000190  30 00 00 00 00 10 00 00  00 02 00 00 00 02 00 00  |0...............|
-# 000001a0  00 00 00 00 00 00 00 00  00 00 00 00 20 00 50 60  |............ .P`|
-# 000001b0  2e 69 64 61 74 61 00 00  14 00 00 00 00 20 00 00  |.idata....... ..|
-# 000001c0  00 02 00 00 00 04 00 00  00 00 00 00 00 00 00 00  |................|
-# 000001d0  00 00 00 00 40 00 30 c0  00 00 00 00 00 00 00 00  |....@.0.........|
-# 000001e0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-# *
-# 00000200  48 c7 c0 3c 00 00 00 48  c7 c7 2a 00 00 00 0f 05  |H..<...H..*.....|
-# 00000210  ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00  |................|
-# *
-# 00000230  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-# *
-# 00000600
+        # Section header 0 (40 bytes)
+        pe.extend(b'\x2e\x74\x65\x78\x74\x00\x00\x00')  # name: ".text"
+        pe.extend(b'\x30\x00\x00\x00')  # addr / size: <unused>
+        pe.extend(b'\x00\x10\x00\x00')  # virtual addr: 0x1000
+        pe.extend(b'\x00\x02\x00\x00')  # data size: 0x200 (512 bytes)
+        pe.extend(b'\x00\x02\x00\x00')  # raw data ptr: 0x200
+        pe.extend(b'\x00\x00\x00\x00')  # relocations ptr: 0x00
+        pe.extend(b'\x00\x00\x00\x00')  # line numbers ptr: 0x00
+        pe.extend(b'\x00\x00')  # relocations count: 0x00
+        pe.extend(b'\x00\x00')  # line numbers count: 0x00
+        pe.extend(b'\x20\x00\x50\x60')  # characteristics: code | align1 | align8 | exec | read
 
-        pe.extend(b'\x00')
-        pe.extend(b'\x00\x00')
-        pe.extend(b'\x00\x00\x00\x00')
+        # Section header 1 (40 bytes)
+        pe.extend(b'\x2e\x69\x64\x61\x74\x61\x00\x00')  # name: ".idata"
+        pe.extend(b'\x14\x00\x00\x00')  # addr / size: <unused>
+        pe.extend(b'\x00\x20\x00\x00')  # virtual addr: 0x2000
+        pe.extend(b'\x00\x02\x00\x00')  # data size: 0x200 (512 bytes)
+        pe.extend(b'\x00\x04\x00\x00')  # raw data ptr: 0x400
+        pe.extend(b'\x00\x00\x00\x00')  # relocations ptr: 0x00
+        pe.extend(b'\x00\x00\x00\x00')  # line numbers ptr: 0x00
+        pe.extend(b'\x00\x00')  # relocations count: 0x00
+        pe.extend(b'\x00\x00')  # line numbers count: 0x00
+        pe.extend(b'\x40\x00\x30\xc0')  # characteristics: data | align1 | align2 | align4? | read | write
+
+        # Padding to 0x200 (512 byte) alignment
+        while len(pe) % 0x200 != 0:
+            pe.extend(b'\x00')
+
+        # Code: .text
+        pe.extend(b'\x48\xc7\xc0\x3c\x00\x00\x00')
+        pe.extend(b'\x48\xc7\xc7\x2a\x00\x00\x00')
+        pe.extend(b'\x0f\x05')
+
+        # TODO what da eff is this?
+        pe.extend(b'\xff\xff\xff\xff\xff\xff\xff\xff')
         pe.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+        pe.extend(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+        pe.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+
+        # Padding to 0x200 (512 byte) alignment
+        while len(pe) % 0x200 != 0:
+            pe.extend(b'\x00')
+
+        # Import data: .idata
+        pe.extend(b'\x00')
+
+        # Padding to 0x200 (512 byte) alignment
+        while len(pe) % 0x200 != 0:
+            pe.extend(b'\x00')
+
         return bytes(pe)

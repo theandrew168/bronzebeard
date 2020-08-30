@@ -50,7 +50,7 @@ class ELF:
 
         # Program header 1 (56 bytes)
         elf.extend(b'\x01\x00\x00\x00')  # type: loadable segment
-        elf.extend(b'\x05\x00\x00\x00')  # flags: read / exec
+        elf.extend(b'\x05\x00\x00\x00')  # flags: read | exec
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x1000 (4096 bytes)
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # virtual address: 0x401000
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # physical address: 0x401000
@@ -58,8 +58,8 @@ class ELF:
         elf.extend(struct.pack('<Q', len(self.code)))  # mem size
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # alignment: 0x1000 (4096 bytes)
 
-        # Padding to page size alignment
-        while len(elf) < 4096:
+        # Padding to page size 0x1000 (4096 byte) alignment
+        while len(elf) % 0x1000 != 0:
             elf.extend(b'\x00')
 
         # Code
@@ -92,7 +92,7 @@ class ELF:
         # Section header 1 (64 bytes)
         elf.extend(b'\x0b\x00\x00\x00')  # name: 0x0b (11 bytes)
         elf.extend(b'\x01\x00\x00\x00')  # type: progbits
-        elf.extend(b'\x06\x00\x00\x00\x00\x00\x00\x00')  # flags: alloc / execute
+        elf.extend(b'\x06\x00\x00\x00\x00\x00\x00\x00')  # flags: execute | alloc
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # address: 0x401000
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x1000 (4096 bytes)
         elf.extend(struct.pack('<Q', len(self.code)))  # size
