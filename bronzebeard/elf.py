@@ -8,8 +8,15 @@ class ELF:
 
     def __init__(self, code):
         self.code = code
+
+        # code will be aligned to 64-bit boundary
+        self.code_size = len(self.code)
+        if self.code_size % 8 != 0:
+            self.code_size += (8 - (self.code_size % 8))
+
+        # strtab will be aligned to 64-bit boundary
         self.strtab_size = 17
-        self.sht_offset = 0x1000 + len(self.code) + self.strtab_size
+        self.sht_offset = 0x1000 + self.code_size + self.strtab_size
         if self.sht_offset % 8 != 0:
             self.sht_offset += (8 - (self.sht_offset % 8))
 
@@ -54,8 +61,8 @@ class ELF:
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # offset: 0x1000 (4096 bytes)
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # virtual address: 0x401000
         elf.extend(b'\x00\x10\x40\x00\x00\x00\x00\x00')  # physical address: 0x401000
-        elf.extend(struct.pack('<Q', len(self.code)))  # file size
-        elf.extend(struct.pack('<Q', len(self.code)))  # mem size
+        elf.extend(struct.pack('<Q', self.code_size))  # file size
+        elf.extend(struct.pack('<Q', self.code_size))  # mem size
         elf.extend(b'\x00\x10\x00\x00\x00\x00\x00\x00')  # alignment: 0x1000 (4096 bytes)
 
         # Padding to page size 0x1000 (4096 byte) alignment
@@ -64,7 +71,10 @@ class ELF:
 
         # Code
         elf.extend(self.code)
-        # TODO: do I need alignment here?
+
+        # ??? Padding to 64-bit (8 byte) alignment ???
+        while len(elf) % 8 != 0:
+            elf.extend(b'\x00')
 
         # Data (empty)
 
@@ -106,7 +116,7 @@ class ELF:
         elf.extend(b'\x03\x00\x00\x00')  # type: strtab
         elf.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')  # flags: <none>
         elf.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')  # address: 0x00
-        elf.extend(struct.pack('<Q', 0x1000 + len(self.code)))  # offset
+        elf.extend(struct.pack('<Q', 0x1000 + self.code_size))  # offset
         elf.extend(b'\x11\x00\x00\x00\x00\x00\x00\x00')  # size: 0x11 (17 bytes)
         elf.extend(b'\x00\x00\x00\x00')  # link: 0
         elf.extend(b'\x00\x00\x00\x00')  # info: 0
