@@ -1,0 +1,32 @@
+# allocate 30000 bytes of memory
+alloc reg1, 30000
+
+# use reg2 as dataptr
+mov reg2, reg1
+
+# stubs for each BF operation
+
+>:
+    add reg2, reg2, 1
+<:
+    sub reg2, reg2, 1
++:
+    load reg3, 0(reg2)
+    add reg3, reg3, 1
+    store reg3, 0(reg2)
+-:
+    load reg3, 0(reg2)
+    sub reg3, reg3, 1
+    store reg3, 0(reg2)
+.:
+    write 1, 0(reg2)
+,:
+    read 1, 0(reg2)
+[:
+    load reg3, 0(reg2)
+    be reg3, 0, loop_end_label
+]:
+    load reg3, 0(reg2)
+    bne reg3, 0, loop_start_label
+
+exit 42
