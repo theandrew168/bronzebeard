@@ -2,8 +2,10 @@ from ctypes import c_uint32
 from functools import partial
 import struct
 
+# Low-level interface to RISC-V instruction encoding
 
-def r_type_instruction(rd, rs1, rs2, opcode, funct3, funct7):
+
+def r_type(rd, rs1, rs2, opcode, funct3, funct7):
     if rd < 0 or rd > 31:
         raise ValueError('Register must be between 0 and 31: {}'.format(rd))
     if rs1 < 0 or rs1 > 31:
@@ -21,7 +23,7 @@ def r_type_instruction(rd, rs1, rs2, opcode, funct3, funct7):
 
     return struct.pack('<I', code)
 
-def i_type_instruction(rd, rs1, imm, opcode, funct3):
+def i_type(rd, rs1, imm, opcode, funct3):
     if rd < 0 or rd > 31:
         raise ValueError('Register must be between 0 and 31: {}'.format(rd))
     if rs1 < 0 or rs1 > 31:
@@ -40,7 +42,7 @@ def i_type_instruction(rd, rs1, imm, opcode, funct3):
 
     return struct.pack('<I', code)
 
-def s_type_instruction(rs1, rs2, imm, opcode, funct3):
+def s_type(rs1, rs2, imm, opcode, funct3):
     if rs1 < 0 or rs1 > 31:
         raise ValueError('Register must be between 0 and 31: {}'.format(rs1))
     if rs2 < 0 or rs2 > 31:
@@ -63,7 +65,7 @@ def s_type_instruction(rs1, rs2, imm, opcode, funct3):
 
     return struct.pack('<I', code)
 
-def b_type_instruction(rs1, rs2, imm, opcode, funct3):
+def b_type(rs1, rs2, imm, opcode, funct3):
     if imm < -0x1000 or imm > 0x0fff:
         raise ValueError('12-bit multiple of 2 immediate must be between -0x1000 (-4096) and 0x0fff (4095): {}'.format(imm))
     if imm % 2 == 1:
@@ -89,7 +91,7 @@ def b_type_instruction(rs1, rs2, imm, opcode, funct3):
 
     return struct.pack('<I', code)
 
-def u_type_instruction(rd, imm, opcode):
+def u_type(rd, imm, opcode):
     if imm < -0x80000 or imm > 0x7ffff:
         raise ValueError('20-bit immediate must be between -0x80000 (-524288) and 0x7ffff (524287): {}'.format(imm))
 
@@ -102,7 +104,7 @@ def u_type_instruction(rd, imm, opcode):
 
     return struct.pack('<I', code)
 
-def j_type_instruction(rd, imm, opcode):
+def j_type(rd, imm, opcode):
     if imm < -0x100000 or imm > 0x0fffff:
         raise ValueError('20-bit multiple of 2 immediate must be between -0x100000 (-1048576) and 0x0fffff (1048575): {}'.format(imm))
     if imm % 2 == 1:
@@ -127,15 +129,15 @@ def j_type_instruction(rd, imm, opcode):
     return struct.pack('<I', code)
 
 
-LUI = partial(u_type_instruction, opcode=0b0110111)
-AUIPC = partial(u_type_instruction, opcode=0b0010111)
-JAL = partial(j_type_instruction, opcode=0b1101111)
-JALR = partial(i_type_instruction, opcode=0b1100111, funct3=0b000)
-BEQ = partial(b_type_instruction, opcode=0b1100011, funct3=0b000)
-LW = partial(i_type_instruction, opcode=0b0000011, funct3=0b010)
-SW = partial(s_type_instruction, opcode=0b0100011, funct3=0b010)
-ADDI = partial(i_type_instruction, opcode=0b0010011, funct3=0b000)
-SLLI = partial(r_type_instruction, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
-XOR = partial(r_type_instruction, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
-OR = partial(r_type_instruction, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
-AND = partial(r_type_instruction, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+LUI = partial(u_type, opcode=0b0110111)
+AUIPC = partial(u_type, opcode=0b0010111)
+JAL = partial(j_type, opcode=0b1101111)
+JALR = partial(i_type, opcode=0b1100111, funct3=0b000)
+BEQ = partial(b_type, opcode=0b1100011, funct3=0b000)
+LW = partial(i_type, opcode=0b0000011, funct3=0b010)
+SW = partial(s_type, opcode=0b0100011, funct3=0b010)
+ADDI = partial(i_type, opcode=0b0010011, funct3=0b000)
+SLLI = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+XOR = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
+OR = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
+AND = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)

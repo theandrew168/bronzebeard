@@ -1,6 +1,8 @@
 from functools import partialmethod
 
-from bronzebeard import asm
+from bronzebeard import instructions
+
+# High-level interface to assembling RISC-V programs
 
 
 REGISTERS = {
@@ -92,7 +94,7 @@ class Program:
         # otherwise the register is invalid
         raise ValueError('Invalid register: {}'.format(reg))
 
-    def _r_type_instruction(self, rd, rs1, rs2, instruction):
+    def _r_type(self, rd, rs1, rs2, instruction):
         rd = self._resolve_register(rd)
         rs1 = self._resolve_register(rs1)
         rs2 = self._resolve_register(rs2)
@@ -100,7 +102,7 @@ class Program:
         code = instruction(rd, rs1, rs2)
         self.machine_code.extend(code)
 
-    def _i_type_instruction(self, rd, rs1, imm, instruction):
+    def _i_type(self, rd, rs1, imm, instruction):
         rd = self._resolve_register(rd)
         rs1 = self._resolve_register(rs1)
         imm = self._resolve_immediate(imm)
@@ -108,7 +110,7 @@ class Program:
         code = instruction(rd, rs1, imm)
         self.machine_code.extend(code)
 
-    def _s_type_instruction(self, rs1, rs2, imm, instruction):
+    def _s_type(self, rs1, rs2, imm, instruction):
         rs1 = self._resolve_register(rs1)
         rs2 = self._resolve_register(rs2)
         imm = self._resolve_immediate(imm)
@@ -116,7 +118,7 @@ class Program:
         code = instruction(rs1, rs2, imm)
         self.machine_code.extend(code)
 
-    def _b_type_instruction(self, rs1, rs2, imm, instruction):
+    def _b_type(self, rs1, rs2, imm, instruction):
         rs1 = self._resolve_register(rs1)
         rs2 = self._resolve_register(rs2)
         imm = self._resolve_immediate(imm)
@@ -124,14 +126,14 @@ class Program:
         code = instruction(rs1, rs2, imm)
         self.machine_code.extend(code)
 
-    def _u_type_instruction(self, rd, imm, instruction):
+    def _u_type(self, rd, imm, instruction):
         rd = self._resolve_register(rd)
         imm = self._resolve_immediate(imm)
 
         code = instruction(rd, imm)
         self.machine_code.extend(code)
 
-    def _j_type_instruction(self, rd, imm, instruction):
+    def _j_type(self, rd, imm, instruction):
         rd = self._resolve_register(rd)
         imm = self._resolve_immediate(imm)
 
@@ -150,15 +152,15 @@ class Program:
         self.labels[name] = len(self.machine_code)
         return self
 
-    LUI = partialmethod(_u_type_instruction, instruction=asm.LUI)
-    AUIPC = partialmethod(_u_type_instruction, instruction=asm.AUIPC)
-    JAL = partialmethod(_j_type_instruction, instruction=asm.JAL)
-    JALR = partialmethod(_i_type_instruction, instruction=asm.JALR)
-    BEQ = partialmethod(_b_type_instruction, instruction=asm.BEQ)
-    LW = partialmethod(_i_type_instruction, instruction=asm.LW)
-    SW = partialmethod(_s_type_instruction, instruction=asm.SW)
-    ADDI = partialmethod(_i_type_instruction, instruction=asm.ADDI)
-    SLLI = partialmethod(_r_type_instruction, instruction=asm.SLLI)
-    XOR = partialmethod(_r_type_instruction, instruction=asm.XOR)
-    OR = partialmethod(_r_type_instruction, instruction=asm.OR)
-    AND = partialmethod(_r_type_instruction, instruction=asm.AND)
+    LUI = partialmethod(_u_type, instruction=instructions.LUI)
+    AUIPC = partialmethod(_u_type, instruction=instructions.AUIPC)
+    JAL = partialmethod(_j_type, instruction=instructions.JAL)
+    JALR = partialmethod(_i_type, instruction=instructions.JALR)
+    BEQ = partialmethod(_b_type, instruction=instructions.BEQ)
+    LW = partialmethod(_i_type, instruction=instructions.LW)
+    SW = partialmethod(_s_type, instruction=instructions.SW)
+    ADDI = partialmethod(_i_type, instruction=instructions.ADDI)
+    SLLI = partialmethod(_r_type, instruction=instructions.SLLI)
+    XOR = partialmethod(_r_type, instruction=instructions.XOR)
+    OR = partialmethod(_r_type, instruction=instructions.OR)
+    AND = partialmethod(_r_type, instruction=instructions.AND)
