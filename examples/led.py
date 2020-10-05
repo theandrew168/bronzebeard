@@ -1,4 +1,4 @@
-from bronzebeard import asm
+from bronzebeard.program import Program
 
 # GPIO info taken from:
 # GD32VF103 User Manual, Section 7 (GPIO and AFIO)
@@ -89,3 +89,68 @@ RCU_RESET_SRC_CLK_OFFSET = 0x24
 RCU_AHB_RESET_OFFSET = 0x28
 RCU_CLK_CONFIG1_OFFSET = 0x2c
 RCU_DEEP_SLEEP_VOLTAGE_OFFSET = 0x34
+
+
+p = Program()
+with p.LABEL('rcu_init'):
+    # load RCU base addr into x1
+    p.LUI('x1', p.HI(RCU_BASE_ADDR))
+    p.ADDI('x1', 'x1', p.LO(RCU_BASE_ADDR))
+
+    p.ADDI('x1', 'x1', RCU_APB2_ENABLE_OFFSET)  # move x1 forward to APB2 enable register
+    p.LW('x2', 'x1', 0)  # load current APB2 enable config into x2
+
+    # prepare the GPIO C enable bit
+    p.ADDI('x3', 'zero', 1)
+    p.SLLI('x3', 'x3', 4)
+
+    # enable clock on GPIO C
+    p.OR('x2', 'x2', 'x3')
+    p.SW('x1', 'x2', 0)
+
+with p.LABEL('gpio_init'):
+    # load GPIO base addr into x1
+    p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
+    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
+
+    p.ADDI('x1', 'x1', GPIO_CTRL1_OFFSET)  # move x1 forward to control 1 register
+
+    p.LW('x2', 'x1', 0)  # load the current GPIO config into x2
+    p.ADDI('x3', 'zero', -1)  # load 0xffffffff into x3 (for future XOR masking)
+
+    p.ADDI('x4', 'zero', GPIO_MODE_MASK)  # load mode mask into x4
+    p.SLLI('x4', 'x4', 20)  # shift mode mask over to correct pin
+    p.XOR('x4', 'x4', 'x3')  # invert the mask
+    p.AND('x2', 'x2', 'x4')  # clear out the existing mode
+
+    p.ADDI('x4', 'zero', GPIO_MODE_OUT_50MHZ)  # load mode value info x4
+    p.SLLI('x4', 'x4', 20)  # shift mode value over to correct pin
+    p.OR('x2', 'x2', 'x4')  # set the mode value
+
+    p.ADDI('x4', 'zero', GPIO_CTRL_MASK)  # load control mask into x4
+    p.SLLI('x4', 'x4', 20)  # shift control mask over to correct pin
+    p.XOR('x4', 'x4', 'x3')  # invert the mask
+    p.AND('x2', 'x2', 'x4')  # clear out the existing control
+
+    p.ADDI('x4', 'zero', GPIO_CTRL_OUT_PUSH_PULL)  # load control value info x4
+    p.SLLI('x4', 'x4', 20)  # shift control value over to correct pin
+    p.SLLI('x4', 'x4', 2)  # shift control value over an extra 2 bits to the correct position
+    p.OR('x2', 'x2', 'x4')  # set the control value
+
+    p.SW('x1', 'x2', 0)  # store the GPIO config back to the CPU
+
+with p.LABEL('led_enable'):
+    p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO C bit operation address
+    p.LW('x2', 'x1', 0)  # load the current bit operate value into x2
+
+    # prepare the GPIO pin 13 enable bit
+    p.ADDI('x3', 'zero', 1)  # load 1 into x3
+    p.SLLI('x3', 'x3', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
+
+    # turn on the LED by writing a 1 to the corrent pin's operate bit
+    p.OR('x2', 'x2', 'x3')
+    p.SW('x1', 'x2', 0)
+
+
+with open('led.bin', 'wb') as f:
+    f.write(p.machine_code)
