@@ -1,8 +1,6 @@
 from ctypes import c_uint32
 from functools import partial
-import re
 import struct
-import sys
 
 
 REGISTERS = {
@@ -195,104 +193,61 @@ def j_type_instruction(rd, imm, opcode):
 
     return struct.pack('<I', inst)
 
+LUI = partial(u_type_instruction, opcode=0b0110111)
+AUIPC = partial(u_type_instruction, opcode=0b0010111)
+JAL = partial(j_type_instruction, opcode=0b1101111)
+JALR = partial(i_type_instruction, opcode=0b1100111, funct3=0b000)
+BEQ = partial(b_type_instruction, opcode=0b1100011, funct3=0b000)
+LW = partial(i_type_instruction, opcode=0b0000011, funct3=0b010)
+SW = partial(s_type_instruction, opcode=0b0100011, funct3=0b010)
+ADDI = partial(i_type_instruction, opcode=0b0010011, funct3=0b000)
+SLLI = partial(r_type_instruction, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+OR = partial(r_type_instruction, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 
-INSTRUCTIONS = {
-    'lui': partial(u_type_instruction, opcode=0b0110111),
-#    'auipc': partial(u_type_instruction, opcode=0b0010111),
-#    'jal': partial(j_type_instruction, opcode=0b1101111),
-#    'jalr': partial(i_type_instruction, opcode=0b1100111, funct3=0b000),
-#    'beq': partial(b_type_instruction, opcode=0b1100011, funct3=0b000),
-    'lw': partial(i_type_instruction, opcode=0b0000011, funct3=0b010),
-    'sw': partial(s_type_instruction, opcode=0b0100011, funct3=0b010),
-    'addi': partial(i_type_instruction, opcode=0b0010011, funct3=0b000),
-    'slli': partial(r_type_instruction, opcode=0b0010011, funct3=0b001, funct7=0b0000000),
-    'or': partial(r_type_instruction, opcode=0b0110011, funct3=0b110, funct7=0b0000000),
-}
-
-def parse(source):
-    ast = []
-    for line in source.splitlines():
-        # strip leading / trailing whitespace
-        # skip empty lines
-        line = line.strip()
-        if len(line) == 0:
-            continue
-
-        # split line into tokens
-        line = re.split(r'[\s,()]+', line)
-
-        statement = []
-        line = iter(line)
-        for token in line:
-            # skip comments
-            if token.startswith('#'):
-                break
-            # skip empty tokens
-            elif len(token) == 0:
-                continue
-            else:
-                statement.append(token)
-
-        # skip empty lines that remain after comment removal
-        if len(statement) == 0:
-            continue
-
-        ast.append(statement)
-
-    return ast
-
-def assemble(ast):
-    instructions = bytearray()
-    constants = {}
-    labels = {}
-
-    for stmt in ast:
-        head = stmt[0].lower()
-
-        # check for constant definition
-        if head == '.equ':
-            key = stmt[1]
-            value = stmt[2]
-            constants[key] = value
-        # check for label
-        elif head.endswith(':'):
-            label = head[:-1]
-            labels[label] = len(instructions)
-        # otherwise assume instruction
-        else:
-            if head not in INSTRUCTIONS:
-                raise ValueError('Invalid instruction: {}'.format(head))
-#            # handle %hi relocation
-#            elif token.lower() == '%hi':
-#                imm = next(line)
-#                imm = int(imm)
-#                imm = relocate_hi(imm)
-#                statement.append(imm)
-#            # handle %lo relocation
-#            elif token.lower() == '%lo':
-#                imm = next(line)
-#                imm = int(imm)
-#                imm = relocate_lo(imm)
-#                statement.append(imm)
-
-    return instructions
-
-
-if __name__ == '__main__':
-    usage = 'usage: {} <input_file> <output_file>'.format(sys.argv[0])
-    if len(sys.argv) != 3:
-        raise SystemExit(usage)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-
-    with open(input_file) as f:
-        source = f.read()
-
-    ast = parse(source)
-    for stmt in ast:
-        print(stmt)
-    bin = assemble(ast)
-
-    with open(output_file, 'wb') as f:
-        f.write(bin)
+#class RISCVAssembler:
+#
+#    def __init__(self):
+#        self.instructions = bytearray()
+#        self.labels = {}
+#
+#    def LABEL(self, name):
+#        if name in self.labels:
+#            raise ValueError('Duplicate label: {}'.format(name))
+#        self.labels[name] = len(self.instructions)
+#
+#
+#def assemble(ast):
+#    instructions = bytearray()
+#    constants = {}
+#    labels = {}
+#
+#    for stmt in ast:
+#        head = stmt[0].lower()
+#
+#        # check for constant definition
+#        if head == '.equ':
+#            key = stmt[1]
+#            value = stmt[2]
+#            constants[key] = value
+#        # check for label
+#        elif head.endswith(':'):
+#            label = head[:-1]
+#            labels[label] = len(instructions)
+#        # otherwise assume instruction
+#        else:
+#            if head not in INSTRUCTIONS:
+#                raise ValueError('Invalid instruction: {}'.format(head))
+##            # handle %hi relocation
+##            elif token.lower() == '%hi':
+##                imm = next(line)
+##                imm = int(imm)
+##                imm = relocate_hi(imm)
+##                statement.append(imm)
+##            # handle %lo relocation
+##            elif token.lower() == '%lo':
+##                imm = next(line)
+##                imm = int(imm)
+##                imm = relocate_lo(imm)
+##                statement.append(imm)
+#
+#    return instructions

@@ -1,2 +1,2 @@
 # bronzebeard
-Native code generation with Python and Forth
+Bare-metal RISC-V development with Python and Forth
