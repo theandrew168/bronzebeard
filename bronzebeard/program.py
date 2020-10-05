@@ -1,6 +1,7 @@
 from functools import partialmethod
 
 from bronzebeard import instructions
+from bronzebeard.utils import relocate_hi, relocate_lo
 
 # High-level interface to assembling RISC-V programs
 
@@ -39,19 +40,6 @@ REGISTERS = {
     'x30': 30, 't5': 30,
     'x31': 31, 't6': 31,
 }
-
-
-def sign_extend(value, bits):
-    sign_bit = 1 << (bits - 1)
-    return (value & (sign_bit - 1)) - (value & sign_bit)
-
-def relocate_hi(imm):
-    if imm & 0x800:
-        imm += 2**12
-    return sign_extend((imm >> 12) & 0x000fffff, 20)
-
-def relocate_lo(imm):
-    return sign_extend(imm & 0x00000fff, 12)
 
 
 class Program:
