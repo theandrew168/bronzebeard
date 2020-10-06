@@ -1,4 +1,4 @@
-from bronzebeard.program import Program
+from simpleriscv import asm
 
 # GPIO info taken from:
 # GD32VF103 User Manual, Section 7 (GPIO and AFIO)
@@ -91,7 +91,7 @@ RCU_CLK_CONFIG1_OFFSET = 0x2c
 RCU_DEEP_SLEEP_VOLTAGE_OFFSET = 0x34
 
 
-p = Program()
+p = asm.Program()
 with p.LABEL('rcu_init'):
     # load RCU base addr into x1
     p.LUI('x1', p.HI(RCU_BASE_ADDR))
@@ -152,5 +152,5 @@ with p.LABEL('led_enable'):
     p.SW('x1', 'x2', 0)
 
 
-with open('led.bin', 'wb') as f:
+with open('longan_nano_led_on.bin', 'wb') as f:
     f.write(p.machine_code)
