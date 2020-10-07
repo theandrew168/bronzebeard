@@ -1,0 +1,12 @@
+Linker snippet taken from:
+https://github.com/riscv-mcu/GD32VF103_Firmware_Library/blob/master/Firmware/RISCV/env_Eclipse/GD32VF103xB.lds
+
+MEMORY
+{
+    flash (rxai!w) : ORIGIN = 0x08000000, LENGTH = 128K
+    ram   (wxa!ri) : ORIGIN = 0x20000000, LENGTH = 32K
+}
+
+In summary:
+Flash: 128k starting at 0x0800_0000: read-only, executable, allocated, initialized, NOT read/write
+RAM:    32k starting at 0x2000_0000: read/write, executable, allocated, NOT read-only, NOT initialized
