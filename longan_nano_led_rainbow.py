@@ -123,116 +123,28 @@ with p.LABEL('init_gpio_port_c_pin_13'):
     p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
 
-    p.ADDI('x1', 'x1', GPIO_CTRL1_OFFSET)  # move x1 forward to control 1 register
+    # move x1 forward to control 1 register
+    p.ADDI('x1', 'x1', GPIO_CTRL1_OFFSET)
 
-    p.LW('x2', 'x1', 0)  # load the current GPIO config into x2
-    p.ADDI('x3', 'zero', -1)  # load 0xffffffff into x3 (for future XOR masking)
+    # TODO: this is destructive
+    p.ADDI('x2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into x2
+    p.SLLI('x2', 'x2', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
 
-    p.ADDI('x4', 'zero', GPIO_MODE_MASK)  # load mode mask into x4
-    p.SLLI('x4', 'x4', 20)  # shift mode mask over to correct pin ((PIN - 8) * 4)
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing mode
-
-    p.ADDI('x4', 'zero', GPIO_MODE_OUT_50MHZ)  # load mode value info x4
-    p.SLLI('x4', 'x4', 20)  # shift mode value over to correct pin
-    p.OR('x2', 'x2', 'x4')  # set the mode value
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_MASK)  # load control mask into x4
-    p.SLLI('x4', 'x4', 20)  # shift control mask over to correct pin
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing control
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_OUT_PUSH_PULL)  # load control value info x4
-    p.SLLI('x4', 'x4', 20)  # shift control value over to correct pin
-    p.SLLI('x4', 'x4', 2)  # shift control value over an extra 2 bits to the correct position
-    p.OR('x2', 'x2', 'x4')  # set the control value
-
-    p.SW('x1', 'x2', 0)  # store the GPIO config back to the CPU
-
-with p.LABEL('init_gpio_port_a_pin_1'):
-    # load GPIO base addr into x1
-    p.LUI('x1', p.HI(GPIO_BASE_ADDR_A))
-    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_A))
-
-    p.ADDI('x1', 'x1', GPIO_CTRL0_OFFSET)  # move x1 forward to control 0 register
-
-    p.LW('x2', 'x1', 0)  # load the current GPIO config into x2
-    p.ADDI('x3', 'zero', -1)  # load 0xffffffff into x3 (for future XOR masking)
-
-    p.ADDI('x4', 'zero', GPIO_MODE_MASK)  # load mode mask into x4
-    p.SLLI('x4', 'x4', 4)  # shift mode mask over to correct pin (PIN * 4)
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing mode
-
-    p.ADDI('x4', 'zero', GPIO_MODE_OUT_50MHZ)  # load mode value info x4
-    p.SLLI('x4', 'x4', 4)  # shift mode value over to correct pin
-    p.OR('x2', 'x2', 'x4')  # set the mode value
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_MASK)  # load control mask into x4
-    p.SLLI('x4', 'x4', 4)  # shift control mask over to correct pin
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing control
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_OUT_PUSH_PULL)  # load control value info x4
-    p.SLLI('x4', 'x4', 4)  # shift control value over to correct pin
-    p.SLLI('x4', 'x4', 2)  # shift control value over an extra 2 bits to the correct position
-    p.OR('x2', 'x2', 'x4')  # set the control value
-
-    p.SW('x1', 'x2', 0)  # store the GPIO config back to the CPU
-
-with p.LABEL('init_gpio_port_a_pin_2'):
-    # load GPIO base addr into x1
-    p.LUI('x1', p.HI(GPIO_BASE_ADDR_A))
-    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_A))
-
-    p.ADDI('x1', 'x1', GPIO_CTRL0_OFFSET)  # move x1 forward to control 0 register
-
-    p.LW('x2', 'x1', 0)  # load the current GPIO config into x2
-    p.ADDI('x3', 'zero', -1)  # load 0xffffffff into x3 (for future XOR masking)
-
-    p.ADDI('x4', 'zero', GPIO_MODE_MASK)  # load mode mask into x4
-    p.SLLI('x4', 'x4', 8)  # shift mode mask over to correct pin (PIN * 4)
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing mode
-
-    p.ADDI('x4', 'zero', GPIO_MODE_OUT_50MHZ)  # load mode value info x4
-    p.SLLI('x4', 'x4', 8)  # shift mode value over to correct pin
-    p.OR('x2', 'x2', 'x4')  # set the mode value
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_MASK)  # load control mask into x4
-    p.SLLI('x4', 'x4', 8)  # shift control mask over to correct pin
-    p.XOR('x4', 'x4', 'x3')  # invert the mask
-    p.AND('x2', 'x2', 'x4')  # clear out the existing control
-
-    p.ADDI('x4', 'zero', GPIO_CTRL_OUT_PUSH_PULL)  # load control value info x4
-    p.SLLI('x4', 'x4', 8)  # shift control value over to correct pin
-    p.SLLI('x4', 'x4', 2)  # shift control value over an extra 2 bits to the correct position
-    p.OR('x2', 'x2', 'x4')  # set the control value
-
-    p.SW('x1', 'x2', 0)  # store the GPIO config back to the CPU
+    # apply the GPIO config back
+    p.SW('x1', 'x2', 0)
 
 with p.LABEL('led_clear_all'):
     # load GPIO base addr C into x1
     p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
 
-    p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO bit operation address
-
     # prepare the GPIO pin 13 enable bit
-    p.ADDI('x3', 'zero', 1)  # load 1 into x3
-    p.SLLI('x3', 'x3', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
-    p.SW('x1', 'x3', 0)  # turn off the LED by writing a 1 to the corrent pin's clear bit
+    p.ADDI('x2', 'zero', 1)  # load 1 into x2
+    p.SLLI('x2', 'x2', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
 
-#    # load GPIO base addr A into x1
-#    p.LUI('x1', p.HI(GPIO_BASE_ADDR_A))
-#    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_A))
-#
-#    p.ADDI('x1', 'x1', GPIO_BIT_CLEAR_OFFSET)  # move x1 to point to the GPIO bit operation address
-##    p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO bit operation address
-#
-#    # prepare the GPIO pins 1 and 2 enable bits
-#    p.ADDI('x3', 'zero', 0b00000110)  # load enable bits into x3
-#    p.SW('x1', 'x3', 0)  # turn off the LEDs by writing a 1 to the corrent pin's clear bit
+    p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO bit operation address
+    p.ADDI('x1', 'x1', 4)  # HACK make this work (now at GPIO_BIT_CLEAR_OFFSET)
+    p.SW('x1', 'x2', 0)  # turn on the LED by writing a 1 to the corrent pin's operate bit
 
 
 with open('longan_nano_led_rainbow.bin', 'wb') as f:
