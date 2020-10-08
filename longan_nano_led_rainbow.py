@@ -40,7 +40,7 @@ GPIO_CTRL0_OFFSET = 0x00
 GPIO_CTRL1_OFFSET = 0x04
 GPIO_IN_STATUS_OFFSET = 0x08
 GPIO_OUT_CTRL_OFFSET = 0x0c
-GPIO_BIT_OPERATE_OFFSET = 0x10
+GPIO_BIT_OPERATE_OFFSET = 0x10  # this MUST be wrong. even writing all 1s turns the light off
 GPIO_BIT_CLEAR_OFFSET = 0x14
 GPIO_LOCK_OFFSET = 0x18
 
@@ -139,11 +139,13 @@ with p.LABEL('led_clear_all'):
     p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
 
     # prepare the GPIO pin 13 enable bit
-    p.ADDI('x2', 'zero', 1)  # load 1 into x2
-    p.SLLI('x2', 'x2', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
+#    p.ADDI('x2', 'zero', 1)  # load 1 into x2
+#    p.SLLI('x2', 'x2', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
+
+    p.ADDI('x2', 'zero', -1)  # load all 1s into x2
 
     p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO bit operation address
-    p.ADDI('x1', 'x1', 4)  # HACK make this work (now at GPIO_BIT_CLEAR_OFFSET)
+#    p.ADDI('x1', 'x1', 4)  # HACK make this work (now at GPIO_BIT_CLEAR_OFFSET)
     p.SW('x1', 'x2', 0)  # turn on the LED by writing a 1 to the corrent pin's operate bit
 
 
