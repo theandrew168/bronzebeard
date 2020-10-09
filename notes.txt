@@ -14,6 +14,9 @@ Summary:
 Flash: 128K starting at 0x0800_0000: read, executable
 RAM:    32K starting at 0x2000_0000: read, write, executable
 
+Explanation of why the GPIO pin needs to be low for an LED to be on:
+https://www.raspberrypi.org/forums/viewtopic.php?t=234598
+
 
 
 FE310-G002 (HiFive1 Rev B)
