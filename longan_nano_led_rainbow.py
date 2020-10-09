@@ -138,15 +138,14 @@ with p.LABEL('led_clear_all'):
     p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
 
-    # prepare the GPIO pin 13 enable bit
-#    p.ADDI('x2', 'zero', 1)  # load 1 into x2
-#    p.SLLI('x2', 'x2', 13)  # shift the 1 over to pin 13 (pins are 0-indexed)
+    # move x1 to point to the GPIO bit operation address
+    p.ADDI('x1', 'x1', GPIO_OUT_CTRL_OFFSET)
 
-    p.ADDI('x2', 'zero', -1)  # load all 1s into x2
-
-    p.ADDI('x1', 'x1', GPIO_BIT_OPERATE_OFFSET)  # move x1 to point to the GPIO bit operation address
-#    p.ADDI('x1', 'x1', 4)  # HACK make this work (now at GPIO_BIT_CLEAR_OFFSET)
-    p.SW('x1', 'x2', 0)  # turn on the LED by writing a 1 to the corrent pin's operate bit
+    # turn LED on
+    p.ADDI('x2', 'zero', 1)  # load 1 (is HIGH is OFF) into x2
+    #p.ADDI('x2', 'zero', 0)  # load 0 (is LOW is ON) into x2
+    p.SLLI('x2', 'x2', 13)  # shift over to pin 13 (pins are 0-indexed)
+    p.SW('x1', 'x2', 0)  # turn the LED on / off
 
 
 with open('longan_nano_led_rainbow.bin', 'wb') as f:
