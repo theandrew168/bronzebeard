@@ -22,6 +22,9 @@ Explanation of why the GPIO pin needs to be low for an LED to be on:
 https://www.raspberrypi.org/forums/viewtopic.php?t=234598
 
 Delay (https://en.bbs.sipeed.com/t/topic/1759/10):
+mtime lo: 0xD100_0000
+mtime hi: 0xD100_0004
+
 RISC-V privileged ISA describes the "mtime" feature. The GD32VF103 supports
 this but the docs are weird about it. They still refer to it as "SysTick"
 which is an ARM thing (though similar). Online, the folks note that this
@@ -72,3 +75,7 @@ RAM:   16K starting at 0x8000_0000: read, write, executable
 Boot Process:
 The first 64K of Flash is occupied by the bootloader (which jumps to 0x2001_0000 at the end).
 That leaves (4M - 64K = 4032K) starting at 0x2001_0000 for my program.
+
+Delay:
+mtime lo: 0x0200_BFF8
+mtime hi: 0x0200_BFFC
