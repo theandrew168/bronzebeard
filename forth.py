@@ -123,8 +123,34 @@ def defword(p, name, label, flags=0):
 
 
 p = asm.Program()
+
+# t0 = src, t1 = dest, t2 = count
 with p.LABEL('copy'):
-    p.LUI
+    p.LUI('t0', p.HI(ROM_BASE_ADDR + 64))
+    p.ADDI('t0', 't0', p.LO(ROM_BASE_ADDR + 64))
+    p.LUI('t1', p.HI(RAM_BASE_ADDR))
+    p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
+    p.ADDI('t2', 'zero', 'here')
+    p.ADDI('t3', 'zero', 'start')
+    p.SUB('t2', 't2', 't3')
+with p.LABEL('copy_loop'):
+    p.BEQ('t2', 'zero', 'copy_done')
+    p.LW('t3', 't0', 0)  # [src] -> t3
+    p.SW('t1', 't3', 0)  # t3 -> [dest]
+    p.ADDI('t0', 't0', 4)  # src += 4
+    p.ADDI('t1', 't1', 4)  # dest += 4
+    p.ADDI('t2', 't2', -4)  # count -= 4
+    p.JAL('zero', 'copy_loop')
+with p.LABEL('copy_done'):
+    # jump to RAM
+    p.LUI('t0', p.HI(RAM_BASE_ADDR))
+    p.JALR('zero', 't0', p.LO(RAM_BASE_ADDR))
+
+
+# TODO: labels aren't understood (or deferred) by HI / LO
+# HACK: just manually assume that the copy block is 64 bytes (16 insts)
+p.ALIGN(64)
+
 with p.LABEL('start'):
     p.JAL('zero', 'init')
 with p.LABEL('error'):
@@ -140,6 +166,9 @@ with p.LABEL('init'):
 
 p.LABEL('interpreter')
 p.LABEL('token')
+# TODO: static TIB code
+p.LABEL('latest')
+p.LABEL('here')
 
 
 with open('forth.bin', 'wb') as f:
