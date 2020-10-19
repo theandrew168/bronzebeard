@@ -200,7 +200,14 @@ with p.LABEL('init'):
 # TODO: fill in all these goodies
 p.LABEL('interpreter')
 p.LABEL('token')
-p.LABEL('tib')
+
+with p.LABEL('tib'):
+    p.BLOB(b': dup sp@ @ ;')
+    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
+    p.BLOB(b': 0 -1 dup nand ;')
+    p.BLOB(b': 1 -1 dup + dup nand ;')
+
+p.ALIGN()
 p.LABEL('latest')
 p.LABEL('here')
 
