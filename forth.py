@@ -56,11 +56,11 @@ R_RSP = 'tp'
 # |----------------------------------------|
 
 # Variable registers
-R_STATE = 's0'
-R_TIB = 's1'
-R_TOIN = 's2'
-R_HERE = 's3'
-R_LATEST = 's4'
+V_STATE = 's0'
+V_TIB = 's1'
+V_TOIN = 's2'
+V_HERE = 's3'
+V_LATEST = 's4'
 
 
 #  16KB      Memory Map
@@ -124,15 +124,25 @@ def defword(p, name, label, flags=0):
 
 p = asm.Program()
 
+# code in ROM starts here
+# code for copying ROM to RAM starts here
+
 # t0 = src, t1 = dest, t2 = count
 with p.LABEL('copy'):
-    p.LUI('t0', p.HI(ROM_BASE_ADDR + 64))
-    p.ADDI('t0', 't0', p.LO(ROM_BASE_ADDR + 64))
+    # setup copy src (RAM_BASE_ADDR + start)
+    p.LUI('t0', p.HI(ROM_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(ROM_BASE_ADDR))
+    p.ADDI('t0', 't0', 'start')
+
+    # setup copy dest (RAM_BASE_ADDR)
     p.LUI('t1', p.HI(RAM_BASE_ADDR))
     p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
+
+    # setup copy count (here - start)
     p.ADDI('t2', 'zero', 'here')
     p.ADDI('t3', 'zero', 'start')
     p.SUB('t2', 't2', 't3')
+
 with p.LABEL('copy_loop'):
     p.BEQ('t2', 'zero', 'copy_done')
     p.LW('t3', 't0', 0)  # [src] -> t3
@@ -141,15 +151,15 @@ with p.LABEL('copy_loop'):
     p.ADDI('t1', 't1', 4)  # dest += 4
     p.ADDI('t2', 't2', -4)  # count -= 4
     p.JAL('zero', 'copy_loop')
+
 with p.LABEL('copy_done'):
     # jump to RAM
     p.LUI('t0', p.HI(RAM_BASE_ADDR))
     p.JALR('zero', 't0', p.LO(RAM_BASE_ADDR))
 
 
-# TODO: labels aren't understood (or deferred) by HI / LO
-# HACK: just manually assume that the copy block is 64 bytes (16 insts)
-p.ALIGN(64)
+# code in RAM starts here
+# main Forth interpreter starts here
 
 with p.LABEL('start'):
     p.JAL('zero', 'init')
@@ -158,15 +168,39 @@ with p.LABEL('error'):
     pass
 with p.LABEL('init'):
     # setup data stack pointer
-    p.LUI('sp', p.HI(DATA_STACK_BASE))
-    p.ADDI('sp', 'sp', p.LO(DATA_STACK_BASE))
-    # setup return stack pointer
-    p.LUI('gp', p.HI(RETURN_STACK_BASE))
-    p.ADDI('gp', 'gp', p.LO(RETURN_STACK_BASE))
+    p.LUI(R_DSP, p.HI(DATA_STACK_BASE))
+    p.ADDI(R_DSP, R_DSP, p.LO(DATA_STACK_BASE))
 
+    # setup return stack pointer
+    p.LUI(R_RSP, p.HI(RETURN_STACK_BASE))
+    p.ADDI(R_RSP, R_RSP, p.LO(RETURN_STACK_BASE))
+
+    # set STATE var to zero
+    p.ADDI(V_STATE, 'zero', 0)
+
+    # set TIB var to "tib" location
+    p.LUI(V_TIB, p.HI(RAM_BASE_ADDR))
+    p.ADDI(V_TIB, V_TIB, p.LO(RAM_BASE_ADDR))
+    p.ADDI(V_TIB, V_TIB, 'tib')
+
+    # set TOIN var to zero
+    p.ADDI(V_TOIN, 'zero', 0)
+
+    # set HERE var to "here" location
+    p.LUI(V_HERE, p.HI(RAM_BASE_ADDR))
+    p.ADDI(V_HERE, V_HERE, p.LO(RAM_BASE_ADDR))
+    p.ADDI(V_HERE, V_HERE, 'here')
+
+    # set LATEST var to "latest" location
+    p.LUI(V_LATEST, p.HI(RAM_BASE_ADDR))
+    p.ADDI(V_LATEST, V_LATEST, p.LO(RAM_BASE_ADDR))
+    p.ADDI(V_LATEST, V_LATEST, 'latest')
+
+
+# TODO: fill in all these goodies
 p.LABEL('interpreter')
 p.LABEL('token')
-# TODO: static TIB code
+p.LABEL('tib')
 p.LABEL('latest')
 p.LABEL('here')
 
