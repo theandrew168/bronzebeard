@@ -286,15 +286,89 @@ p.ALIGN()
 # dictionary starts here
 
 with defword(p, '@', 'FETCH'):
+    # pop address into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
+    # load value from address
+    p.LW('t0', 't0', 0)
+    # push value onto stack
     p.SW(DSP, 't0', 0)
     p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '!', 'STORE'):
+    # pop address into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # store value to address
+    p.SW('t0', 't1', 0)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'sp@', 'SPFETCH'):
+    # push DSP onto stack
+    p.SW(DSP, DSP, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'rp@', 'RPFETCH'):
+    # push RSP onto stack
+    p.SW(DSP, RSP, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
     p.JAL('zero', 'next')
 
 with defword(p, '0=', 'ZEROEQUALS'):
+    # pop value into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
+    # check equality between t0 and 0
+    p.ADDI('t1', 'zero', 0)
+    p.BNE('t0', 'zero', 'notzero')
+    p.ADDI('t1', 't1', -1)  # -1 if zero, 0 otherwise
+with p.LABEL('notzero'):
+    # push result of comparison onto stack
+    p.SW(DSP, 't1', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '+', 'PLUS'):
+    # pop first value into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop second value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # add the two together into t0
+    p.ADD('t0', 't0', 't1')
+    # push resulting sum onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'nand', 'NAND'):
+    # pop first value into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop second value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # AND the two together into t0
+    p.AND('t0', 't0', 't1')
+    # NOT the value in t0
+    p.XORI('t0', 't0', -1)
+    # push resulting value onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
 
 p.LABEL('latest')
 p.LABEL('here')
