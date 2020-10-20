@@ -132,6 +132,7 @@ def defword(p, name, label, flags=0):
 
 p = asm.Program()
 
+
 # code in ROM starts here
 # code for copying ROM to RAM starts here
 
@@ -140,13 +141,11 @@ with p.LABEL('copy'):
     # setup copy src (ROM_BASE_ADDR)
     p.LUI('t0', p.HI(ROM_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(ROM_BASE_ADDR))
-
     # setup copy dest (RAM_BASE_ADDR)
     p.LUI('t1', p.HI(RAM_BASE_ADDR))
     p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
-
-    # setup copy count (everything up to "here" label)
-    p.ADDI('t2', 'zero', 'here')
+    # setup copy count (first 1K of ROM)
+    p.ADDI('t2', 'zero', 0x0400)
 
 with p.LABEL('copy_loop'):
     p.BEQ('t2', 'zero', 'copy_done')
@@ -158,103 +157,147 @@ with p.LABEL('copy_loop'):
     p.JAL('zero', 'copy_loop')
 
 with p.LABEL('copy_done'):
-    # jump to RAM
+    # jump to RAM:start
     p.LUI('t0', p.HI(RAM_BASE_ADDR))
-    p.JALR('zero', 't0', p.LO(RAM_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
+    p.JALR('zero', 't0', 128)
+
+p.ALIGN(128)  # allot 128 bytes (32 insts) for the copy
 
 
 # code in RAM starts here
 # main Forth interpreter starts here
 
-with p.LABEL('start'):
-    p.JAL('zero', 'init')
-with p.LABEL('error'):
-    # TODO: print error indicator ("!!" or "?" or something like that)
-    pass
-with p.LABEL('init'):
-    # setup data stack pointer
-    p.LUI(R_DSP, p.HI(DATA_STACK_BASE))
-    p.ADDI(R_DSP, R_DSP, p.LO(DATA_STACK_BASE))
+# this just exists to ensure that code got correctly copied from ROM to RAM
+with p.LABEL('start_led'):
+    RCU_BASE_ADDR = 0x40021000
+    RCU_APB2_ENABLE_OFFSET = 0x18
+    GPIO_BASE_ADDR_C = 0x40011000
+    GPIO_CTRL1_OFFSET = 0x04
+    GPIO_MODE_OUT_50MHZ = 0b11
+    GPIO_CTRL_OUT_PUSH_PULL = 0b00
 
-    # setup return stack pointer
-    p.LUI(R_RSP, p.HI(RETURN_STACK_BASE))
-    p.ADDI(R_RSP, R_RSP, p.LO(RETURN_STACK_BASE))
+    # load RCU base addr into x1
+    p.LUI('x1', p.HI(RCU_BASE_ADDR))
+    p.ADDI('x1', 'x1', p.LO(RCU_BASE_ADDR))
 
-    # set STATE var to zero
-    p.ADDI(V_STATE, 'zero', 0)
+    p.ADDI('x1', 'x1', RCU_APB2_ENABLE_OFFSET)  # move x1 forward to APB2 enable register
+    p.LW('x2', 'x1', 0)  # load current APB2 enable config into x2
 
-    # set TIB var to "tib" location
-    p.LUI(V_TIB, p.HI(RAM_BASE_ADDR))
-    p.ADDI(V_TIB, V_TIB, p.LO(RAM_BASE_ADDR))
-    p.ADDI(V_TIB, V_TIB, 'tib')
+    # prepare the GPIO enable bits
+    #                     | EDCBA  |
+    p.ADDI('x3', 'zero', 0b00010100)
 
-    # set TOIN var to zero
-    p.ADDI(V_TOIN, 'zero', 0)
+    # enable GPIO clock
+    p.OR('x2', 'x2', 'x3')
+    p.SW('x1', 'x2', 0)
 
-    # set HERE var to "here" location
-    p.LUI(V_HERE, p.HI(RAM_BASE_ADDR))
-    p.ADDI(V_HERE, V_HERE, p.LO(RAM_BASE_ADDR))
-    p.ADDI(V_HERE, V_HERE, 'here')
+    # load GPIO base addr into x1
+    p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
+    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
 
-    # set LATEST var to "latest" location
-    p.LUI(V_LATEST, p.HI(RAM_BASE_ADDR))
-    p.ADDI(V_LATEST, V_LATEST, p.LO(RAM_BASE_ADDR))
-    p.ADDI(V_LATEST, V_LATEST, 'latest')
+    # move x1 forward to control 1 register
+    p.ADDI('x1', 'x1', GPIO_CTRL1_OFFSET)
 
+    # TODO: this is destructive
+    p.ADDI('x2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into x2
+    p.SLLI('x2', 'x2', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
 
-# TODO: fill in all these goodies
-p.LABEL('interpreter')
-p.LABEL('token')
+    # apply the GPIO config back
+    p.SW('x1', 'x2', 0)
 
-# standard forth routine: next
-with p.LABEL('next'):
-    p.LW(R_WORK, R_FIP, 0)
-    p.ADDI(R_FIP, R_FIP, 4)
-    p.JALR('zero', R_WORK, 0)
+#with p.LABEL('start'):
+#    p.JAL('zero', 'init')
+#with p.LABEL('error'):
+#    # TODO: print error indicator ("!!" or "?" or something like that)
+#    pass
+#with p.LABEL('init'):
+#    # setup data stack pointer
+#    p.LUI(R_DSP, p.HI(DATA_STACK_BASE))
+#    p.ADDI(R_DSP, R_DSP, p.LO(DATA_STACK_BASE))
+#
+#    # setup return stack pointer
+#    p.LUI(R_RSP, p.HI(RETURN_STACK_BASE))
+#    p.ADDI(R_RSP, R_RSP, p.LO(RETURN_STACK_BASE))
+#
+#    # set STATE var to zero
+#    p.ADDI(V_STATE, 'zero', 0)
+#
+#    # set TIB var to "tib" location
+#    p.LUI(V_TIB, p.HI(RAM_BASE_ADDR))
+#    p.ADDI(V_TIB, V_TIB, p.LO(RAM_BASE_ADDR))
+#    p.ADDI(V_TIB, V_TIB, 'tib')
+#
+#    # set TOIN var to zero
+#    p.ADDI(V_TOIN, 'zero', 0)
+#
+#    # set HERE var to "here" location
+#    p.LUI(V_HERE, p.HI(RAM_BASE_ADDR))
+#    p.ADDI(V_HERE, V_HERE, p.LO(RAM_BASE_ADDR))
+#    p.ADDI(V_HERE, V_HERE, 'here')
+#
+#    # set LATEST var to "latest" location
+#    p.LUI(V_LATEST, p.HI(RAM_BASE_ADDR))
+#    p.ADDI(V_LATEST, V_LATEST, p.LO(RAM_BASE_ADDR))
+#    p.ADDI(V_LATEST, V_LATEST, 'latest')
+#
+#
+## TODO: fill in all these goodies
+#p.LABEL('interpreter')
+#p.LABEL('token')
+#
+#
+## standard forth routine: next
+#with p.LABEL('next'):
+#    p.LW(R_WORK, R_FIP, 0)
+#    p.ADDI(R_FIP, R_FIP, 4)
+#    p.JALR('zero', R_WORK, 0)
+#
+## standard forth routine: enter (aka docol)
+#with p.LABEL('enter'):
+#    p.SW(R_RSP, R_FIP, 0)
+#    p.ADDI(R_RSP, R_RSP, 4)
+#    p.ADDI(R_FIP, R_WORK, 4)  # skip code field
+#    p.JAL('zero', 'next')
+#
+## standard forth routine: exit (aka semi)
+#with p.LABEL('exit'):
+#    p.ADDI(R_RSP, R_RSP, -4)
+#    p.LW(R_FIP, R_RSP, 0)
+#    p.JAL('zero', 'next')
+#
+#with p.LABEL('tib'):
+#    # make some numbers
+#    p.BLOB(b': dup sp@ @ ;')
+#    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
+#    p.BLOB(b': 0 -1 dup nand ;')
+#    p.BLOB(b': 1 -1 dup + dup nand ;')
+#    p.BLOB(b': 2 1 1 + ;')
+#    p.BLOB(b': 4 2 2 + ;')
+#    p.BLOB(b': 8 4 4 + ;')
+#
+#    # logic and arithmetic operators
+#    p.BLOB(b': invert dup nand ;')
+#    p.BLOB(b': and nand invert ;')
+#    p.BLOB(b': negate invert 1 + ;')
+#    p.BLOB(b': - negate + ;')
+#
+#p.ALIGN()
+#
+## dictionary starts here
+#
+#with defword(p, '@', 'FETCH'):
+#    p.ADDI(R_DSP, R_DSP, -4)
+#    p.LW('t0', R_DSP, 0)
+#    p.SW(R_DSP, 't0', 0)
+#    p.ADDI('sp', 'sp', 4)
+#    p.JAL('zero', 'next')
+#
+#p.LABEL('latest')
+#p.LABEL('here')
 
-# standard forth routine: enter (aka docol)
-with p.LABEL('enter'):
-    p.SW(R_RSP, R_FIP, 0)
-    p.ADDI(R_RSP, R_RSP, 4)
-    p.ADDI(R_FIP, R_WORK, 4)  # skip code field
-    p.JAL('zero', 'next')
-
-# standard forth routine: exit (aka semi)
-with p.LABEL('exit'):
-    p.ADDI(R_RSP, R_RSP, -4)
-    p.LW(R_FIP, R_RSP, 0)
-    p.JAL('zero', 'next')
-
-with p.LABEL('tib'):
-    # make some numbers
-    p.BLOB(b': dup sp@ @ ;')
-    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
-    p.BLOB(b': 0 -1 dup nand ;')
-    p.BLOB(b': 1 -1 dup + dup nand ;')
-    p.BLOB(b': 2 1 1 + ;')
-    p.BLOB(b': 4 2 2 + ;')
-    p.BLOB(b': 8 4 4 + ;')
-
-    # logic and arithmetic operators
-    p.BLOB(b': invert dup nand ;')
-    p.BLOB(b': and nand invert ;')
-    p.BLOB(b': negate invert 1 + ;')
-    p.BLOB(b': - negate + ;')
-
-p.ALIGN()
-
-# dictionary starts here
-
-with defword(p, '@', 'FETCH'):
-    p.ADDI(R_DSP, R_DSP, -4)
-    p.LW('t0', R_DSP, 0)
-    p.SW(R_DSP, 't0', 0)
-    p.ADDI('sp', 'sp', 4)
-    p.JAL('zero', 'next')
-
-p.LABEL('latest')
-p.LABEL('here')
-
+from pprint import pprint
+pprint(p.labels)
 
 with open('forth.bin', 'wb') as f:
     f.write(p.machine_code)
