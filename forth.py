@@ -41,10 +41,10 @@ RAM_BASE_ADDR = 0x20000000  # 32K
 # |------------------------------|
 
 # "The Classical Forth Registers"
-R_WORK = 'ra'  # working register
-R_FIP = 'gp'  # interpreter pointer
-R_DSP = 'sp'  # data stack pointer
-R_RSP = 'tp'  # return stack pointer
+W = 'ra'  # working register
+IP = 'gp'  # interpreter pointer
+DSP = 'sp'  # data stack pointer
+RSP = 'tp'  # return stack pointer
 
 
 #                Variables
@@ -59,11 +59,11 @@ R_RSP = 'tp'  # return stack pointer
 # |----------------------------------------|
 
 # Variable registers
-V_STATE = 's0'
-V_TIB = 's1'
-V_TOIN = 's2'
-V_HERE = 's3'
-V_LATEST = 's4'
+STATE = 's0'
+TIB = 's1'
+TOIN = 's2'
+HERE = 's3'
+LATEST = 's4'
 
 
 #  16KB      Memory Map
@@ -205,92 +205,96 @@ with p.LABEL('start_led'):
     # apply the GPIO config back
     p.SW('x1', 'x2', 0)
 
-#with p.LABEL('start'):
-#    p.JAL('zero', 'init')
-#with p.LABEL('error'):
-#    # TODO: print error indicator ("!!" or "?" or something like that)
-#    pass
-#with p.LABEL('init'):
-#    # setup data stack pointer
-#    p.LUI(R_DSP, p.HI(DATA_STACK_BASE))
-#    p.ADDI(R_DSP, R_DSP, p.LO(DATA_STACK_BASE))
-#
-#    # setup return stack pointer
-#    p.LUI(R_RSP, p.HI(RETURN_STACK_BASE))
-#    p.ADDI(R_RSP, R_RSP, p.LO(RETURN_STACK_BASE))
-#
-#    # set STATE var to zero
-#    p.ADDI(V_STATE, 'zero', 0)
-#
-#    # set TIB var to "tib" location
-#    p.LUI(V_TIB, p.HI(RAM_BASE_ADDR))
-#    p.ADDI(V_TIB, V_TIB, p.LO(RAM_BASE_ADDR))
-#    p.ADDI(V_TIB, V_TIB, 'tib')
-#
-#    # set TOIN var to zero
-#    p.ADDI(V_TOIN, 'zero', 0)
-#
-#    # set HERE var to "here" location
-#    p.LUI(V_HERE, p.HI(RAM_BASE_ADDR))
-#    p.ADDI(V_HERE, V_HERE, p.LO(RAM_BASE_ADDR))
-#    p.ADDI(V_HERE, V_HERE, 'here')
-#
-#    # set LATEST var to "latest" location
-#    p.LUI(V_LATEST, p.HI(RAM_BASE_ADDR))
-#    p.ADDI(V_LATEST, V_LATEST, p.LO(RAM_BASE_ADDR))
-#    p.ADDI(V_LATEST, V_LATEST, 'latest')
-#
-#
-## TODO: fill in all these goodies
-#p.LABEL('interpreter')
-#p.LABEL('token')
-#
-#
-## standard forth routine: next
-#with p.LABEL('next'):
-#    p.LW(R_WORK, R_FIP, 0)
-#    p.ADDI(R_FIP, R_FIP, 4)
-#    p.JALR('zero', R_WORK, 0)
-#
-## standard forth routine: enter (aka docol)
-#with p.LABEL('enter'):
-#    p.SW(R_RSP, R_FIP, 0)
-#    p.ADDI(R_RSP, R_RSP, 4)
-#    p.ADDI(R_FIP, R_WORK, 4)  # skip code field
-#    p.JAL('zero', 'next')
-#
-## standard forth routine: exit (aka semi)
-#with p.LABEL('exit'):
-#    p.ADDI(R_RSP, R_RSP, -4)
-#    p.LW(R_FIP, R_RSP, 0)
-#    p.JAL('zero', 'next')
-#
-#with p.LABEL('tib'):
-#    # make some numbers
-#    p.BLOB(b': dup sp@ @ ;')
-#    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
-#    p.BLOB(b': 0 -1 dup nand ;')
-#    p.BLOB(b': 1 -1 dup + dup nand ;')
-#    p.BLOB(b': 2 1 1 + ;')
-#    p.BLOB(b': 4 2 2 + ;')
-#    p.BLOB(b': 8 4 4 + ;')
-#
-#    # logic and arithmetic operators
-#    p.BLOB(b': invert dup nand ;')
-#    p.BLOB(b': and nand invert ;')
-#    p.BLOB(b': negate invert 1 + ;')
-#    p.BLOB(b': - negate + ;')
-#
-#p.ALIGN()
-#
-## dictionary starts here
-#
-#with defword(p, '@', 'FETCH'):
-#    p.ADDI(R_DSP, R_DSP, -4)
-#    p.LW('t0', R_DSP, 0)
-#    p.SW(R_DSP, 't0', 0)
-#    p.ADDI('sp', 'sp', 4)
-#    p.JAL('zero', 'next')
+with p.LABEL('start'):
+    p.JAL('zero', 'init')
+with p.LABEL('error'):
+    # TODO: print error indicator ("!!" or "?" or something like that)
+    pass
+with p.LABEL('init'):
+    # setup data stack pointer
+    p.LUI(DSP, p.HI(DATA_STACK_BASE))
+    p.ADDI(DSP, DSP, p.LO(DATA_STACK_BASE))
+
+    # setup return stack pointer
+    p.LUI(RSP, p.HI(RETURN_STACK_BASE))
+    p.ADDI(RSP, RSP, p.LO(RETURN_STACK_BASE))
+
+    # set STATE var to zero
+    p.ADDI(STATE, 'zero', 0)
+
+    # set TIB var to "tib" location
+    p.LUI(TIB, p.HI(RAM_BASE_ADDR))
+    p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR))
+    p.ADDI(TIB, TIB, 'tib')
+
+    # set TOIN var to zero
+    p.ADDI(TOIN, 'zero', 0)
+
+    # set HERE var to "here" location
+    p.LUI(HERE, p.HI(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, 'here')
+
+    # set LATEST var to "latest" location
+    p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, 'latest')
+
+
+# TODO: fill in all these goodies
+p.LABEL('interpreter')
+p.LABEL('token')
+
+
+# standard forth routine: next
+with p.LABEL('next'):
+    p.LW(W, IP, 0)
+    p.ADDI(IP, IP, 4)
+    p.JALR('zero', W, 0)
+
+# standard forth routine: enter (aka docol)
+with p.LABEL('enter'):
+    p.SW(RSP, IP, 0)
+    p.ADDI(RSP, RSP, 4)
+    p.ADDI(IP, W, 4)  # skip code field
+    p.JAL('zero', 'next')
+
+# standard forth routine: exit (aka semi)
+with p.LABEL('exit'):
+    p.ADDI(RSP, RSP, -4)
+    p.LW(IP, RSP, 0)
+    p.JAL('zero', 'next')
+
+with p.LABEL('tib'):
+    # make some numbers
+    p.BLOB(b': dup sp@ @ ;')
+    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
+    p.BLOB(b': 0 -1 dup nand ;')
+    p.BLOB(b': 1 -1 dup + dup nand ;')
+    p.BLOB(b': 2 1 1 + ;')
+    p.BLOB(b': 4 2 2 + ;')
+    p.BLOB(b': 8 4 4 + ;')
+
+    # logic and arithmetic operators
+    p.BLOB(b': invert dup nand ;')
+    p.BLOB(b': and nand invert ;')
+    p.BLOB(b': negate invert 1 + ;')
+    p.BLOB(b': - negate + ;')
+
+p.ALIGN()
+
+# dictionary starts here
+
+with defword(p, '@', 'FETCH'):
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    p.JAL('zero', 'next')
+
+with defword(p, '0=', 'ZEROEQUALS'):
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
 
 p.LABEL('latest')
 p.LABEL('here')
