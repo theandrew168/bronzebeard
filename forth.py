@@ -103,7 +103,7 @@ def defword(p, name, label, flags=0):
     I'd like to replace it with something else. The "flags" param be any
     or'd combo of the 2 F_FOO constants defined above.
 
-    TODO: are any of these 2 internal labels necessary?
+    TODO: is the second label necessary?
     """
 
     if len(name) > 0x1f:
@@ -122,16 +122,15 @@ def defword(p, name, label, flags=0):
     LINK = word_label
 
     p.BLOB(struct.pack('<h', link))
-    p.BLOB(struct.pack('<B', len(name)))
+    p.BLOB(struct.pack('<B', flags | len(name)))
     p.BLOB(name.encode())
     p.ALIGN()
 
-    p.LABEL(name)
+    p.LABEL('code_' + name)
     yield
 
 
 p = asm.Program()
-
 
 # code in ROM starts here
 # code for copying ROM to RAM starts here
@@ -160,50 +159,12 @@ with p.LABEL('copy_done'):
     # jump to RAM:start
     p.LUI('t0', p.HI(RAM_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
-    p.ADDI('t0', 't0', 'start_led')
+    p.ADDI('t0', 't0', 'start')
     p.JALR('zero', 't0', 0)
 
 
 # code in RAM starts here
 # main Forth interpreter starts here
-
-# this just exists to ensure that code got correctly copied from ROM to RAM
-with p.LABEL('start_led'):
-    RCU_BASE_ADDR = 0x40021000
-    RCU_APB2_ENABLE_OFFSET = 0x18
-    GPIO_BASE_ADDR_C = 0x40011000
-    GPIO_CTRL1_OFFSET = 0x04
-    GPIO_MODE_OUT_50MHZ = 0b11
-    GPIO_CTRL_OUT_PUSH_PULL = 0b00
-
-    # load RCU base addr into x1
-    p.LUI('x1', p.HI(RCU_BASE_ADDR))
-    p.ADDI('x1', 'x1', p.LO(RCU_BASE_ADDR))
-
-    p.ADDI('x1', 'x1', RCU_APB2_ENABLE_OFFSET)  # move x1 forward to APB2 enable register
-    p.LW('x2', 'x1', 0)  # load current APB2 enable config into x2
-
-    # prepare the GPIO enable bits
-    #                     | EDCBA  |
-    p.ADDI('x3', 'zero', 0b00010100)
-
-    # enable GPIO clock
-    p.OR('x2', 'x2', 'x3')
-    p.SW('x1', 'x2', 0)
-
-    # load GPIO base addr into x1
-    p.LUI('x1', p.HI(GPIO_BASE_ADDR_C))
-    p.ADDI('x1', 'x1', p.LO(GPIO_BASE_ADDR_C))
-
-    # move x1 forward to control 1 register
-    p.ADDI('x1', 'x1', GPIO_CTRL1_OFFSET)
-
-    # TODO: this is destructive
-    p.ADDI('x2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into x2
-    p.SLLI('x2', 'x2', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
-
-    # apply the GPIO config back
-    p.SW('x1', 'x2', 0)
 
 with p.LABEL('start'):
     p.JAL('zero', 'init')
@@ -240,11 +201,12 @@ with p.LABEL('init'):
     p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
     p.ADDI(LATEST, LATEST, 'latest')
 
+# main interpreter loop
+with p.LABEL('interpreter'):
+    p.JAL('zero', 'code_led')
 
-# TODO: fill in all these goodies
-p.LABEL('interpreter')
-p.LABEL('token')
-
+with p.LABEL('token'):
+    pass
 
 # standard forth routine: next
 with p.LABEL('next'):
@@ -266,6 +228,9 @@ with p.LABEL('exit'):
     p.JAL('zero', 'next')
 
 with p.LABEL('tib'):
+    # call the building "led" word
+    p.BLOB(b'led\n')
+
     # make some numbers
     p.BLOB(b': dup sp@ @ ;')
     p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
@@ -281,9 +246,91 @@ with p.LABEL('tib'):
     p.BLOB(b': negate invert 1 + ;')
     p.BLOB(b': - negate + ;')
 
-p.ALIGN()
+    # paranoid align just to be safe
+    p.ALIGN()
+
 
 # dictionary starts here
+
+with defword(p, ':', 'COLON'):
+    pass
+
+with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
+    pass
+
+# this just exists to ensure that code got correctly copied from ROM to RAM
+with defword(p, 'led', 'LED'):
+    RCU_BASE_ADDR = 0x40021000
+    RCU_APB2_ENABLE_OFFSET = 0x18
+    GPIO_BASE_ADDR_C = 0x40011000
+    GPIO_CTRL1_OFFSET = 0x04
+    GPIO_MODE_OUT_50MHZ = 0b11
+    GPIO_CTRL_OUT_PUSH_PULL = 0b00
+
+    # load RCU base addr into t0
+    p.LUI('t0', p.HI(RCU_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
+
+    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)  # move t0 forward to APB2 enable register
+    p.LW('t1', 't0', 0)  # load current APB2 enable config into t1
+
+    # prepare the GPIO enable bits
+    #                     | EDCBA  |
+    p.ADDI('t2', 'zero', 0b00010100)
+
+    # set GPIO clock enable bits
+    p.OR('t1', 't1', 't2')
+    p.SW('t0', 't1', 0)  # store the ABP2 config
+
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
+
+    # move t0 forward to control 1 register
+    p.ADDI('t0', 't0', GPIO_CTRL1_OFFSET)
+
+    p.ADDI('t1', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into t1
+    p.SLLI('t1', 't1', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'state', 'STATEVAR'):
+    # push STATE onto stack
+    p.SW(DSP, STATE, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'tib', 'TIBVAR'):
+    # push TIB onto stack
+    p.SW(DSP, TIB, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '>in', 'TOINVAR'):
+    # push TOIN onto stack
+    p.SW(DSP, TOIN, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'here', 'HEREVAR'):
+    # push HERE onto stack
+    p.SW(DSP, HERE, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'latest', 'LATESTVAR'):
+    # push LATEST onto stack
+    p.SW(DSP, LATEST, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
 
 with defword(p, '@', 'FETCH'):
     # pop address into t0
@@ -353,6 +400,7 @@ with defword(p, '+', 'PLUS'):
     # next
     p.JAL('zero', 'next')
 
+p.LABEL('latest')  # mark the latest builtin word
 with defword(p, 'nand', 'NAND'):
     # pop first value into t0
     p.ADDI(DSP, DSP, -4)
@@ -370,8 +418,8 @@ with defword(p, 'nand', 'NAND'):
     # next
     p.JAL('zero', 'next')
 
-p.LABEL('latest')
-p.LABEL('here')
+p.LABEL('here')  # mark the location of the next new word
+
 
 with open('forth.bin', 'wb') as f:
     f.write(p.machine_code)
