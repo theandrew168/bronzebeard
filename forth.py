@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+import struct
+
 from simpleriscv import asm
 
 # Based heavily on "sectorforth" and "Moving Forth":
@@ -38,10 +41,10 @@ RAM_BASE_ADDR = 0x20000000  # 32K
 # |------------------------------|
 
 # "The Classical Forth Registers"
-R_W = 'ra'
-R_IP = 'gp'
-R_DSP = 'sp'
-R_RSP = 'tp'
+R_WORK = 'ra'  # working register
+R_FIP = 'gp'  # interpreter pointer
+R_DSP = 'sp'  # data stack pointer
+R_RSP = 'tp'  # return stack pointer
 
 
 #                Variables
@@ -92,11 +95,15 @@ F_HIDDEN = 0x40
 LEN_MASK = 0x1f
 
 LINK = None
+
+@contextmanager
 def defword(p, name, label, flags=0):
     """
     Macro to define a Forth word. The LINK stuff is really hacky and
     I'd like to replace it with something else. The "flags" param be any
     or'd combo of the 2 F_FOO constants defined above.
+
+    TODO: are any of these 2 internal labels necessary?
     """
 
     if len(name) > 0x1f:
@@ -120,6 +127,7 @@ def defword(p, name, label, flags=0):
     p.ALIGN()
 
     p.LABEL(name)
+    yield
 
 
 p = asm.Program()
@@ -129,19 +137,16 @@ p = asm.Program()
 
 # t0 = src, t1 = dest, t2 = count
 with p.LABEL('copy'):
-    # setup copy src (RAM_BASE_ADDR + start)
+    # setup copy src (ROM_BASE_ADDR)
     p.LUI('t0', p.HI(ROM_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(ROM_BASE_ADDR))
-    p.ADDI('t0', 't0', 'start')
 
     # setup copy dest (RAM_BASE_ADDR)
     p.LUI('t1', p.HI(RAM_BASE_ADDR))
     p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
 
-    # setup copy count (here - start)
+    # setup copy count (everything up to "here" label)
     p.ADDI('t2', 'zero', 'here')
-    p.ADDI('t3', 'zero', 'start')
-    p.SUB('t2', 't2', 't3')
 
 with p.LABEL('copy_loop'):
     p.BEQ('t2', 'zero', 'copy_done')
@@ -164,7 +169,7 @@ with p.LABEL('copy_done'):
 with p.LABEL('start'):
     p.JAL('zero', 'init')
 with p.LABEL('error'):
-    # TODO: print error indicator ("!!" or something like that)
+    # TODO: print error indicator ("!!" or "?" or something like that)
     pass
 with p.LABEL('init'):
     # setup data stack pointer
@@ -201,13 +206,52 @@ with p.LABEL('init'):
 p.LABEL('interpreter')
 p.LABEL('token')
 
+# standard forth routine: next
+with p.LABEL('next'):
+    p.LW(R_WORK, R_FIP, 0)
+    p.ADDI(R_FIP, R_FIP, 4)
+    p.JALR('zero', R_WORK, 0)
+
+# standard forth routine: enter (aka docol)
+with p.LABEL('enter'):
+    p.SW(R_RSP, R_FIP, 0)
+    p.ADDI(R_RSP, R_RSP, 4)
+    p.ADDI(R_FIP, R_WORK, 4)  # skip code field
+    p.JAL('zero', 'next')
+
+# standard forth routine: exit (aka semi)
+with p.LABEL('exit'):
+    p.ADDI(R_RSP, R_RSP, -4)
+    p.LW(R_FIP, R_RSP, 0)
+    p.JAL('zero', 'next')
+
 with p.LABEL('tib'):
+    # make some numbers
     p.BLOB(b': dup sp@ @ ;')
     p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
     p.BLOB(b': 0 -1 dup nand ;')
     p.BLOB(b': 1 -1 dup + dup nand ;')
+    p.BLOB(b': 2 1 1 + ;')
+    p.BLOB(b': 4 2 2 + ;')
+    p.BLOB(b': 8 4 4 + ;')
+
+    # logic and arithmetic operators
+    p.BLOB(b': invert dup nand ;')
+    p.BLOB(b': and nand invert ;')
+    p.BLOB(b': negate invert 1 + ;')
+    p.BLOB(b': - negate + ;')
 
 p.ALIGN()
+
+# dictionary starts here
+
+with defword(p, '@', 'FETCH'):
+    p.ADDI(R_DSP, R_DSP, -4)
+    p.LW('t0', R_DSP, 0)
+    p.SW(R_DSP, 't0', 0)
+    p.ADDI('sp', 'sp', 4)
+    p.JAL('zero', 'next')
+
 p.LABEL('latest')
 p.LABEL('here')
 
