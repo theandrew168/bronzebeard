@@ -144,8 +144,8 @@ with p.LABEL('copy'):
     # setup copy dest (RAM_BASE_ADDR)
     p.LUI('t1', p.HI(RAM_BASE_ADDR))
     p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
-    # setup copy count (first 1K of ROM)
-    p.ADDI('t2', 'zero', 0x0400)
+    # setup copy count (everything up to the "here" label)
+    p.ADDI('t2', 'zero', 'here')
 
 with p.LABEL('copy_loop'):
     p.BEQ('t2', 'zero', 'copy_done')
@@ -160,9 +160,8 @@ with p.LABEL('copy_done'):
     # jump to RAM:start
     p.LUI('t0', p.HI(RAM_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
-    p.JALR('zero', 't0', 128)
-
-p.ALIGN(128)  # allot 128 bytes (32 insts) for the copy
+    p.ADDI('t0', 't0', 'start_led')
+    p.JALR('zero', 't0', 0)
 
 
 # code in RAM starts here
@@ -292,12 +291,9 @@ with p.LABEL('start_led'):
 #    p.SW(R_DSP, 't0', 0)
 #    p.ADDI('sp', 'sp', 4)
 #    p.JAL('zero', 'next')
-#
-#p.LABEL('latest')
-#p.LABEL('here')
 
-from pprint import pprint
-pprint(p.labels)
+p.LABEL('latest')
+p.LABEL('here')
 
 with open('forth.bin', 'wb') as f:
     f.write(p.machine_code)
