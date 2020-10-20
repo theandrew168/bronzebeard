@@ -173,12 +173,12 @@ with p.LABEL('error'):
     pass
 with p.LABEL('init'):
     # setup data stack pointer
-    p.LUI(DSP, p.HI(DATA_STACK_BASE))
-    p.ADDI(DSP, DSP, p.LO(DATA_STACK_BASE))
+    p.LUI(DSP, p.HI(RAM_BASE_ADDR + DATA_STACK_BASE))
+    p.ADDI(DSP, DSP, p.LO(RAM_BASE_ADDR + DATA_STACK_BASE))
 
     # setup return stack pointer
-    p.LUI(RSP, p.HI(RETURN_STACK_BASE))
-    p.ADDI(RSP, RSP, p.LO(RETURN_STACK_BASE))
+    p.LUI(RSP, p.HI(RAM_BASE_ADDR + RETURN_STACK_BASE))
+    p.ADDI(RSP, RSP, p.LO(RAM_BASE_ADDR + RETURN_STACK_BASE))
 
     # set STATE var to zero
     p.ADDI(STATE, 'zero', 0)
@@ -206,6 +206,22 @@ with p.LABEL('interpreter'):
     p.JAL('zero', 'code_led')
 
 with p.LABEL('token'):
+    p.ADDI('t0', TOIN, 0)
+    p.ADDI('t1', 'zero', 33)
+with p.LABEL('token_scan'):
+    # point t2 at next char
+    p.ADD('t2', TIB, 't0')
+    # load next char into t3
+    p.LW('t3', 't2', 0)
+    # check for non-printing character
+    p.BLT('t3', 't1', 'token_delimiter')
+    # increment offset
+    p.ADDI('t0', 't0', 1)
+    # scan the next char
+    p.JAL('zero', 'token_scan')
+with p.LABEL('token_delimiter'):
+    # word starts at TIB + TOIN
+    # word len is t0 - TOIN
     pass
 
 # standard forth routine: next
@@ -232,19 +248,39 @@ with p.LABEL('tib'):
     p.BLOB(b'led\n')
 
     # make some numbers
-    p.BLOB(b': dup sp@ @ ;')
-    p.BLOB(b': -1 dup dup nand dup dup nand nand ;')
-    p.BLOB(b': 0 -1 dup nand ;')
-    p.BLOB(b': 1 -1 dup + dup nand ;')
-    p.BLOB(b': 2 1 1 + ;')
-    p.BLOB(b': 4 2 2 + ;')
-    p.BLOB(b': 8 4 4 + ;')
+    p.BLOB(b': dup sp@ @ ;\n')
+    p.BLOB(b': -1 dup dup nand dup dup nand nand ;\n')
+    p.BLOB(b': 0 -1 dup nand ;\n')
+    p.BLOB(b': 1 -1 dup + dup nand ;\n')
+    p.BLOB(b': 2 1 1 + ;\n')
+    p.BLOB(b': 4 2 2 + ;\n')
+    p.BLOB(b': 8 4 4 + ;\n')
+    p.BLOB(b': 12 4 8 + ;\n')
+    p.BLOB(b': 16 8 8 + ;\n')
 
     # logic and arithmetic operators
-    p.BLOB(b': invert dup nand ;')
-    p.BLOB(b': and nand invert ;')
-    p.BLOB(b': negate invert 1 + ;')
-    p.BLOB(b': - negate + ;')
+    p.BLOB(b': invert dup nand ;\n')
+    p.BLOB(b': and nand invert ;\n')
+    p.BLOB(b': negate invert 1 + ;\n')
+    p.BLOB(b': - negate + ;\n')
+
+    # equality checks
+    p.BLOB(b': = - 0= ;\n')
+    p.BLOB(b': <> = invert ;\n')
+
+    # stack manipulation words
+    p.BLOB(b': drop dup - + ;\n')
+    p.BLOB(b': over sp@ 4 + @ ;\n')
+    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ;\n')
+    p.BLOB(b': nip swap drop ;\n')
+    p.BLOB(b': 2dup over over ;\n')
+    p.BLOB(b': 2drop drop drop ;\n')
+
+    # more logic
+    p.BLOB(b': or invert swap invert and invert ;\n')
+
+    # left shift 1 bit
+    p.BLOB(b': 2* dup + ;\n')
 
     # paranoid align just to be safe
     p.ALIGN()
@@ -252,9 +288,11 @@ with p.LABEL('tib'):
 
 # dictionary starts here
 
+# TODO: implement colon
 with defword(p, ':', 'COLON'):
     pass
 
+# TODO: implement semicolon
 with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
     pass
 
