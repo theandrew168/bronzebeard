@@ -16,6 +16,14 @@ RAM_BASE_ADDR = 0x20000000  # 32K
 #ROM_BASE_ADDR += 0x00010000  # first 64K of ROM is taken by the bootloader
 #RAM_BASE_ADDR  = 0x80000000  # 16K
 
+# PicoRV32/PicoSoC: iCEBreaker (Lattice iCE40UP5K FPGA)
+#ROM_BASE_ADDR = 0x00100000  # 16M
+#RAM_BASE_ADDR = 0x00000000  # 128K
+
+# PicoRV32/PicoSoC: TinyFPGA BX (Lattice iCE40LP8K FPGA)
+#ROM_BASE_ADDR = 0x00050000  # 1M
+#RAM_BASE_ADDR = 0x00000000  # 16K
+
 
 #       Register Assignment
 # |------------------------------|
