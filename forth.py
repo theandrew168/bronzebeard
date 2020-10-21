@@ -22,26 +22,41 @@ RAM_BASE_ADDR = 0x20000000  # 32K
 # | reg | name |   description   |
 # |------------------------------|
 # |  x0 | zero | always 0        |
-# |  x1 |  ra  | working reg     |
+# |  x1 |  ra  | return address  |
 # |  x2 |  sp  | data stack ptr  |
 # |  x3 |  gp  | interpreter ptr |
 # |  x4 |  tp  | ret stack ptr   |
-# |  x5 |  t0  | temp reg 0      |
-# |  x6 |  t1  | temp reg 1      |
-# |  x7 |  t2  | temp reg 2      |
-# |  x8 |  s0  | STATE var       |
-# |  x9 |  s1  | TIB var         |
-# | x18 |  s2  | >IN var         |
-# | x19 |  s3  | HERE var        |
-# | x20 |  s4  | LATEST var      |
-# | x28 |  t3  | temp reg 3      |
-# | x29 |  t4  | temp reg 4      |
-# | x30 |  t5  | temp reg 5      |
-# | x31 |  t6  | temp reg 6      |
+# |  x5 |  t0  | scratch         |
+# |  x6 |  t1  | scratch         |
+# |  x7 |  t2  | scratch         |
+# |  x8 |  s0  | working reg     |
+# |  x9 |  s1  | STATE var       |
+# | x10 |  a0  | token address   |
+# | x11 |  a1  | token length    |
+# | x12 |  a2  | <unused>        |
+# | x13 |  a3  | <unused>        |
+# | x14 |  a4  | <unused>        |
+# | x15 |  a5  | <unused>        |
+# | x16 |  a6  | <unused>        |
+# | x17 |  a7  | <unused>        |
+# | x18 |  s2  | TIB var         |
+# | x19 |  s3  | >IN var         |
+# | x20 |  s4  | HERE var        |
+# | x21 |  s5  | LATEST var      |
+# | x22 |  s6  | <unused>        |
+# | x23 |  s7  | <unused>        |
+# | x24 |  s8  | <unused>        |
+# | x25 |  s9  | <unused>        |
+# | x26 |  s10 | <unused>        |
+# | x27 |  s11 | <unused>        |
+# | x28 |  t3  | scratch         |
+# | x29 |  t4  | scratch         |
+# | x30 |  t5  | scratch         |
+# | x31 |  t6  | scratch         |
 # |------------------------------|
 
 # "The Classical Forth Registers"
-W = 'ra'  # working register
+W = 's0'  # working register
 IP = 'gp'  # interpreter pointer
 DSP = 'sp'  # data stack pointer
 RSP = 'tp'  # return stack pointer
@@ -59,11 +74,11 @@ RSP = 'tp'  # return stack pointer
 # |----------------------------------------|
 
 # Variable registers
-STATE = 's0'
-TIB = 's1'
-TOIN = 's2'
-HERE = 's3'
-LATEST = 's4'
+STATE = 's1'
+TIB = 's2'
+TOIN = 's3'
+HERE = 's4'
+LATEST = 's5'
 
 
 #  16KB      Memory Map
@@ -121,8 +136,8 @@ def defword(p, name, label, flags=0):
         link = p.labels[LINK] - p.labels[word_label]
     LINK = word_label
 
-    p.BLOB(struct.pack('<h', link))
     p.BLOB(struct.pack('<B', flags | len(name)))
+    p.BLOB(struct.pack('<h', link))
     p.BLOB(name.encode())
     p.ALIGN()
 
@@ -245,42 +260,42 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the building "led" word
-    p.BLOB(b'led\n')
+    p.BLOB(b'led ')
 
     # make some numbers
-    p.BLOB(b': dup sp@ @ ;\n')
-    p.BLOB(b': -1 dup dup nand dup dup nand nand ;\n')
-    p.BLOB(b': 0 -1 dup nand ;\n')
-    p.BLOB(b': 1 -1 dup + dup nand ;\n')
-    p.BLOB(b': 2 1 1 + ;\n')
-    p.BLOB(b': 4 2 2 + ;\n')
-    p.BLOB(b': 8 4 4 + ;\n')
-    p.BLOB(b': 12 4 8 + ;\n')
-    p.BLOB(b': 16 8 8 + ;\n')
+    p.BLOB(b': dup sp@ @ ; ')
+    p.BLOB(b': -1 dup dup nand dup dup nand nand ; ')
+    p.BLOB(b': 0 -1 dup nand ; ')
+    p.BLOB(b': 1 -1 dup + dup nand ; ')
+    p.BLOB(b': 2 1 1 + ; ')
+    p.BLOB(b': 4 2 2 + ; ')
+    p.BLOB(b': 8 4 4 + ; ')
+    p.BLOB(b': 12 4 8 + ; ')
+    p.BLOB(b': 16 8 8 + ; ')
 
     # logic and arithmetic operators
-    p.BLOB(b': invert dup nand ;\n')
-    p.BLOB(b': and nand invert ;\n')
-    p.BLOB(b': negate invert 1 + ;\n')
-    p.BLOB(b': - negate + ;\n')
+    p.BLOB(b': invert dup nand ; ')
+    p.BLOB(b': and nand invert ; ')
+    p.BLOB(b': negate invert 1 + ; ')
+    p.BLOB(b': - negate + ; ')
 
     # equality checks
-    p.BLOB(b': = - 0= ;\n')
-    p.BLOB(b': <> = invert ;\n')
+    p.BLOB(b': = - 0= ; ')
+    p.BLOB(b': <> = invert ; ')
 
     # stack manipulation words
-    p.BLOB(b': drop dup - + ;\n')
-    p.BLOB(b': over sp@ 4 + @ ;\n')
-    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ;\n')
-    p.BLOB(b': nip swap drop ;\n')
-    p.BLOB(b': 2dup over over ;\n')
-    p.BLOB(b': 2drop drop drop ;\n')
+    p.BLOB(b': drop dup - + ; ')
+    p.BLOB(b': over sp@ 4 + @ ; ')
+    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ; ')
+    p.BLOB(b': nip swap drop ; ')
+    p.BLOB(b': 2dup over over ; ')
+    p.BLOB(b': 2drop drop drop ; ')
 
     # more logic
-    p.BLOB(b': or invert swap invert and invert ;\n')
+    p.BLOB(b': or invert swap invert and invert ; ')
 
     # left shift 1 bit
-    p.BLOB(b': 2* dup + ;\n')
+    p.BLOB(b': 2* dup + ; ')
 
     # paranoid align just to be safe
     p.ALIGN()
@@ -395,15 +410,21 @@ with defword(p, '!', 'STORE'):
     p.JAL('zero', 'next')
 
 with defword(p, 'sp@', 'SPFETCH'):
-    # push DSP onto stack
-    p.SW(DSP, DSP, 0)
+    # copy DSP into t0 and decrement to current top value
+    p.ADDI('t0', DSP, 0)
+    p.ADDI('t0', 't0', -4)
+    # push t0 onto stack
+    p.SW(DSP, 't0', 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
 with defword(p, 'rp@', 'RPFETCH'):
-    # push RSP onto stack
-    p.SW(DSP, RSP, 0)
+    # copy RSP into t0 and decrement to current top value
+    p.ADDI('t0', RSP, 0)
+    p.ADDI('t0', 't0', -4)
+    # push t0 onto stack
+    p.SW(DSP, 't0', 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
