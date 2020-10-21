@@ -203,6 +203,9 @@ with p.LABEL('init'):
     p.LUI(RSP, p.HI(RAM_BASE_ADDR + RETURN_STACK_BASE))
     p.ADDI(RSP, RSP, p.LO(RAM_BASE_ADDR + RETURN_STACK_BASE))
 
+    # set working register to zero
+    p.ADDI(W, 'zero', 0)
+
     # set STATE var to zero
     p.ADDI(STATE, 'zero', 0)
 
@@ -226,23 +229,21 @@ with p.LABEL('init'):
 
 # main interpreter loop
 with p.LABEL('interpreter'):
-    p.JAL('ra', 'token')
-    p.JAL('zero', 'code_led')
+    # TODO: what is the default for IP?
+    p.JAL('ra', 'token')  # call token procedure
+    p.ADDI('t0', 'zero', 3)
+    p.BEQ('a1', 't0', 'code_led')  # turn on LED if current token len == 3
+    p.JAL('zero', 'interpreter')
 
 with p.LABEL('token'):
-    p.ADDI('t0', TOIN, 0)
-    p.ADDI('t1', 'zero', 33)
+    p.ADDI('t0', TOIN, 0)  # put current TOIN value into t0
+    p.ADDI('t1', 'zero', 33)  # put whitespace threshold value into t1
 with p.LABEL('token_scan'):
-    # point t2 at next char
-    p.ADD('t2', TIB, 't0')
-    # load next char into t3
-    p.LW('t3', 't2', 0)
-    # check for non-printing character
-    p.BLT('t3', 't1', 'token_delimiter')
-    # increment offset
-    p.ADDI('t0', 't0', 1)
-    # scan the next char
-    p.JAL('zero', 'token_scan')
+    p.ADD('t2', TIB, 't0')  # point t2 at next char
+    p.ADDI('t0', 't0', 1)  # increment offset
+    p.LW('t3', 't2', 0)  # load next char into t3
+    p.BLT('t3', 't1', 'token_delimiter')  # check for whitespace
+    p.JAL('zero', 'token_scan')  # scan the next char
 with p.LABEL('token_delimiter'):
     p.ADD('a0', TIB, TOIN)  # a0 = address of word
     p.SUB('a1', 't0', TOIN)  # a1 = length of word
