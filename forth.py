@@ -226,6 +226,7 @@ with p.LABEL('init'):
 
 # main interpreter loop
 with p.LABEL('interpreter'):
+    p.JAL('ra', 'token')
     p.JAL('zero', 'code_led')
 
 with p.LABEL('token'):
@@ -243,9 +244,10 @@ with p.LABEL('token_scan'):
     # scan the next char
     p.JAL('zero', 'token_scan')
 with p.LABEL('token_delimiter'):
-    # word starts at TIB + TOIN
-    # word len is t0 - TOIN
-    pass
+    p.ADD('a0', TIB, TOIN)  # a0 = address of word
+    p.SUB('a1', 't0', TOIN)  # a1 = length of word
+    p.ADDI(TOIN, 't0', 0)  # update TOIN
+    p.JALR('zero', 'ra', 0)  # return
 
 # standard forth routine: next
 with p.LABEL('next'):
