@@ -273,7 +273,7 @@ with p.LABEL('token'):
     p.ADDI('t0', 'zero', 33)  # put whitespace threshold value into t0
 with p.LABEL('token_skip_whitespace'):
     p.ADD('t1', TIB, TOIN)  # point t1 at current char
-    p.LW('t2', 't1', 0)  # load current char into t2
+    p.LBU('t2', 't1', 0)  # load current char into t2
     p.BGE('t2', 't0', 'token_scan')  # check if done skipping whitespace
     p.ADDI(TOIN, TOIN, 1)  # inc TOIN
     p.JAL('zero', 'token_skip_whitespace')  # check again
@@ -281,9 +281,9 @@ with p.LABEL('token_scan'):
     p.ADDI('t1', TOIN, 0)  # put current TOIN value into t1
 with p.LABEL('token_scan_loop'):
     p.ADD('t2', TIB, 't1')  # point t2 at next char
-    p.ADDI('t1', 't1', 1)  # increment offset
-    p.LW('t3', 't2', 0)  # load next char into t3
+    p.LBU('t3', 't2', 0)  # load next char into t3
     p.BLT('t3', 't0', 'token_done')  # check for whitespace
+    p.ADDI('t1', 't1', 1)  # increment offset
     p.JAL('zero', 'token_scan_loop')  # scan the next char
 with p.LABEL('token_done'):
     p.ADD('a0', TIB, TOIN)  # a0 = address of word
@@ -311,8 +311,8 @@ with p.LABEL('exit'):
     p.JAL('zero', 'next')
 
 with p.LABEL('tib'):
-    # call the building "led" word
-    p.BLOB(b'led ')
+    # call the builtin "led" word
+    p.BLOB(b'  led ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
