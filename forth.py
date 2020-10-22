@@ -235,8 +235,8 @@ with p.LABEL('init'):
 # main interpreter loop
 with p.LABEL('interpreter'):
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-    p.ADDI('t0', 'zero', 3)
-    p.BEQ('a1', 't0', 'code_led')
+#    p.ADDI('t0', 'zero', 3)
+#    p.BEQ('a1', 't0', 'code_led')
 with p.LABEL('search'):
     p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
 with p.LABEL('search_loop'):
@@ -266,7 +266,7 @@ with p.LABEL('search_compare_loop'):
 with p.LABEL('search_found'):
     # word is found and located at t0
     p.ADDI(W, 't0', 8)  # TODO: hack to manually skip name pad bytes
-    p.JAL('zero', 'next')  # execute the word!
+    p.JALR('zero', W, 0)  # execute the word!
 
 # TODO: handle running off the TIB (max 1024 bytes or something)
 with p.LABEL('token'):
@@ -356,14 +356,13 @@ with p.LABEL('tib'):
 # dictionary starts here
 
 # TODO: implement colon
-#with defword(p, ':', 'COLON'):
-#    pass
+with defword(p, ':', 'COLON'):
+    pass
 
 # TODO: implement semicolon
-#with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
-#    pass
+with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
+    pass
 
-p.LABEL('latest')  # mark the latest builtin word
 with defword(p, 'led', 'LED'):
     RCU_BASE_ADDR = 0x40021000
     RCU_APB2_ENABLE_OFFSET = 0x18
@@ -402,132 +401,132 @@ with defword(p, 'led', 'LED'):
     # next
     p.JAL('zero', 'next')
 
-#with defword(p, 'state', 'STATEVAR'):
-#    # push STATE onto stack
-#    p.SW(DSP, STATE, 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, 'tib', 'TIBVAR'):
-#    # push TIB onto stack
-#    p.SW(DSP, TIB, 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, '>in', 'TOINVAR'):
-#    # push TOIN onto stack
-#    p.SW(DSP, TOIN, 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, 'here', 'HEREVAR'):
-#    # push HERE onto stack
-#    p.SW(DSP, HERE, 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, 'latest', 'LATESTVAR'):
-#    # push LATEST onto stack
-#    p.SW(DSP, LATEST, 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, '@', 'FETCH'):
-#    # pop address into t0
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t0', DSP, 0)
-#    # load value from address
-#    p.LW('t0', 't0', 0)
-#    # push value onto stack
-#    p.SW(DSP, 't0', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, '!', 'STORE'):
-#    # pop address into t0
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t0', DSP, 0)
-#    # pop value into t1
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t1', DSP, 0)
-#    # store value to address
-#    p.SW('t0', 't1', 0)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, 'sp@', 'SPFETCH'):
-#    # copy DSP into t0 and decrement to current top value
-#    p.ADDI('t0', DSP, 0)
-#    p.ADDI('t0', 't0', -4)
-#    # push t0 onto stack
-#    p.SW(DSP, 't0', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, 'rp@', 'RPFETCH'):
-#    # copy RSP into t0 and decrement to current top value
-#    p.ADDI('t0', RSP, 0)
-#    p.ADDI('t0', 't0', -4)
-#    # push t0 onto stack
-#    p.SW(DSP, 't0', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, '0=', 'ZEROEQUALS'):
-#    # pop value into t0
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t0', DSP, 0)
-#    # check equality between t0 and 0
-#    p.ADDI('t1', 'zero', 0)
-#    p.BNE('t0', 'zero', 'notzero')
-#    p.ADDI('t1', 't1', -1)  # -1 if zero, 0 otherwise
-#with p.LABEL('notzero'):
-#    # push result of comparison onto stack
-#    p.SW(DSP, 't1', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#with defword(p, '+', 'PLUS'):
-#    # pop first value into t0
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t0', DSP, 0)
-#    # pop second value into t1
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t1', DSP, 0)
-#    # add the two together into t0
-#    p.ADD('t0', 't0', 't1')
-#    # push resulting sum onto stack
-#    p.SW(DSP, 't0', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
-#
-#p.LABEL('latest')  # mark the latest builtin word
-#with defword(p, 'nand', 'NAND'):
-#    # pop first value into t0
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t0', DSP, 0)
-#    # pop second value into t1
-#    p.ADDI(DSP, DSP, -4)
-#    p.LW('t1', DSP, 0)
-#    # AND the two together into t0
-#    p.AND('t0', 't0', 't1')
-#    # NOT the value in t0
-#    p.XORI('t0', 't0', -1)
-#    # push resulting value onto stack
-#    p.SW(DSP, 't0', 0)
-#    p.ADDI(DSP, DSP, 4)
-#    # next
-#    p.JAL('zero', 'next')
+with defword(p, 'state', 'STATEVAR'):
+    # push STATE onto stack
+    p.SW(DSP, STATE, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'tib', 'TIBVAR'):
+    # push TIB onto stack
+    p.SW(DSP, TIB, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '>in', 'TOINVAR'):
+    # push TOIN onto stack
+    p.SW(DSP, TOIN, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'here', 'HEREVAR'):
+    # push HERE onto stack
+    p.SW(DSP, HERE, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'latest', 'LATESTVAR'):
+    # push LATEST onto stack
+    p.SW(DSP, LATEST, 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '@', 'FETCH'):
+    # pop address into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # load value from address
+    p.LW('t0', 't0', 0)
+    # push value onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '!', 'STORE'):
+    # pop address into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # store value to address
+    p.SW('t0', 't1', 0)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'sp@', 'SPFETCH'):
+    # copy DSP into t0 and decrement to current top value
+    p.ADDI('t0', DSP, 0)
+    p.ADDI('t0', 't0', -4)
+    # push t0 onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'rp@', 'RPFETCH'):
+    # copy RSP into t0 and decrement to current top value
+    p.ADDI('t0', RSP, 0)
+    p.ADDI('t0', 't0', -4)
+    # push t0 onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '0=', 'ZEROEQUALS'):
+    # pop value into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # check equality between t0 and 0
+    p.ADDI('t1', 'zero', 0)
+    p.BNE('t0', 'zero', 'notzero')
+    p.ADDI('t1', 't1', -1)  # -1 if zero, 0 otherwise
+with p.LABEL('notzero'):
+    # push result of comparison onto stack
+    p.SW(DSP, 't1', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, '+', 'PLUS'):
+    # pop first value into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop second value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # add the two together into t0
+    p.ADD('t0', 't0', 't1')
+    # push resulting sum onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
+
+p.LABEL('latest')  # mark the latest builtin word
+with defword(p, 'nand', 'NAND'):
+    # pop first value into t0
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t0', DSP, 0)
+    # pop second value into t1
+    p.ADDI(DSP, DSP, -4)
+    p.LW('t1', DSP, 0)
+    # AND the two together into t0
+    p.AND('t0', 't0', 't1')
+    # NOT the value in t0
+    p.XORI('t0', 't0', -1)
+    # push resulting value onto stack
+    p.SW(DSP, 't0', 0)
+    p.ADDI(DSP, DSP, 4)
+    # next
+    p.JAL('zero', 'next')
 
 p.LABEL('here')  # mark the location of the next new word
 
