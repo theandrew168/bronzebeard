@@ -112,7 +112,6 @@ INTERPRETER_BASE = 0x0000
 DATA_STACK_BASE = 0x2000
 RETURN_STACK_BASE = 0x3000
 
-
 F_IMMEDIATE = 0x80
 F_HIDDEN = 0x40
 LEN_MASK = 0x1f
@@ -235,19 +234,27 @@ with p.LABEL('interpreter'):
     p.BEQ('a1', 't0', 'code_led')  # turn on LED if current token len == 3
     p.JAL('zero', 'interpreter')
 
+# TODO: handle running off the TIB (max 1024 bytes or something)
 with p.LABEL('token'):
-    p.ADDI('t0', TOIN, 0)  # put current TOIN value into t0
-    p.ADDI('t1', 'zero', 33)  # put whitespace threshold value into t1
+    p.ADDI('t0', 'zero', 33)  # put whitespace threshold value into t0
+with p.LABEL('token_skip_whitespace'):
+    p.ADD('t1', TIB, TOIN)  # point t1 at current char
+    p.LW('t2', 't1', 0)  # load current char into t2
+    p.BGE('t2', 't0', 'token_scan')  # check if done skipping whitespace
+    p.ADDI(TOIN, TOIN, 1)  # inc TOIN
+    p.JAL('zero', 'token_skip_whitespace')  # check again
 with p.LABEL('token_scan'):
-    p.ADD('t2', TIB, 't0')  # point t2 at next char
-    p.ADDI('t0', 't0', 1)  # increment offset
+    p.ADDI('t1', TOIN, 0)  # put current TOIN value into t1
+with p.LABEL('token_scan_loop'):
+    p.ADD('t2', TIB, 't1')  # point t2 at next char
+    p.ADDI('t1', 't1', 1)  # increment offset
     p.LW('t3', 't2', 0)  # load next char into t3
-    p.BLT('t3', 't1', 'token_delimiter')  # check for whitespace
-    p.JAL('zero', 'token_scan')  # scan the next char
-with p.LABEL('token_delimiter'):
+    p.BLT('t3', 't0', 'token_done')  # check for whitespace
+    p.JAL('zero', 'token_scan_loop')  # scan the next char
+with p.LABEL('token_done'):
     p.ADD('a0', TIB, TOIN)  # a0 = address of word
-    p.SUB('a1', 't0', TOIN)  # a1 = length of word
-    p.ADDI(TOIN, 't0', 0)  # update TOIN
+    p.SUB('a1', 't1', TOIN)  # a1 = length of word
+    p.ADDI(TOIN, 't1', 0)  # update TOIN
     p.JALR('zero', 'ra', 0)  # return
 
 # standard forth routine: next
@@ -271,7 +278,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the building "led" word
-    p.BLOB(b'led ')
+    p.BLOB(b'     led ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
