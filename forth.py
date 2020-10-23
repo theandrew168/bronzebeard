@@ -603,8 +603,8 @@ with defword(p, 'usart0', 'USART0'):
     p.SW('t0', 't1', 0)
 
     CLOCK = 8000000  # 8MHz
-    #BAUD = 115200  # 115200 bits per second
-    BAUD = 9600
+    BAUD = 115200  # 115200 bits per second
+    #BAUD = 9600
     udiv = CLOCK // BAUD
 
     # load USART0 base address
@@ -614,6 +614,8 @@ with defword(p, 'usart0', 'USART0'):
     # configure USART0 baud rate
     p.ADDI('t1', 't0', USART_BAUD_OFFSET)
     p.ADDI('t2', 'zero', udiv)
+    #p.SLLI('t2', 't2', 4)  # let the fraction part be zero?
+    #p.ORI('t2', 't2', 7)  # .44444 * 16 is the frac part?
     p.SW('t1', 't2', 0)
 
     # enable TX and RX
