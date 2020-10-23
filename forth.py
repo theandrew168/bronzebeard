@@ -379,7 +379,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'rcu rled gled bled ')
+    p.BLOB(b'rcu rled usart0 gled bled usart0 ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
@@ -555,8 +555,8 @@ with defword(p, 'usart0', 'USART0'):
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
 
-    # move t0 forward to control 0 register
-    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
+    # move t0 forward to control 1 register
+    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
 
     # load current GPIO config into t1
     p.LW('t1', 't0', 0)
@@ -585,6 +585,51 @@ with defword(p, 'usart0', 'USART0'):
 
     # store the GPIO config
     p.SW('t0', 't1', 0)
+
+    # USART config:
+    # enabled (USART_CTL0 bit 13)
+    # rx/tx enabled (USART_CTL0 bits 2 and 3)
+    # 115200 baud (USART_BAUD)
+    # 8 bits per word (USART_CTL0 bit 12, default)
+    # 1 stop bit (USART_CTL1 bits 13:12, default)
+    # 0 parity bits (USART_CTL0 bit 10, default)
+
+    CLOCK = 8000000  # 8MHz
+    BAUD = 115200  # 115200 bits per second
+    udiv = (CLOCK + (BAUD / 2)) // BAUD
+
+    # load USART0 base address
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+
+    # configure USART0 baud rate
+    p.ADDI('t1', 't0', USART_BAUD_OFFSET)
+    p.ADDI('t2', 'zero', udiv)
+    p.SW('t1', 't2', 0)
+
+    # enable TX and RX
+    p.ADDI('t1', 't0', USART_CTL0_OFFSET)
+    p.ADDI('t2', 'zero', 0b00001100)
+    p.SW('t1', 't2', 0)
+
+    # enable USART0 (but don't overritw TX/RX config)
+    p.ADDI('t1', 't0', USART_CTL0_OFFSET)
+    p.ADDI('t2', 'zero', 0b00001100)
+    p.ADDI('t3', 'zero', 1)
+    p.SLLI('t3', 't3', 13)
+    p.OR('t2', 't2', 't3')
+    p.SW('t1', 't2', 0)
+
+    # write out a continuous stream of '!' to serial
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)
+    p.ADDI('t3', 'zero', 33)
+    p.LABEL('usart_loop')
+    p.LW('t4', 't1', 0)  # load stat
+    p.ANDI('t4', 't4', 1 << 7)
+    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
+    p.SW('t2', 't3', 0)  # write the '!'
+    p.JAL('zero', 'usart_loop')  # loop again
 
     # next
     p.JAL('zero', 'next')
