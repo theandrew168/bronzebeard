@@ -24,6 +24,59 @@ RAM_BASE_ADDR = 0x20000000  # 32K
 #ROM_BASE_ADDR = 0x00050000  # 1M
 #RAM_BASE_ADDR = 0x00000000  # 16K
 
+# Longan Nano Details:
+RCU_BASE_ADDR = 0x40021000
+
+RCU_CTRL_OFFSET = 0x00
+RCU_CLK_CONFIG0_OFFSET = 0x04
+RCU_CLK_INTERRUPT_OFFSET = 0x08
+RCU_APB2_RESET_OFFSET = 0x0c
+RCU_APB1_RESET_OFFSET = 0x10
+RCU_AHB_ENABLE_OFFSET = 0x14
+RCU_APB2_ENABLE_OFFSET = 0x18
+RCU_APB1_ENABLE_OFFSET = 0x1c
+RCU_BACKUP_DOMAIN_CTRL_OFFSET = 0x20
+RCU_RESET_SRC_CLK_OFFSET = 0x24
+RCU_AHB_RESET_OFFSET = 0x28
+RCU_CLK_CONFIG1_OFFSET = 0x2c
+RCU_DEEP_SLEEP_VOLTAGE_OFFSET = 0x34
+
+GPIO_BASE_ADDR_A = 0x40010800
+GPIO_BASE_ADDR_B = 0x40010c00
+GPIO_BASE_ADDR_C = 0x40011000
+GPIO_BASE_ADDR_D = 0x40011400
+GPIO_BASE_ADDR_E = 0x40011800
+
+GPIO_CTRL0_OFFSET = 0x00
+GPIO_CTRL1_OFFSET = 0x04
+GPIO_IN_STATUS_OFFSET = 0x08
+GPIO_OUT_CTRL_OFFSET = 0x0c
+GPIO_BIT_OPERATE_OFFSET = 0x10
+GPIO_BIT_CLEAR_OFFSET = 0x14
+GPIO_LOCK_OFFSET = 0x18
+
+GPIO_MODE_IN = 0b00
+GPIO_MODE_OUT_10MHZ = 0b01
+GPIO_MODE_OUT_2MHZ = 0b10
+GPIO_MODE_OUT_50MHZ = 0b11
+
+GPIO_CTRL_IN_ANALOG = 0b00
+GPIO_CTRL_IN_FLOATING = 0b01
+GPIO_CTRL_IN_PULL = 0b10
+GPIO_CTRL_IN_RESERVED = 0b11
+
+GPIO_CTRL_OUT_PUSH_PULL = 0b00
+GPIO_CTRL_OUT_OPEN_DRAIN = 0b01
+GPIO_CTRL_OUT_ALT_PUSH_PULL = 0b10
+GPIO_CTRL_OUT_ALT_OPEN_DRAIN = 0b11
+
+LED_R_GPIO = GPIO_BASE_ADDR_C
+LED_R_PIN = 13  # GPIO_CTRL1
+LED_G_GPIO = GPIO_BASE_ADDR_A
+LED_G_PIN = 1  # GPIO_CTRL0
+LED_B_GPIO = GPIO_BASE_ADDR_A
+LED_B_PIN = 2  # GPIO_CTRL0
+
 
 #       Register Assignment
 # |------------------------------|
@@ -316,7 +369,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b' rcu led ')
+    p.BLOB(b'rcu rled gled bled ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
@@ -389,12 +442,9 @@ with defword(p, 'rcu', 'RCU'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'led', 'LED'):
-    GPIO_BASE_ADDR_C = 0x40011000
-    GPIO_CTRL1_OFFSET = 0x04
-    GPIO_MODE_OUT_50MHZ = 0b11
-    GPIO_CTRL_OUT_PUSH_PULL = 0b00
-
+# red LED: GPIO port C, ctrl 1, pin 13
+# offset: ((PIN - 8) * 4) = 20
+with defword(p, 'rled', 'RLED'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -402,9 +452,79 @@ with defword(p, 'led', 'LED'):
     # move t0 forward to control 1 register
     p.ADDI('t0', 't0', GPIO_CTRL1_OFFSET)
 
-    # TODO: this is destructive to other GPIO configs
-    p.ADDI('t1', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into t1
-    p.SLLI('t1', 't1', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 20)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 20)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
+    # next
+    p.JAL('zero', 'next')
+
+# green LED: GPIO port A, ctrl 0, pin 1
+# offset: (PIN * 4) = 4
+with defword(p, 'gled', 'GLED'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+
+    # move t0 forward to control 0 register
+    p.ADDI('t0', 't0', GPIO_CTRL0_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 4)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 4)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
+    # next
+    p.JAL('zero', 'next')
+
+# blue LED: GPIO port A, ctrl 0, pin 2
+# offset: (PIN * 4) = 8
+with defword(p, 'bled', 'BLED'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+
+    # move t0 forward to control 0 register
+    p.ADDI('t0', 't0', GPIO_CTRL0_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 8)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 8)
+    p.OR('t1', 't1', 't2')
 
     # store the GPIO config
     p.SW('t0', 't1', 0)
