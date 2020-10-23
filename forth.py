@@ -379,7 +379,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'rcu rled usart0 gled bled usart0 ')
+    p.BLOB(b'rcu rled gled bled ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
@@ -583,7 +583,7 @@ with defword(p, 'usart0', 'USART0'):
     # store the GPIO config
     p.SW('t0', 't1', 0)
 
-    # USART config:
+    # USART config: 115200 8N1
     # enabled (USART_CTL0 bit 13)
     # rx/tx enabled (USART_CTL0 bits 2 and 3)
     # 115200 baud (USART_BAUD)
@@ -601,11 +601,20 @@ with defword(p, 'usart0', 'USART0'):
     p.ADDI('t1', 'zero', 1)
     p.SLLI('t1', 't1', 14)
     p.SW('t0', 't1', 0)
+    p.ADDI('t1', 'zero', 0)
+    p.SLLI('t1', 't1', 14)
+    p.SW('t0', 't1', 0)
 
     CLOCK = 8000000  # 8MHz
     BAUD = 115200  # 115200 bits per second
     #BAUD = 9600
-    udiv = CLOCK // BAUD
+    udiv = CLOCK // BAUD // 16
+    udiv = 70  # 115200
+    #udiv = 834  # 9600
+    udiv = 18  # 115200 w/ CLK / 4
+    #intdiv = 4
+    #fracdiv = 5
+    #udiv = intdiv << 4 | fracdiv
 
     # load USART0 base address
     p.LUI('t0', p.HI(USART_BASE_ADDR_0))
@@ -614,18 +623,16 @@ with defword(p, 'usart0', 'USART0'):
     # configure USART0 baud rate
     p.ADDI('t1', 't0', USART_BAUD_OFFSET)
     p.ADDI('t2', 'zero', udiv)
-    #p.SLLI('t2', 't2', 4)  # let the fraction part be zero?
-    #p.ORI('t2', 't2', 7)  # .44444 * 16 is the frac part?
     p.SW('t1', 't2', 0)
 
     # enable TX and RX
     p.ADDI('t1', 't0', USART_CTL0_OFFSET)
-    p.ADDI('t2', 'zero', 0b00001100)
+    p.ADDI('t2', 'zero', 0b1100)
     p.SW('t1', 't2', 0)
 
     # enable USART0 (but don't overwrite TX/RX config)
     p.ADDI('t1', 't0', USART_CTL0_OFFSET)
-    p.ADDI('t2', 'zero', 0b00001100)
+    p.ADDI('t2', 'zero', 0b1100)
     p.ADDI('t3', 'zero', 1)
     p.SLLI('t3', 't3', 13)
     p.OR('t2', 't2', 't3')
@@ -636,9 +643,9 @@ with defword(p, 'usart0', 'USART0'):
     p.ADDI('t2', 't0', USART_DATA_OFFSET)
     p.ADDI('t3', 'zero', 33)
     p.LABEL('usart_loop')
-#    p.LW('t4', 't1', 0)  # load stat
-#    p.ANDI('t4', 't4', 1 << 7)
-#    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
+    p.LW('t4', 't1', 0)  # load stat
+    p.ANDI('t4', 't4', 1 << 7)
+    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
     p.SW('t2', 't3', 0)  # write the '!'
     p.JAL('zero', 'usart_loop')  # loop again
 
