@@ -431,9 +431,6 @@ with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
     pass
 
 with defword(p, 'rcu', 'RCU'):
-    RCU_BASE_ADDR = 0x40021000
-    RCU_APB2_ENABLE_OFFSET = 0x18
-
     # load RCU base addr into t0
     p.LUI('t0', p.HI(RCU_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
@@ -594,9 +591,21 @@ with defword(p, 'usart0', 'USART0'):
     # 1 stop bit (USART_CTL1 bits 13:12, default)
     # 0 parity bits (USART_CTL0 bit 10, default)
 
+    # load RCU base addr into t0
+    p.LUI('t0', p.HI(RCU_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
+    # move t0 forward to APB2 reset register
+    p.ADDI('t0', 't0', RCU_APB2_RESET_OFFSET)
+
+    # reset USART0
+    p.ADDI('t1', 'zero', 1)
+    p.SLLI('t1', 't1', 14)
+    p.SW('t0', 't1', 0)
+
     CLOCK = 8000000  # 8MHz
-    BAUD = 115200  # 115200 bits per second
-    udiv = (CLOCK + (BAUD / 2)) // BAUD
+    #BAUD = 115200  # 115200 bits per second
+    BAUD = 9600
+    udiv = CLOCK // BAUD
 
     # load USART0 base address
     p.LUI('t0', p.HI(USART_BASE_ADDR_0))
@@ -612,7 +621,7 @@ with defword(p, 'usart0', 'USART0'):
     p.ADDI('t2', 'zero', 0b00001100)
     p.SW('t1', 't2', 0)
 
-    # enable USART0 (but don't overritw TX/RX config)
+    # enable USART0 (but don't overwrite TX/RX config)
     p.ADDI('t1', 't0', USART_CTL0_OFFSET)
     p.ADDI('t2', 'zero', 0b00001100)
     p.ADDI('t3', 'zero', 1)
@@ -625,9 +634,9 @@ with defword(p, 'usart0', 'USART0'):
     p.ADDI('t2', 't0', USART_DATA_OFFSET)
     p.ADDI('t3', 'zero', 33)
     p.LABEL('usart_loop')
-    p.LW('t4', 't1', 0)  # load stat
-    p.ANDI('t4', 't4', 1 << 7)
-    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
+#    p.LW('t4', 't1', 0)  # load stat
+#    p.ANDI('t4', 't4', 1 << 7)
+#    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
     p.SW('t2', 't3', 0)  # write the '!'
     p.JAL('zero', 'usart_loop')  # loop again
 
