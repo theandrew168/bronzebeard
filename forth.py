@@ -205,11 +205,6 @@ with p.LABEL('init'):
     # set working register to zero
     p.ADDI(W, 'zero', 0)
 
-    # set interpreter pointer to "interpreter" location
-    p.LUI(IP, p.HI(RAM_BASE_ADDR))
-    p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
-    p.ADDI(IP, IP, 'interpreter')
-
     # set STATE var to zero
     p.ADDI(STATE, 'zero', 0)
 
@@ -233,10 +228,14 @@ with p.LABEL('init'):
     p.ADDI(LATEST, LATEST, 'latest')
 
 # main interpreter loop
+# TODO this loop is terrible! come up with a better design for the CF
 with p.LABEL('interpreter'):
+    # set interpreter pointer to indirect addr back to interpreter loop
+    p.LUI(IP, p.HI(RAM_BASE_ADDR))
+    p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
+    p.ADDI(IP, IP, 'interpreter_addr')
+
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-#    p.ADDI('t0', 'zero', 3)
-#    p.BEQ('a1', 't0', 'code_led')
 with p.LABEL('search'):
     p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
 with p.LABEL('search_loop'):
@@ -267,6 +266,11 @@ with p.LABEL('search_found'):
     # word is found and located at t0
     p.ADDI(W, 't0', 8)  # TODO: hack to manually skip name pad bytes
     p.JALR('zero', W, 0)  # execute the word!
+
+# TODO: this feels real hacky
+with p.LABEL('interpreter_addr'):
+    addr = RAM_BASE_ADDR + p.labels['interpreter']
+    p.BLOB(struct.pack('<I', addr))
 
 # TODO: handle running off the TIB (max 1024 bytes or something)
 with p.LABEL('token'):
@@ -312,7 +316,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'  led ')
+    p.BLOB(b' rcu led ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
@@ -363,13 +367,9 @@ with defword(p, ':', 'COLON'):
 with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
     pass
 
-with defword(p, 'led', 'LED'):
+with defword(p, 'rcu', 'RCU'):
     RCU_BASE_ADDR = 0x40021000
     RCU_APB2_ENABLE_OFFSET = 0x18
-    GPIO_BASE_ADDR_C = 0x40011000
-    GPIO_CTRL1_OFFSET = 0x04
-    GPIO_MODE_OUT_50MHZ = 0b11
-    GPIO_CTRL_OUT_PUSH_PULL = 0b00
 
     # load RCU base addr into t0
     p.LUI('t0', p.HI(RCU_BASE_ADDR))
@@ -386,6 +386,15 @@ with defword(p, 'led', 'LED'):
     p.OR('t1', 't1', 't2')
     p.SW('t0', 't1', 0)  # store the ABP2 config
 
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'led', 'LED'):
+    GPIO_BASE_ADDR_C = 0x40011000
+    GPIO_CTRL1_OFFSET = 0x04
+    GPIO_MODE_OUT_50MHZ = 0b11
+    GPIO_CTRL_OUT_PUSH_PULL = 0b00
+
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -393,11 +402,13 @@ with defword(p, 'led', 'LED'):
     # move t0 forward to control 1 register
     p.ADDI('t0', 't0', GPIO_CTRL1_OFFSET)
 
+    # TODO: this is destructive to other GPIO configs
     p.ADDI('t1', 'zero', (GPIO_CTRL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)  # load pin settings into t1
     p.SLLI('t1', 't1', 20)  # shift settings over to correct pin ((PIN - 8) * 4)
 
     # store the GPIO config
     p.SW('t0', 't1', 0)
+
     # next
     p.JAL('zero', 'next')
 
