@@ -313,13 +313,14 @@ with p.LABEL('interpreter'):
     p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
 with p.LABEL('interpreter_compile'):
     # otherwise compile!
+    p.SW(HERE, 'a2', 0)  # write addr of word to definition
+    p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.JAL('zero', 'interpreter')
 with p.LABEL('interpreter_execute'):
     # set interpreter pointer to indirect addr back to interpreter loop
     p.LUI(IP, p.HI(RAM_BASE_ADDR))
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
     p.ADDI(IP, IP, 'interpreter_addr')
-
     # word is found and located at a2
     p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 5)
     p.JALR('zero', W, 0)  # execute the word!
@@ -487,22 +488,26 @@ with p.LABEL('padding_next'):
     p.ADDI(HERE, HERE, 1)  # HERE++
     p.JAL('zero', 'padding_body')  # loop again
 with p.LABEL('padding_done'):
+    # TODO: this would be simpler with a indirect-threaded forth
+    # the current version is hacky and jitty as heck
     offset = p.labels['word_ENTER'] - p.location
-    print('offset:', offset)
     inst = asm.JAL('zero', offset)
-    print(inst)
     inst, = struct.unpack('<I', inst)
-    print(inst)
     p.LUI('t0', p.HI(inst))  # load code to t0
-    p.ADDI('t0', 't0', p.LO(inst))  # load code to t0
+    p.ADDI('t0', 't0', p.LO(inst))  # ...
     p.SW(HERE, 't0', 0)  # write JAL inst into word (due to DTF)
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 1)  # STATE = 1 (compile)
     p.JAL('zero', 'next')  # next
 
-# TODO: implement semicolon
 with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
-    pass
+    addr = RAM_BASE_ADDR + p.labels['word_EXIT']
+    p.LUI('t0', p.HI(addr))  # load addr of EXIT into t0
+    p.ADDI('t0', 't0', p.LO(addr))  # ...
+    p.SW(HERE, 't0', 0)  # write addr of EXIT to word definition
+    p.ADDI(HERE, HERE, 4)  # HERE += 4
+    p.ADDI(STATE, 'zero', 1)  # STATE = 0 (execute)
+    p.JAL('zero', 'next')  # next
 
 with defword(p, 'rcu', 'RCU'):
     # load RCU base addr into t0
