@@ -104,7 +104,7 @@ USART_GP_OFFSET = 0x18
 # |  x9 |  s1  | STATE var       |
 # | x10 |  a0  | token address   |
 # | x11 |  a1  | token length    |
-# | x12 |  a2  | <unused>        |
+# | x12 |  a2  | lookup address  |
 # | x13 |  a3  | <unused>        |
 # | x14 |  a4  | <unused>        |
 # | x15 |  a5  | <unused>        |
@@ -299,38 +299,14 @@ with p.LABEL('interpreter'):
     p.ADDI(IP, IP, 'interpreter_addr')
 
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-with p.LABEL('search'):
-    p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
-with p.LABEL('search_loop'):
-    p.LH('t1', 't0', 0)  # load link of current word into t1
-    p.LBU('t2', 't0', 2)  # load flags / len of current word into t2
-    p.ANDI('t2', 't2', LEN_MASK)  # TODO wipe out flags for now leaving word length
-    p.BEQ('a1', 't2', 'search_compare')  # continue the search if length matches
-    p.BEQ('t1', 'zero', 'error')  # if link is zero then the word isn't found: error and reset
-    p.ADD('t0', 't0', 't1')  # point t0 at the next word (add the link offset)
-    p.JAL('zero', 'search_loop')  # continue the search
-with p.LABEL('search_compare_next'):
-    p.ADDI('t2', 't2', -1)  # dec len by 1
-    p.BEQ('t2', 'zero', 'search_found')  # if all chars have been checked, its a match!
-    p.ADDI('t3', 't3', 1)  # inc TIB ptr
-    p.ADDI('t4', 't4', 1)  # inc word dict ptr
-    p.JAL('zero', 'search_compare_loop')  # check next char
-with p.LABEL('search_compare'):
-    p.ADDI('t3', 'a0', 0)  # t3 points at name in TIB string
-    p.ADDI('t4', 't0', 3)  # t4 points at name in word dict
-with p.LABEL('search_compare_loop'):
-    p.LBU('t5', 't3', 0)  # load TIB char into t5
-    p.LBU('t6', 't4', 0)  # load dict char into t6
-    p.BEQ('t5', 't6', 'search_compare_next')  # continue comparing if current chars match
-    p.BEQ('t1', 'zero', 'error')  # if link is zero then the word isn't found: error and reset
-    p.ADD('t0', 't0', 't1')  # point t0 at the next word (add the link offset)
-    p.JAL('zero', 'search_loop')  # continue the search
-with p.LABEL('search_found'):
-    # word is found and located at t0
-    p.ADDI(W, 't0', 8)  # TODO: hack to manually skip name pad bytes
+    p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
+    p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
+
+    # word is found and located at a2
+    p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 5)
     p.JALR('zero', W, 0)  # execute the word!
 
-# TODO: this feels real hacky
+# TODO: this feels real hacky (v2: Location('interpreter'))
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
@@ -358,6 +334,37 @@ with p.LABEL('token_done'):
     p.ADDI(TOIN, 't1', 0)  # update TOIN
     p.JALR('zero', 'ra', 0)  # return
 
+with p.LABEL('lookup'):
+    p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
+with p.LABEL('lookup_body'):
+    p.LH('t1', 't0', 0)  # load link of current word into t1
+    p.LBU('t2', 't0', 2)  # load flags / len of current word into t2
+    p.ANDI('t2', 't2', LEN_MASK)  # TODO wipe out flags for now leaving word length
+    p.BEQ('a1', 't2', 'lookup_strcmp')  # start strcmp if len matches
+with p.LABEL('lookup_next'):
+    p.BEQ('t1', 'zero', 'lookup_not_found')  # if link is zero then the word isn't found
+    p.ADD('t0', 't0', 't1')  # point t0 at the next word (add the link offset)
+    p.JAL('zero', 'lookup_body')  # continue the search
+with p.LABEL('lookup_not_found'):
+    p.ADDI('a2', 'zero', 0)  # a2 = 0
+    p.JALR('zero', 'ra', 0)  # return
+with p.LABEL('lookup_strcmp'):
+    p.ADDI('t3', 'a0', 0)  # t3 points at name in TIB string
+    p.ADDI('t4', 't0', 3)  # t4 points at name in word dict
+with p.LABEL('lookup_strcmp_body'):
+    p.LBU('t5', 't3', 0)  # load TIB char into t5
+    p.LBU('t6', 't4', 0)  # load dict char into t6
+    p.BNE('t5', 't6', 'lookup_next')  # try next word if current chars don't match
+with p.LABEL('lookup_strcmp_next'):
+    p.ADDI('t2', 't2', -1)  # dec len by 1
+    p.BEQ('t2', 'zero', 'lookup_found')  # if all chars have been checked, its a match!
+    p.ADDI('t3', 't3', 1)  # inc TIB ptr
+    p.ADDI('t4', 't4', 1)  # inc word dict ptr
+    p.JAL('zero', 'lookup_strcmp_body')  # check next char
+with p.LABEL('lookup_found'):
+    p.ADDI('a2', 't0', 0)  # a2 = addr of found word
+    p.JALR('zero', 'ra', 0)  # return
+
 # standard forth routine: next
 with p.LABEL('next'):
     p.LW(W, IP, 0)
@@ -379,7 +386,7 @@ with p.LABEL('exit'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'rcu rled gled bled ')
+    p.BLOB(b'rcu rled bled ')
 
     # make some numbers
     p.BLOB(b': dup sp@ @ ; ')
@@ -611,7 +618,6 @@ with defword(p, 'usart0', 'USART0'):
     udiv = CLOCK // BAUD // 16
     udiv = 70  # 115200
     #udiv = 834  # 9600
-    udiv = 18  # 115200 w/ CLK / 4
     #intdiv = 4
     #fracdiv = 5
     #udiv = intdiv << 4 | fracdiv
@@ -623,6 +629,7 @@ with defword(p, 'usart0', 'USART0'):
     # configure USART0 baud rate
     p.ADDI('t1', 't0', USART_BAUD_OFFSET)
     p.ADDI('t2', 'zero', udiv)
+    p.SLLI('t2', 't2', 4)  # shift over to intdiv?
     p.SW('t1', 't2', 0)
 
     # enable TX and RX
