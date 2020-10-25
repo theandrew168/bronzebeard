@@ -275,7 +275,18 @@ with p.LABEL('init'):
     p.LUI(TIB, p.HI(RAM_BASE_ADDR))
     p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR))
     p.ADDI(TIB, TIB, 'tib')
-    # TODO: fill TIB with zeroes
+
+    # fill TIB with zeroes
+#    p.LABEL('tib_clear')
+#    p.ADDI('t0', TIB, 9)  # t0 = addr
+#    p.ADDI('t1', 'zero', 1)  # t1 = 1
+#    p.SLLI('t1', 't1', 10)  # t1 = 1024 (count)
+#    p.LABEL('tib_clear_body')
+#    p.SB('t0', 'zero', 0)  # [t0] = 0
+#    p.LABEL('tib_clear_next')
+#    p.ADDI('t0', 't0', 1)  # t0 += 1
+#    p.ADDI('t1', 't1', -1)  # t1 -= 1
+#    p.BNE('t1', 'zero', 'tib_clear_body')  # keep looping til t1 == 0
 
     # set TOIN var to zero
     p.ADDI(TOIN, 'zero', 0)
@@ -291,28 +302,39 @@ with p.LABEL('init'):
     p.ADDI(LATEST, LATEST, 'latest')
 
 # main interpreter loop
-# TODO this loop is terrible! come up with a better design for the CF
 with p.LABEL('interpreter'):
+    p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
+    p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
+    p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
+
+    p.LB('t0', 'a0', 2)  # load word flags + len into t0
+    p.ANDI('t0', 't0', F_IMMEDIATE)  # isolate immediate flag
+    p.BNE('t0', 'zero', 'interpreter_execute')  # execute if word is immediate
+    p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
+with p.LABEL('interpreter_compile'):
+    # otherwise compile!
+    p.JAL('zero', 'interpreter')
+with p.LABEL('interpreter_execute'):
     # set interpreter pointer to indirect addr back to interpreter loop
     p.LUI(IP, p.HI(RAM_BASE_ADDR))
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
     p.ADDI(IP, IP, 'interpreter_addr')
 
-    p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-    p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
-    p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
-
     # word is found and located at a2
     p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 5)
     p.JALR('zero', W, 0)  # execute the word!
 
-# TODO: this feels real hacky (v2: Location('interpreter'))
+# TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
 
-# TODO: handle running off the TIB (max 1024 bytes or something)
+# Procedure: token
+# Usage: p.JAL('ra', 'token')
+# Ret: a0 = addr of word name
+# Ret: a1 = length of word name
 with p.LABEL('token'):
+    # TODO: handle running off the TIB (max 1024 bytes or something)
     p.ADDI('t0', 'zero', 33)  # put whitespace threshold value into t0
 with p.LABEL('token_skip_whitespace'):
     p.ADD('t1', TIB, TOIN)  # point t1 at current char
@@ -334,6 +356,11 @@ with p.LABEL('token_done'):
     p.ADDI(TOIN, 't1', 0)  # update TOIN
     p.JALR('zero', 'ra', 0)  # return
 
+# Procedure: lookup
+# Usage: p.JAL('ra', 'lookup')
+# Arg: a0 = addr of word name
+# Arg: a1 = length of word name
+# Ret: a2 = addr of found word (0 if not found)
 with p.LABEL('lookup'):
     p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
 with p.LABEL('lookup_body'):
@@ -364,25 +391,6 @@ with p.LABEL('lookup_strcmp_next'):
 with p.LABEL('lookup_found'):
     p.ADDI('a2', 't0', 0)  # a2 = addr of found word
     p.JALR('zero', 'ra', 0)  # return
-
-# standard forth routine: next
-with p.LABEL('next'):
-    p.LW(W, IP, 0)
-    p.ADDI(IP, IP, 4)
-    p.JALR('zero', W, 0)
-
-# standard forth routine: enter (aka docol)
-with p.LABEL('enter'):
-    p.SW(RSP, IP, 0)
-    p.ADDI(RSP, RSP, 4)
-    p.ADDI(IP, W, 4)  # skip code field
-    p.JAL('zero', 'next')
-
-# standard forth routine: exit (aka semi)
-with p.LABEL('exit'):
-    p.ADDI(RSP, RSP, -4)
-    p.LW(IP, RSP, 0)
-    p.JAL('zero', 'next')
 
 with p.LABEL('tib'):
     # call the builtin "led" word
@@ -427,11 +435,70 @@ with p.LABEL('tib'):
     p.ALIGN()
 
 
-# dictionary starts here
+# standard forth routine: next
+with p.LABEL('next'):
+    p.LW(W, IP, 0)
+    p.ADDI(IP, IP, 4)
+    p.JALR('zero', W, 0)
 
-# TODO: implement colon
+###
+### dictionary starts here
+###
+
+# standard forth routine: enter
+with defword(p, 'enter', 'ENTER'):
+    p.SW(RSP, IP, 0)
+    p.ADDI(RSP, RSP, 4)
+    p.ADDI(IP, W, 4)  # skip code field
+    p.JAL('zero', 'next')
+
+# standard forth routine: exit
+with defword(p, 'exit', 'EXIT'):
+    p.ADDI(RSP, RSP, -4)
+    p.LW(IP, RSP, 0)
+    p.JAL('zero', 'next')
+
 with defword(p, ':', 'COLON'):
-    pass
+    p.JAL('ra', 'token')  # a0 = addr, a1 = len
+    p.SUB('t0', LATEST, HERE)  # link = LATEST - HERE
+    p.ADDI(LATEST, HERE, 0)  # LATEST = HERE
+    p.SH(HERE, 't0', 0)  # write LINK
+    p.SB(HERE, 'a1', 2)  # write FLAGS + LEN
+with p.LABEL('strncpy'):
+    p.ADDI('t0', 'a0', 0)  # t0 = strncpy src
+    p.ADDI('t1', HERE, 3)  # t1 = strncpy dest (+3 to skip LINK and FLAGS/LEN)
+    p.ADDI('t2', 'a1', 0)  # t2 = strncpy len
+with p.LABEL('strncpy_body'):
+    p.LBU('t3', 't0', 0)  # t3 = [src]
+    p.SB('t1', 't3', 0)  # [dest] = t3
+with p.LABEL('strncpy_next'):
+    p.ADDI('t2', 't2', -1)  # len--
+    p.BEQ('t2', 'zero', 'strncpy_done')  # done if len == 0
+    p.ADDI('t0', 't0', 1)  # src++
+    p.ADDI('t1', 't1', 1)  # dest++
+    p.JAL('zero', 'strncpy_body')
+with p.LABEL('strncpy_done'):
+    p.ADDI(HERE, 't1', 0)  # HERE = end of word
+with p.LABEL('padding_body'):
+    p.ANDI('t0', HERE, 0b0011)  # isolate bottom two bits of HERE
+    p.BEQ('t0', 'zero', 'padding_done')  # done if they are zero (which means HERE is a multiple of 4)
+    p.SB(HERE, 'zero', 0)  # else store a zero
+with p.LABEL('padding_next'):
+    p.ADDI(HERE, HERE, 1)  # HERE++
+    p.JAL('zero', 'padding_body')  # loop again
+with p.LABEL('padding_done'):
+    offset = p.labels['word_ENTER'] - p.location
+    print('offset:', offset)
+    inst = asm.JAL('zero', offset)
+    print(inst)
+    inst, = struct.unpack('<I', inst)
+    print(inst)
+    p.LUI('t0', p.HI(inst))  # load code to t0
+    p.ADDI('t0', 't0', p.LO(inst))  # load code to t0
+    p.SW(HERE, 't0', 0)  # write JAL inst into word (due to DTF)
+    p.ADDI(HERE, HERE, 4)  # HERE += 4
+    p.ADDI(STATE, 'zero', 1)  # STATE = 1 (compile)
+    p.JAL('zero', 'next')  # next
 
 # TODO: implement semicolon
 with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
