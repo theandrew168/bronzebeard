@@ -3,6 +3,23 @@ import struct
 
 from simpleriscv import asm
 
+# Types of Immediate values (one of Literal / Position / Location / Address):
+# An Immediate can be resolved to a Number given a map[string]int of labels (can be nil, too)
+# Resolution wouldn't happen until subsequent passes of the assembler
+#
+# 1. Literal numeric value (needs no resolution)
+#       Number -> Number
+# 2. PC location (anytime I dig into p.location manually)
+#       PC -> Number
+# 3. Label location (anytime I dig into p.labels manually)
+#       String -> Number
+# 4. Relative to PC (jumps / branches, forward and backward)
+#       String + PC -> Number
+# 5. Relative to other position (forth word links)
+#       String + String -> Number
+# 6. Relative to base address (absolute locations in memory: TIB, DSP, RSP, etc)
+#       String + Number -> Number
+
 # Based heavily on "sectorforth" and "Moving Forth":
 # https://github.com/cesarblum/sectorforth
 # https://www.bradrodriguez.com/papers/moving1.htm
@@ -177,50 +194,35 @@ RETURN_STACK_BASE = 0x3000
 
 F_IMMEDIATE = 0b10000000
 F_HIDDEN    = 0b01000000
-LEN_MASK    = 0b00011111
-
-LINK = None
+F_LENGTH    = 0b00111111
 
 @contextmanager
-def defword(p, name, label, flags=0):
-    """
-    Macro to define a Forth word. The LINK stuff is really hacky and
-    I'd like to replace it with something else. The "flags" param be any
-    or'd combo of the 2 F_FOO constants defined above.
+def defword(p, name, flags=0):
+    # hack to impl a static function var (alternative is using the 'global' keyword)
+    if not hasattr(defword, 'link'): defword.link = 0
 
-    TODO: is the second label necessary?
-    """
+    if len(name) > 0x3f:
+        raise ValueError('Word name is longer than 0x3f (63 chars): {}'.format(name))
 
-    if len(name) > 0x1f:
-        raise ValueError('Word name is longer than 0x1f (31 chars): {}'.format(name))
-
-    word_label = 'word_' + label
+    # create a label for the word (word name prefixed with 'word_')
+    word_label = 'word_' + name
     p.LABEL(word_label)
 
-    # these links will above be relative and negative
-    #  (since new words are higher in the address space)
-    # TODO: this is just too hacky: doesn't respect defer, digs into labels...
-    # Feature: deferred blob that refs a label, specify the size? 8, 16, 32, etc
-    #   but then it also updates a var? almost seems cleaner to just collect
-    #   the "normal" segments (label, inst, blob, align) into a list and make
-    #   a first pass that just collects label locations. then the second pass
-    #   handle "macros" and does the actual assembling? Second pass can include
-    #   an API for querying label locations since they'll all be present.
-    #   Immediate values can also use this. Maybe have two functions, one for
-    #   raw location and one for relative offset? (for PIC on jump / branch insts)
-    global LINK
-    if LINK is None:
-        link = 0
-    else:
-        link = p.labels[LINK] - p.labels[word_label]
-    LINK = word_label
+    # write the link to previous word and update link to point to this word
+    #   OffsetFrom(RAM_BASE_ADDR, word_label)
+    #   AbsoluteAddress(RAM_BASE_ADDR, word_label)
+    p.BLOB(struct.pack('<I', defword.link))
+    defword.link = RAM_BASE_ADDR + p.labels[word_label]
+    print(hex(defword.link))
 
-    p.BLOB(struct.pack('<h', link))
+    # write word flags + length
     p.BLOB(struct.pack('<B', flags | len(name)))
+
+    # write word name and align to multiple of 4 bytes
     p.BLOB(name.encode())
     p.ALIGN()
 
-    p.LABEL('code_' + name)
+    # context manager aesthetics hack
     yield
 
 
@@ -254,7 +256,8 @@ with p.LABEL('copy_done'):
 with p.LABEL('start'):
     p.JAL('zero', 'init')
 with p.LABEL('error'):
-    # TODO: print error indicator ("!!" or "?" or something like that)
+    # TODO: print error indicator ("?" or something like that)
+    # can do this once UART works and can print stuff using "emit"
     pass
 with p.LABEL('init'):
     # setup data stack pointer
@@ -307,7 +310,7 @@ with p.LABEL('interpreter'):
     p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
     p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
 
-    p.LB('t0', 'a0', 2)  # load word flags + len into t0
+    p.LB('t0', 'a2', 4)  # load word flags + len into t0
     p.ANDI('t0', 't0', F_IMMEDIATE)  # isolate immediate flag
     p.BNE('t0', 'zero', 'interpreter_execute')  # execute if word is immediate
     p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
@@ -322,10 +325,12 @@ with p.LABEL('interpreter_execute'):
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
     p.ADDI(IP, IP, 'interpreter_addr')
     # word is found and located at a2
-    p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 5)
+    p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 3)
     p.JALR('zero', W, 0)  # execute the word!
 
 # TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
+#   OffsetFrom(RAM_BASE_ADDR, 'interpreter')
+#   AbsolutePosition(RAM_BASE_ADDR, 'interpreter')
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
@@ -365,20 +370,20 @@ with p.LABEL('token_done'):
 with p.LABEL('lookup'):
     p.ADDI('t0', LATEST, 0)  # copy addr of latest word into t0
 with p.LABEL('lookup_body'):
-    p.LH('t1', 't0', 0)  # load link of current word into t1
-    p.LBU('t2', 't0', 2)  # load flags / len of current word into t2
-    p.ANDI('t2', 't2', LEN_MASK)  # TODO wipe out flags for now leaving word length
+    p.LW('t1', 't0', 0)  # load link of current word into t1
+    p.LBU('t2', 't0', 4)  # load flags / len of current word into t2
+    p.ANDI('t2', 't2', F_LENGTH)  # TODO (check hidden) wipe out flags for now leaving word length
     p.BEQ('a1', 't2', 'lookup_strcmp')  # start strcmp if len matches
 with p.LABEL('lookup_next'):
     p.BEQ('t1', 'zero', 'lookup_not_found')  # if link is zero then the word isn't found
-    p.ADD('t0', 't0', 't1')  # point t0 at the next word (add the link offset)
+    p.ADDI('t0', 't1', 0)  # point t0 at the next word (move link addr into t0)
     p.JAL('zero', 'lookup_body')  # continue the search
 with p.LABEL('lookup_not_found'):
     p.ADDI('a2', 'zero', 0)  # a2 = 0
     p.JALR('zero', 'ra', 0)  # return
 with p.LABEL('lookup_strcmp'):
     p.ADDI('t3', 'a0', 0)  # t3 points at name in TIB string
-    p.ADDI('t4', 't0', 3)  # t4 points at name in word dict
+    p.ADDI('t4', 't0', 5)  # t4 points at name in word dict
 with p.LABEL('lookup_strcmp_body'):
     p.LBU('t5', 't3', 0)  # load TIB char into t5
     p.LBU('t6', 't4', 0)  # load dict char into t6
@@ -395,42 +400,42 @@ with p.LABEL('lookup_found'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'rcu rled bled ')
+    p.BLOB(b'rcu rle ble ')
 
-    # make some numbers
-    p.BLOB(b': dup sp@ @ ; ')
-    p.BLOB(b': -1 dup dup nand dup dup nand nand ; ')
-    p.BLOB(b': 0 -1 dup nand ; ')
-    p.BLOB(b': 1 -1 dup + dup nand ; ')
-    p.BLOB(b': 2 1 1 + ; ')
-    p.BLOB(b': 4 2 2 + ; ')
-    p.BLOB(b': 8 4 4 + ; ')
-    p.BLOB(b': 12 4 8 + ; ')
-    p.BLOB(b': 16 8 8 + ; ')
-
-    # logic and arithmetic operators
-    p.BLOB(b': invert dup nand ; ')
-    p.BLOB(b': and nand invert ; ')
-    p.BLOB(b': negate invert 1 + ; ')
-    p.BLOB(b': - negate + ; ')
-
-    # equality checks
-    p.BLOB(b': = - 0= ; ')
-    p.BLOB(b': <> = invert ; ')
-
-    # stack manipulation words
-    p.BLOB(b': drop dup - + ; ')
-    p.BLOB(b': over sp@ 4 + @ ; ')
-    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ; ')
-    p.BLOB(b': nip swap drop ; ')
-    p.BLOB(b': 2dup over over ; ')
-    p.BLOB(b': 2drop drop drop ; ')
-
-    # more logic
-    p.BLOB(b': or invert swap invert and invert ; ')
-
-    # left shift 1 bit
-    p.BLOB(b': 2* dup + ; ')
+#    # make some numbers
+#    p.BLOB(b': dup sp@ @ ; ')
+#    p.BLOB(b': -1 dup dup nand dup dup nand nand ; ')
+#    p.BLOB(b': 0 -1 dup nand ; ')
+#    p.BLOB(b': 1 -1 dup + dup nand ; ')
+#    p.BLOB(b': 2 1 1 + ; ')
+#    p.BLOB(b': 4 2 2 + ; ')
+#    p.BLOB(b': 8 4 4 + ; ')
+#    p.BLOB(b': 12 4 8 + ; ')
+#    p.BLOB(b': 16 8 8 + ; ')
+#
+#    # logic and arithmetic operators
+#    p.BLOB(b': invert dup nand ; ')
+#    p.BLOB(b': and nand invert ; ')
+#    p.BLOB(b': negate invert 1 + ; ')
+#    p.BLOB(b': - negate + ; ')
+#
+#    # equality checks
+#    p.BLOB(b': = - 0= ; ')
+#    p.BLOB(b': <> = invert ; ')
+#
+#    # stack manipulation words
+#    p.BLOB(b': drop dup - + ; ')
+#    p.BLOB(b': over sp@ 4 + @ ; ')
+#    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ; ')
+#    p.BLOB(b': nip swap drop ; ')
+#    p.BLOB(b': 2dup over over ; ')
+#    p.BLOB(b': 2drop drop drop ; ')
+#
+#    # more logic
+#    p.BLOB(b': or invert swap invert and invert ; ')
+#
+#    # left shift 1 bit
+#    p.BLOB(b': 2* dup + ; ')
 
     # paranoid align just to be safe
     p.ALIGN()
@@ -447,27 +452,27 @@ with p.LABEL('next'):
 ###
 
 # standard forth routine: enter
-with defword(p, 'enter', 'ENTER'):
+with defword(p, 'enter'):
     p.SW(RSP, IP, 0)
     p.ADDI(RSP, RSP, 4)
     p.ADDI(IP, W, 4)  # skip code field
     p.JAL('zero', 'next')
 
 # standard forth routine: exit
-with defword(p, 'exit', 'EXIT'):
+with defword(p, 'exit'):
     p.ADDI(RSP, RSP, -4)
     p.LW(IP, RSP, 0)
     p.JAL('zero', 'next')
 
-with defword(p, ':', 'COLON'):
+with defword(p, ':'):
     p.JAL('ra', 'token')  # a0 = addr, a1 = len
     p.SUB('t0', LATEST, HERE)  # link = LATEST - HERE
     p.ADDI(LATEST, HERE, 0)  # LATEST = HERE
-    p.SH(HERE, 't0', 0)  # write LINK
-    p.SB(HERE, 'a1', 2)  # write FLAGS + LEN
+    p.SH(HERE, 't0', 0)  # TODO make addr, write LINK
+    p.SB(HERE, 'a1', 4)  # write FLAGS + LEN
 with p.LABEL('strncpy'):
     p.ADDI('t0', 'a0', 0)  # t0 = strncpy src
-    p.ADDI('t1', HERE, 3)  # t1 = strncpy dest (+3 to skip LINK and FLAGS/LEN)
+    p.ADDI('t1', HERE, 5)  # t1 = strncpy dest (+5 to skip LINK and FLAGS/LEN)
     p.ADDI('t2', 'a1', 0)  # t2 = strncpy len
 with p.LABEL('strncpy_body'):
     p.LBU('t3', 't0', 0)  # t3 = [src]
@@ -488,20 +493,16 @@ with p.LABEL('padding_next'):
     p.ADDI(HERE, HERE, 1)  # HERE++
     p.JAL('zero', 'padding_body')  # loop again
 with p.LABEL('padding_done'):
-    # TODO: this would be simpler with a indirect-threaded forth
-    # the current version is hacky and jitty as heck
-    offset = p.labels['word_ENTER'] - p.location
-    inst = asm.JAL('zero', offset)
-    inst, = struct.unpack('<I', inst)
-    p.LUI('t0', p.HI(inst))  # load code to t0
-    p.ADDI('t0', 't0', p.LO(inst))  # ...
-    p.SW(HERE, 't0', 0)  # write JAL inst into word (due to DTF)
+    addr = RAM_BASE_ADDR + p.labels['word_enter']
+    p.LUI('t0', p.HI(addr))  # load addr of ENTER into t0
+    p.ADDI('t0', 't0', p.LO(addr))  # ...
+    p.SW(HERE, 't0', 0)  # write addr of ENTER to word definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 1)  # STATE = 1 (compile)
     p.JAL('zero', 'next')  # next
 
-with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
-    addr = RAM_BASE_ADDR + p.labels['word_EXIT']
+with defword(p, ';', flags=F_IMMEDIATE):
+    addr = RAM_BASE_ADDR + p.labels['word_exit']
     p.LUI('t0', p.HI(addr))  # load addr of EXIT into t0
     p.ADDI('t0', 't0', p.LO(addr))  # ...
     p.SW(HERE, 't0', 0)  # write addr of EXIT to word definition
@@ -509,7 +510,7 @@ with defword(p, ';', 'SEMICOLON', flags=F_IMMEDIATE):
     p.ADDI(STATE, 'zero', 1)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
 
-with defword(p, 'rcu', 'RCU'):
+with defword(p, 'rcu'):
     # load RCU base addr into t0
     p.LUI('t0', p.HI(RCU_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
@@ -535,7 +536,7 @@ with defword(p, 'rcu', 'RCU'):
 
 # red LED: GPIO port C, ctrl 1, pin 13
 # offset: ((PIN - 8) * 4) = 20
-with defword(p, 'rled', 'RLED'):
+with defword(p, 'rle'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -565,7 +566,7 @@ with defword(p, 'rled', 'RLED'):
 
 # green LED: GPIO port A, ctrl 0, pin 1
 # offset: (PIN * 4) = 4
-with defword(p, 'gled', 'GLED'):
+with defword(p, 'gle'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -595,7 +596,7 @@ with defword(p, 'gled', 'GLED'):
 
 # blue LED: GPIO port A, ctrl 0, pin 2
 # offset: (PIN * 4) = 8
-with defword(p, 'bled', 'BLED'):
+with defword(p, 'ble'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -626,7 +627,7 @@ with defword(p, 'bled', 'BLED'):
 # USART0: GPIO port A, ctrl 1, pins 9 and 10
 # offset: ((PIN - 8) * 4) = 4 (pin 9)
 # offset: ((PIN - 8) * 4) = 8 (pin 10)
-with defword(p, 'usart0', 'USART0'):
+with defword(p, 'usart0'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -731,42 +732,42 @@ with defword(p, 'usart0', 'USART0'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'state', 'STATEVAR'):
+with defword(p, 'state'):
     # push STATE onto stack
     p.SW(DSP, STATE, 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'tib', 'TIBVAR'):
+with defword(p, 'tib'):
     # push TIB onto stack
     p.SW(DSP, TIB, 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
-with defword(p, '>in', 'TOINVAR'):
+with defword(p, '>in'):
     # push TOIN onto stack
     p.SW(DSP, TOIN, 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'here', 'HEREVAR'):
+with defword(p, 'here'):
     # push HERE onto stack
     p.SW(DSP, HERE, 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'latest', 'LATESTVAR'):
+with defword(p, 'latest'):
     # push LATEST onto stack
     p.SW(DSP, LATEST, 0)
     p.ADDI(DSP, DSP, 4)
     # next
     p.JAL('zero', 'next')
 
-with defword(p, '@', 'FETCH'):
+with defword(p, '@'):
     # pop address into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
@@ -778,7 +779,7 @@ with defword(p, '@', 'FETCH'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, '!', 'STORE'):
+with defword(p, '!'):
     # pop address into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
@@ -790,7 +791,7 @@ with defword(p, '!', 'STORE'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'sp@', 'SPFETCH'):
+with defword(p, 'sp@'):
     # copy DSP into t0 and decrement to current top value
     p.ADDI('t0', DSP, 0)
     p.ADDI('t0', 't0', -4)
@@ -800,7 +801,7 @@ with defword(p, 'sp@', 'SPFETCH'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, 'rp@', 'RPFETCH'):
+with defword(p, 'rp@'):
     # copy RSP into t0 and decrement to current top value
     p.ADDI('t0', RSP, 0)
     p.ADDI('t0', 't0', -4)
@@ -810,7 +811,7 @@ with defword(p, 'rp@', 'RPFETCH'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, '0=', 'ZEROEQUALS'):
+with defword(p, '0='):
     # pop value into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
@@ -825,7 +826,7 @@ with p.LABEL('notzero'):
     # next
     p.JAL('zero', 'next')
 
-with defword(p, '+', 'PLUS'):
+with defword(p, '+'):
     # pop first value into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
@@ -841,7 +842,7 @@ with defword(p, '+', 'PLUS'):
     p.JAL('zero', 'next')
 
 p.LABEL('latest')  # mark the latest builtin word
-with defword(p, 'nand', 'NAND'):
+with defword(p, 'nand'):
     # pop first value into t0
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
