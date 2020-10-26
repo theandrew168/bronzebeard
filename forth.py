@@ -8,17 +8,19 @@ from simpleriscv import asm
 # Resolution wouldn't happen until subsequent passes of the assembler
 #
 # 1. Literal numeric value (needs no resolution)
-#       Number -> Number
+#       Number -> Number            0x42
 # 2. PC location (anytime I dig into p.location manually)
-#       PC -> Number
+#       PC -> Number                Position()  # implicit PC
 # 3. Label location (anytime I dig into p.labels manually)
-#       String -> Number
+#       String -> Number            PositionFrom('foo')
+#                                   PositionAt('foo')
 # 4. Relative to PC (jumps / branches, forward and backward)
-#       String + PC -> Number
-# 5. Relative to other position (forth word links)
-#       String + String -> Number
-# 6. Relative to base address (absolute locations in memory: TIB, DSP, RSP, etc)
-#       String + Number -> Number
+#       String + PC -> Number       Offset('bar')  # implicit PC
+# 5. Relative to base address (absolute locations in memory: TIB, DSP, RSP, etc)
+#       String + Number -> Number   OffsetFrom('baz', RAM_BASE_ADDR)
+#                                   PositionRelativeTo('baz', RAM_BASE_ADDR)
+# 6. Relative to other position (forth word links)
+#       String + String -> Number   OffsetBetween('foo', 'bar')
 
 # Based heavily on "sectorforth" and "Moving Forth":
 # https://github.com/cesarblum/sectorforth
@@ -213,7 +215,6 @@ def defword(p, name, flags=0):
     #   AbsoluteAddress(RAM_BASE_ADDR, word_label)
     p.BLOB(struct.pack('<I', defword.link))
     defword.link = RAM_BASE_ADDR + p.labels[word_label]
-    print(hex(defword.link))
 
     # write word flags + length
     p.BLOB(struct.pack('<B', flags | len(name)))
@@ -237,7 +238,7 @@ with p.LABEL('copy'):
     p.LUI('t1', p.HI(RAM_BASE_ADDR))
     p.ADDI('t1', 't1', p.LO(RAM_BASE_ADDR))
     # setup copy count (everything up to the "here" label)
-    p.ADDI('t2', 'zero', 'here')
+    p.ADDI('t2', 'zero', 'here')  # RelativeOffset('here')
 with p.LABEL('copy_loop'):
     p.BEQ('t2', 'zero', 'copy_done')
     p.LW('t3', 't0', 0)  # [src] -> t3
@@ -325,7 +326,14 @@ with p.LABEL('interpreter_execute'):
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
     p.ADDI(IP, IP, 'interpreter_addr')
     # word is found and located at a2
-    p.ADDI(W, 'a2', 8)  # TODO: hack to manually skip name pad bytes (word len must be <= 3)
+    p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
+    p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
+with p.LABEL('interpreter_padding'):
+    p.ANDI('t0', W, 0b0011)  # isolate bottom two bits of W
+    p.BEQ('t0', 'zero', 'interpreter_padding_done')  # done if they are zero (which means W is a multiple of 4)
+    p.ADDI(W, W, 1)  # W += 1
+    p.JAL('zero', 'interpreter_padding')  # keep on padding
+with p.LABEL('interpreter_padding_done'):
     p.JALR('zero', W, 0)  # execute the word!
 
 # TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
@@ -334,6 +342,7 @@ with p.LABEL('interpreter_execute'):
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
+    p.ALIGN()  # not required but should be here since this is data between insts
 
 # Procedure: token
 # Usage: p.JAL('ra', 'token')
@@ -400,7 +409,7 @@ with p.LABEL('lookup_found'):
 
 with p.LABEL('tib'):
     # call the builtin "led" word
-    p.BLOB(b'rcu rle ble ')
+    p.BLOB(b'rcu rled bleddd usart0 gled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -536,7 +545,7 @@ with defword(p, 'rcu'):
 
 # red LED: GPIO port C, ctrl 1, pin 13
 # offset: ((PIN - 8) * 4) = 20
-with defword(p, 'rle'):
+with defword(p, 'rled'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -566,7 +575,7 @@ with defword(p, 'rle'):
 
 # green LED: GPIO port A, ctrl 0, pin 1
 # offset: (PIN * 4) = 4
-with defword(p, 'gle'):
+with defword(p, 'gled'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -596,7 +605,7 @@ with defword(p, 'gle'):
 
 # blue LED: GPIO port A, ctrl 0, pin 2
 # offset: (PIN * 4) = 8
-with defword(p, 'ble'):
+with defword(p, 'bleddd'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -687,13 +696,7 @@ with defword(p, 'usart0'):
 
     CLOCK = 8000000  # 8MHz
     BAUD = 115200  # 115200 bits per second
-    #BAUD = 9600
-    udiv = CLOCK // BAUD // 16
-    udiv = 70  # 115200
-    #udiv = 834  # 9600
-    #intdiv = 4
-    #fracdiv = 5
-    #udiv = intdiv << 4 | fracdiv
+    udiv = CLOCK // BAUD
 
     # load USART0 base address
     p.LUI('t0', p.HI(USART_BASE_ADDR_0))
@@ -702,7 +705,6 @@ with defword(p, 'usart0'):
     # configure USART0 baud rate
     p.ADDI('t1', 't0', USART_BAUD_OFFSET)
     p.ADDI('t2', 'zero', udiv)
-    p.SLLI('t2', 't2', 4)  # shift over to intdiv?
     p.SW('t1', 't2', 0)
 
     # enable TX and RX
