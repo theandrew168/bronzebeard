@@ -233,7 +233,7 @@ def defword(p, name, flags=0):
     p.LABEL(word_label)
 
     # write code word (addr to raw machine code that will follow)
-    #   OffsetFrom(RAM_BASE_ADDR, code_label)
+    #   OffsetFrom(RAM_BASE_ADDR, body_label)
     addr = RAM_BASE_ADDR + p.location + 4
     p.BLOB(struct.pack('<I', addr))
 
@@ -541,7 +541,7 @@ with p.LABEL('strncpy_next'):
     p.ADDI('t1', 't1', 1)  # dest++
     p.JAL('zero', 'strncpy_body')  # copy next char
 with p.LABEL('strncpy_done'):
-    p.ADDI(HERE, 't1', 0)  # HERE = end of word
+    p.ADDI(HERE, 't1', 1)  # HERE = end of word, start of padding / code, need +1 cuz still on last char
 with p.LABEL('padding_body'):
     p.ANDI('t0', HERE, 0b0011)  # isolate bottom two bits of HERE
     p.BEQ('t0', 'zero', 'padding_done')  # done if they are zero (which means HERE is a multiple of 4)
