@@ -340,6 +340,7 @@ with p.LABEL('interpreter_padding'):
     p.ADDI(W, W, 1)  # W += 1
     p.JAL('zero', 'interpreter_padding')  # keep on padding
 with p.LABEL('interpreter_padding_done'):
+    # TODO: I think this might not work for secondary words! Only builtins.
     p.LW('t0', W, 0)  # load code addr into t0
     p.JALR('zero', 't0', 0)  # execute the word!
 
@@ -421,7 +422,8 @@ with p.LABEL('lookup_found'):
 with p.LABEL('tib'):
 #    p.BLOB(b'rcu rled gled usart0 gled ')
     p.BLOB(b': pled rcu rled bled ; ')
-    p.BLOB(b'rcu gled ')
+    p.BLOB(b'pled ')
+#    p.BLOB(b'rcu gled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -530,7 +532,6 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.SW(HERE, 't0', 0)  # write addr of EXIT to word definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
-    #p.JAL('zero', 'code_reddy')
     p.JAL('zero', 'next')  # next
 
 with defword(p, 'rcu'):
