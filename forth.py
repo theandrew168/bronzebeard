@@ -124,7 +124,7 @@ USART_GP_OFFSET = 0x18
 # | x10 |  a0  | token address   |
 # | x11 |  a1  | token length    |
 # | x12 |  a2  | lookup address  |
-# | x13 |  a3  | <unused>        |
+# | x13 |  a3  | align arg / ret |
 # | x14 |  a4  | <unused>        |
 # | x15 |  a5  | <unused>        |
 # | x16 |  a6  | <unused>        |
@@ -206,15 +206,15 @@ def defword(p, name, flags=0):
     if len(name) > 0x3f:
         raise ValueError('Word name is longer than 0x3f (63 chars): {}'.format(name))
 
-    # create a label for the word (word name prefixed with 'word_')
-    word_label = 'word_' + name
-    p.LABEL(word_label)
+    # create a label for the word header (word name prefixed with 'header_')
+    header_label = 'header_' + name
+    p.LABEL(header_label)
 
     # write the link to previous word and update link to point to this word
-    #   OffsetFrom(RAM_BASE_ADDR, word_label)
-    #   AbsoluteAddress(RAM_BASE_ADDR, word_label)
+    #   OffsetFrom(RAM_BASE_ADDR, header_label)
+    #   AbsoluteAddress(RAM_BASE_ADDR, header_label)
     p.BLOB(struct.pack('<I', defword.link))
-    defword.link = RAM_BASE_ADDR + p.labels[word_label]
+    defword.link = RAM_BASE_ADDR + p.labels[header_label]
 
     # write word flags + length
     p.BLOB(struct.pack('<B', flags | len(name)))
@@ -223,9 +223,18 @@ def defword(p, name, flags=0):
     p.BLOB(name.encode())
     p.ALIGN()
 
+    # create helper label for code field
+    word_label = 'word_' + name
+    p.LABEL(word_label)
+
     # write code word (addr to raw machine code that will follow)
+    #   OffsetFrom(RAM_BASE_ADDR, code_label)
     addr = RAM_BASE_ADDR + p.location + 4
     p.BLOB(struct.pack('<I', addr))
+
+    # create helper label for word's actual code / address list
+    body_label = 'body_' + name
+    p.LABEL(body_label)
 
     # context manager aesthetics hack
     yield
@@ -321,7 +330,11 @@ with p.LABEL('interpreter'):
     p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
 with p.LABEL('interpreter_compile'):
     # otherwise compile!
-    p.SW(HERE, 'a2', 0)  # write addr of word to definition
+    p.ADDI('t0', 'a2', 5)  # set t0 = start of word name
+    p.ADD('t0', 't0', 'a1')  # skip to end of word name
+    p.ADDI('a3', 't0', 0)  # setup arg for align
+    p.JAL('ra', 'align')  # align to start of code word (a3 = addr of code word)
+    p.SW(HERE, 'a3', 0)  # write addr of code word to definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.JAL('zero', 'interpreter')
 with p.LABEL('interpreter_execute'):
@@ -341,7 +354,8 @@ with p.LABEL('interpreter_padding'):
     p.JAL('zero', 'interpreter_padding')  # keep on padding
 with p.LABEL('interpreter_padding_done'):
     # TODO: I think this might not work for secondary words! Only builtins.
-    p.LW('t0', W, 0)  # load code addr into t0
+    # At this point, W holds the addr of the target word's code field
+    p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
     p.JALR('zero', 't0', 0)  # execute the word!
 
 # TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
@@ -418,6 +432,18 @@ with p.LABEL('lookup_strcmp_next'):
 with p.LABEL('lookup_found'):
     p.ADDI('a2', 't0', 0)  # a2 = addr of found word
     p.JALR('zero', 'ra', 0)  # return
+
+# Procedure: align
+# Usage: p.JAL('ra', 'align')
+# Arg: a3 = value to be aligned
+# Ret: a3 = value after alignment
+with p.LABEL('align'):
+    p.ANDI('t0', 'a3', 0b11)
+    p.BEQ('t0', 'zero', 'align_done')
+    p.ADDI('a3', 'a3', 1)
+    p.JAL('zero', 'align')
+with p.LABEL('align_done'):
+    p.JALR('zero', 'ra', 0)
 
 with p.LABEL('tib'):
 #    p.BLOB(b'rcu rled gled usart0 gled ')
@@ -517,6 +543,8 @@ with p.LABEL('padding_next'):
     p.ADDI(HERE, HERE, 1)  # HERE++
     p.JAL('zero', 'padding_body')  # loop again
 with p.LABEL('padding_done'):
+    #   OffsetFrom(RAM_BASE_ADDR, 'word_enter')
+    #   AddressFrom(RAM_BASE_ADDR, 'word_enter')
     addr = RAM_BASE_ADDR + p.labels['word_enter']
     p.LUI('t0', p.HI(addr))  # load addr of ENTER into t0
     p.ADDI('t0', 't0', p.LO(addr))  # ...
@@ -526,6 +554,8 @@ with p.LABEL('padding_done'):
     p.JAL('zero', 'next')  # next
 
 with defword(p, ';', flags=F_IMMEDIATE):
+    #   OffsetFrom(RAM_BASE_ADDR, 'word_exit')
+    #   AddressFrom(RAM_BASE_ADDR, 'word_exit')
     addr = RAM_BASE_ADDR + p.labels['word_exit']
     p.LUI('t0', p.HI(addr))  # load addr of EXIT into t0
     p.ADDI('t0', 't0', p.LO(addr))  # ...
@@ -560,7 +590,6 @@ with defword(p, 'rcu'):
 
 # debug place to jump to check if the code got somewhere
 with defword(p, 'reddy'):
-    p.LABEL('code_reddy')
     # load RCU base addr into t0
     p.LUI('t0', p.HI(RCU_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
