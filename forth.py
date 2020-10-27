@@ -694,6 +694,39 @@ with defword(p, 'usart0'):
     p.SLLI('t1', 't1', 14)
     p.SW('t0', 't1', 0)
 
+    # NOTE: This math yields the same results achieved from
+    #   following the GD32VF103 manual (16.3.2). I'm not sure
+    #   if this is always the case or just happens to work out
+    #   for a few common baud rates (9600 and 115200, at least).
+    #
+    # Example 1:
+    # >>> import math
+    # >>> PCLK = 8000000
+    # >>> BAUD = 9600
+    # >>> PCLK // BAUD
+    # 833
+    # >>>
+    # >>> d = PCLK / BAUD / 16
+    # >>> fracdiv, intdiv = math.modf(d)
+    # >>> intdiv = int(intdiv)
+    # >>> fracdiv = round(16 * fracdiv)
+    # >>> intdiv << 4 | fracdiv
+    # 833
+    #
+    # Example 2:
+    # >>> import math
+    # >>> PCLK = 8000000
+    # >>> BAUD = 115200
+    # >>> PCLK // BAUD
+    # 69
+    # >>>
+    # >>> d = PCLK / BAUD / 16
+    # >>> fracdiv, intdiv = math.modf(d)
+    # >>> intdiv = int(intdiv)
+    # >>> fracdiv = round(16 * fracdiv)
+    # >>> intdiv << 4 | fracdiv
+    # 69
+
     CLOCK = 8000000  # 8MHz
     BAUD = 115200  # 115200 bits per second
     udiv = CLOCK // BAUD
