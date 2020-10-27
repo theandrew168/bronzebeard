@@ -453,13 +453,7 @@ with p.LABEL('align_done'):
 with p.LABEL('tib'):
 #    p.BLOB(b'rcu rled gled usart0 gled ')
 
-    # TODO: Option 1: after compile, lookup can't find pled (strncpy bug?)
-    # TODO: Option 2: after compile, after lookup, execution of pled goes wonky (inner interp bug?)
-    p.BLOB(b'rcu ')
-    p.BLOB(b': pled rcu rled bled ; ')
-    p.BLOB(b'rled ')
-    p.BLOB(b'pled ')
-    p.BLOB(b'gled ')
+    p.BLOB(b': pled rcu r b ; pled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -513,7 +507,6 @@ with p.LABEL('next'):
 
 # standard forth routine: enter
 with defword(p, 'enter'):
-    p.JAL('zero', 'body_reddy')
     p.SW(RSP, IP, 0)
     p.ADDI(RSP, RSP, 4)
     p.ADDI(IP, W, 4)  # skip code field
@@ -650,7 +643,7 @@ with defword(p, 'reddy'):
 
 # red LED: GPIO port C, ctrl 1, pin 13
 # offset: ((PIN - 8) * 4) = 20
-with defword(p, 'rled'):
+with defword(p, 'r'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -710,7 +703,7 @@ with defword(p, 'gled'):
 
 # blue LED: GPIO port A, ctrl 0, pin 2
 # offset: (PIN * 4) = 8
-with defword(p, 'bled'):
+with defword(p, 'b'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
