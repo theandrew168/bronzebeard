@@ -14,11 +14,16 @@ from simpleriscv import asm
 # 3. Label location (anytime I dig into p.labels manually)
 #       String -> Number            PositionFrom('foo')
 #                                   PositionAt('foo')
+#                                   AbsolutePosition(0, 'foo')  # args: base, label
+#                                   Position(0, 'foo')
+#                                   Location(0, 'foo')
 # 4. Relative to PC (jumps / branches, forward and backward)
 #       String + PC -> Number       Offset('bar')  # implicit PC
+#                                   RelativePosition('bar')
 # 5. Relative to base address (absolute locations in memory: TIB, DSP, RSP, etc)
 #       String + Number -> Number   OffsetFrom('baz', RAM_BASE_ADDR)
 #                                   PositionRelativeTo('baz', RAM_BASE_ADDR)
+#                                   AbsolutePosition(RAM_BASE_ADDR, 'baz')
 # 6. Relative to other position (forth word links)
 #       String + String -> Number   OffsetBetween('foo', 'bar')
 
@@ -309,6 +314,7 @@ with p.LABEL('init'):
     p.ADDI(TOIN, 'zero', 0)
 
     # set HERE var to "here" location
+    #   Position(RAM_BASE_ADDR, 'here') -> Number, not bytes
     p.LUI(HERE, p.HI(RAM_BASE_ADDR))
     p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
     p.ADDI(HERE, HERE, 'here')
@@ -353,7 +359,6 @@ with p.LABEL('interpreter_padding'):
     p.ADDI(W, W, 1)  # W += 1
     p.JAL('zero', 'interpreter_padding')  # keep on padding
 with p.LABEL('interpreter_padding_done'):
-    # TODO: I think this might not work for secondary words! Only builtins.
     # At this point, W holds the addr of the target word's code field
     p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
     p.JALR('zero', 't0', 0)  # execute the word!
@@ -438,18 +443,20 @@ with p.LABEL('lookup_found'):
 # Arg: a3 = value to be aligned
 # Ret: a3 = value after alignment
 with p.LABEL('align'):
-    p.ANDI('t0', 'a3', 0b11)
-    p.BEQ('t0', 'zero', 'align_done')
-    p.ADDI('a3', 'a3', 1)
-    p.JAL('zero', 'align')
+    p.ANDI('t0', 'a3', 0b11)  # t0 = bottom 2 bits of a3
+    p.BEQ('t0', 'zero', 'align_done')  # if they are zero, a3 is aligned
+    p.ADDI('a3', 'a3', 1)  # else inc a3 by 1
+    p.JAL('zero', 'align')  # and loop again
 with p.LABEL('align_done'):
-    p.JALR('zero', 'ra', 0)
+    p.JALR('zero', 'ra', 0)  # return
 
 with p.LABEL('tib'):
 #    p.BLOB(b'rcu rled gled usart0 gled ')
+
+    # TODO: Option 1: after compile, lookup can't find pled (strncpy bug?)
+    # TODO: Option 2: after compile, after lookup, execution of pled goes wonky (inner interp bug?)
     p.BLOB(b': pled rcu rled bled ; ')
     p.BLOB(b'pled ')
-#    p.BLOB(b'rcu gled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
