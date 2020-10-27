@@ -223,6 +223,10 @@ def defword(p, name, flags=0):
     p.BLOB(name.encode())
     p.ALIGN()
 
+    # write code word (addr to raw machine code that will follow)
+    addr = RAM_BASE_ADDR + p.location + 4
+    p.BLOB(struct.pack('<I', addr))
+
     # context manager aesthetics hack
     yield
 
@@ -322,9 +326,11 @@ with p.LABEL('interpreter_compile'):
     p.JAL('zero', 'interpreter')
 with p.LABEL('interpreter_execute'):
     # set interpreter pointer to indirect addr back to interpreter loop
+    # TODO: can't just pre-calc addr here because its a forward ref
+    #   and I can't dig into p.labels yet. Fix in v3.
     p.LUI(IP, p.HI(RAM_BASE_ADDR))
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
-    p.ADDI(IP, IP, 'interpreter_addr')
+    p.ADDI(IP, IP, 'interpreter_addr_addr')
     # word is found and located at a2
     p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
     p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
@@ -334,7 +340,8 @@ with p.LABEL('interpreter_padding'):
     p.ADDI(W, W, 1)  # W += 1
     p.JAL('zero', 'interpreter_padding')  # keep on padding
 with p.LABEL('interpreter_padding_done'):
-    p.JALR('zero', W, 0)  # execute the word!
+    p.LW('t0', W, 0)  # load code addr into t0
+    p.JALR('zero', 't0', 0)  # execute the word!
 
 # TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
 #   OffsetFrom(RAM_BASE_ADDR, 'interpreter')
@@ -342,7 +349,11 @@ with p.LABEL('interpreter_padding_done'):
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
-    p.ALIGN()  # not required but should be here since this is data between insts
+with p.LABEL('interpreter_addr_addr'):
+    addr = RAM_BASE_ADDR + p.labels['interpreter_addr']
+    p.BLOB(struct.pack('<I', addr))
+
+p.ALIGN()  # not required but should be here since this is data between insts
 
 # Procedure: token
 # Usage: p.JAL('ra', 'token')
@@ -408,8 +419,9 @@ with p.LABEL('lookup_found'):
     p.JALR('zero', 'ra', 0)  # return
 
 with p.LABEL('tib'):
-    # call the builtin "led" word
-    p.BLOB(b'rcu rled bleddd usart0 gled ')
+#    p.BLOB(b'rcu rled gled usart0 gled ')
+    p.BLOB(b': pled rcu rled bled ; ')
+    p.BLOB(b'rcu gled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -454,7 +466,8 @@ with p.LABEL('tib'):
 with p.LABEL('next'):
     p.LW(W, IP, 0)
     p.ADDI(IP, IP, 4)
-    p.JALR('zero', W, 0)
+    p.LW('t0', W, 0)
+    p.JALR('zero', 't0', 0)
 
 ###
 ### dictionary starts here
@@ -475,13 +488,13 @@ with defword(p, 'exit'):
 
 with defword(p, ':'):
     p.JAL('ra', 'token')  # a0 = addr, a1 = len
-    p.SUB('t0', LATEST, HERE)  # link = LATEST - HERE
-    p.ADDI(LATEST, HERE, 0)  # LATEST = HERE
-    p.SH(HERE, 't0', 0)  # TODO make addr, write LINK
-    p.SB(HERE, 'a1', 4)  # write FLAGS + LEN
-with p.LABEL('strncpy'):
+    p.SW(HERE, LATEST, 0)  # write link to prev word (write LATEST to HERE)
+    p.SB(HERE, 'a1', 4)  # write word length
+    p.ADDI(LATEST, HERE, 0)  # set LATEST = HERE (before HERE gets modified)
+    p.ADDI(HERE, HERE, 5)  # move HERE past link and len (start of name)
+with p.LABEL('strncpy'):  # NOTE: breaks if len <= 0
     p.ADDI('t0', 'a0', 0)  # t0 = strncpy src
-    p.ADDI('t1', HERE, 5)  # t1 = strncpy dest (+5 to skip LINK and FLAGS/LEN)
+    p.ADDI('t1', HERE, 0)  # t1 = strncpy dest
     p.ADDI('t2', 'a1', 0)  # t2 = strncpy len
 with p.LABEL('strncpy_body'):
     p.LBU('t3', 't0', 0)  # t3 = [src]
@@ -491,7 +504,7 @@ with p.LABEL('strncpy_next'):
     p.BEQ('t2', 'zero', 'strncpy_done')  # done if len == 0
     p.ADDI('t0', 't0', 1)  # src++
     p.ADDI('t1', 't1', 1)  # dest++
-    p.JAL('zero', 'strncpy_body')
+    p.JAL('zero', 'strncpy_body')  # copy next char
 with p.LABEL('strncpy_done'):
     p.ADDI(HERE, 't1', 0)  # HERE = end of word
 with p.LABEL('padding_body'):
@@ -516,7 +529,8 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI('t0', 't0', p.LO(addr))  # ...
     p.SW(HERE, 't0', 0)  # write addr of EXIT to word definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
-    p.ADDI(STATE, 'zero', 1)  # STATE = 0 (execute)
+    p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
+    #p.JAL('zero', 'code_reddy')
     p.JAL('zero', 'next')  # next
 
 with defword(p, 'rcu'):
@@ -539,6 +553,56 @@ with defword(p, 'rcu'):
     # set GPIO clock enable bits
     p.OR('t1', 't1', 't2')
     p.SW('t0', 't1', 0)  # store the ABP2 config
+
+    # next
+    p.JAL('zero', 'next')
+
+# debug place to jump to check if the code got somewhere
+with defword(p, 'reddy'):
+    p.LABEL('code_reddy')
+    # load RCU base addr into t0
+    p.LUI('t0', p.HI(RCU_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
+
+    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)  # move t0 forward to APB2 enable register
+    p.LW('t1', 't0', 0)  # load current APB2 enable config into t1
+
+    # prepare enable bits for GPIO A and GPIO C
+    #                     | EDCBA  |
+    p.ADDI('t2', 'zero', 0b00010100)
+
+    # prepare enable bit for USART0
+    p.ADDI('t3', 'zero', 1)
+    p.SLLI('t3', 't3', 14)
+    p.OR('t2', 't2', 't3')
+
+    # set GPIO clock enable bits
+    p.OR('t1', 't1', 't2')
+    p.SW('t0', 't1', 0)  # store the ABP2 config
+
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
+
+    # move t0 forward to control 1 register
+    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 20)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 20)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
 
     # next
     p.JAL('zero', 'next')
@@ -605,7 +669,7 @@ with defword(p, 'gled'):
 
 # blue LED: GPIO port A, ctrl 0, pin 2
 # offset: (PIN * 4) = 8
-with defword(p, 'bleddd'):
+with defword(p, 'bled'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
