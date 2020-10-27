@@ -354,7 +354,7 @@ with p.LABEL('interpreter_execute'):
     p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
     p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
 with p.LABEL('interpreter_padding'):
-    p.ANDI('t0', W, 0b0011)  # isolate bottom two bits of W
+    p.ANDI('t0', W, 0b11)  # isolate bottom two bits of W
     p.BEQ('t0', 'zero', 'interpreter_padding_done')  # done if they are zero (which means W is a multiple of 4)
     p.ADDI(W, W, 1)  # W += 1
     p.JAL('zero', 'interpreter_padding')  # keep on padding
@@ -455,8 +455,11 @@ with p.LABEL('tib'):
 
     # TODO: Option 1: after compile, lookup can't find pled (strncpy bug?)
     # TODO: Option 2: after compile, after lookup, execution of pled goes wonky (inner interp bug?)
+    p.BLOB(b'rcu ')
     p.BLOB(b': pled rcu rled bled ; ')
+    p.BLOB(b'rled ')
     p.BLOB(b'pled ')
+    p.BLOB(b'gled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -510,6 +513,7 @@ with p.LABEL('next'):
 
 # standard forth routine: enter
 with defword(p, 'enter'):
+    p.JAL('zero', 'body_reddy')
     p.SW(RSP, IP, 0)
     p.ADDI(RSP, RSP, 4)
     p.ADDI(IP, W, 4)  # skip code field
@@ -543,7 +547,7 @@ with p.LABEL('strncpy_next'):
 with p.LABEL('strncpy_done'):
     p.ADDI(HERE, 't1', 1)  # HERE = end of word, start of padding / code, need +1 cuz still on last char
 with p.LABEL('padding_body'):
-    p.ANDI('t0', HERE, 0b0011)  # isolate bottom two bits of HERE
+    p.ANDI('t0', HERE, 0b11)  # isolate bottom two bits of HERE
     p.BEQ('t0', 'zero', 'padding_done')  # done if they are zero (which means HERE is a multiple of 4)
     p.SB(HERE, 'zero', 0)  # else store a zero
 with p.LABEL('padding_next'):
@@ -997,6 +1001,11 @@ with defword(p, 'nand'):
 
 p.LABEL('here')  # mark the location of the next new word
 
+print(hex(RAM_BASE_ADDR + p.labels['latest']))
+print(hex(RAM_BASE_ADDR + p.labels['here']))
+print(hex(RAM_BASE_ADDR + p.labels['word_enter']))
+print(hex(RAM_BASE_ADDR + p.labels['word_rcu']))
+print(hex(RAM_BASE_ADDR + p.labels['word_exit']))
 
 with open('forth.bin', 'wb') as f:
     f.write(p.machine_code)
