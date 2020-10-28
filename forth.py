@@ -36,6 +36,8 @@ from simpleriscv import asm
 # GD32VF103[CBT6]: Longan Nano, Wio Lite
 ROM_BASE_ADDR = 0x08000000  # 128K
 RAM_BASE_ADDR = 0x20000000  # 32K
+CLOCK_FREQ = 8000000
+MTIME_FREQ = CLOCK_FREQ // 4
 
 # FE310-G002: HiFive1 Rev B
 #ROM_BASE_ADDR  = 0x20000000  # 4M
@@ -489,8 +491,8 @@ with p.LABEL('tib'):
 
     # stack manipulation words
     p.BLOB(b': drop dup - + ; ')
-    p.BLOB(b': over sp@ 4 + @ ; ')
-    p.BLOB(b': swap over over sp@ 12 + ! sp@ 4 + ! ; ')
+    p.BLOB(b': over sp@ 4 - @ ; ')
+    p.BLOB(b': swap over over sp@ 12 - ! sp@ 4 - ! ; ')
     p.BLOB(b': nip swap drop ; ')
     p.BLOB(b': 2dup over over ; ')
     p.BLOB(b': 2drop drop drop ; ')
@@ -498,10 +500,19 @@ with p.LABEL('tib'):
     # more logic
     p.BLOB(b': or invert swap invert and invert ; ')
 
-    # left shift 1 bit
+    # left shift 1, 2, 4, 8 bits
     p.BLOB(b': 2* dup + ; ')
+    p.BLOB(b': 4* 2* 2* ; ')
+    p.BLOB(b': 16* 4* 4* ; ')
+    p.BLOB(b': 256* 16* 16* ; ')
 
-    p.BLOB(b': pled rcu r b ; ')
+    # REAL STUFF
+    p.BLOB(b': 0x14 1 16* 1 4* or ; ')  # constant 0x14
+    p.BLOB(b': 0x18 1 16* 1 4* 2* or ; ')  # constant 0x18
+    p.BLOB(b': 0x40021000 1 256* 256* 256* 16* 4* 1 256* 256* 2* 1 256* 16* or or ; ')  # constant 0x40021000
+    p.BLOB(b': rcu 0x14 0x40021000 0x18 + ! ; ')  # rcu enables clock for GPIO ports A and C
+
+    p.BLOB(b': pled rcu rled bled ; ')
     p.BLOB(b'pled ')
 
     # paranoid align just to be safe
@@ -577,33 +588,33 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
 
-with defword(p, 'rcu'):
-    # load RCU base addr into t0
-    p.LUI('t0', p.HI(RCU_BASE_ADDR))
-    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
-
-    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)  # move t0 forward to APB2 enable register
-    p.LW('t1', 't0', 0)  # load current APB2 enable config into t1
-
-    # prepare enable bits for GPIO A and GPIO C
-    #                     | EDCBA  |
-    p.ADDI('t2', 'zero', 0b00010100)
-
-    # prepare enable bit for USART0
-    p.ADDI('t3', 'zero', 1)
-    p.SLLI('t3', 't3', 14)
-    p.OR('t2', 't2', 't3')
-
-    # set GPIO clock enable bits
-    p.OR('t1', 't1', 't2')
-    p.SW('t0', 't1', 0)  # store the ABP2 config
-
-    # next
-    p.JAL('zero', 'next')
+#with defword(p, 'rcu'):
+#    # load RCU base addr into t0
+#    p.LUI('t0', p.HI(RCU_BASE_ADDR))
+#    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
+#
+#    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)  # move t0 forward to APB2 enable register
+#    p.LW('t1', 't0', 0)  # load current APB2 enable config into t1
+#
+#    # prepare enable bits for GPIO A and GPIO C
+#    #                     | EDCBA  |
+#    p.ADDI('t2', 'zero', 0b00010100)
+#
+#    # prepare enable bit for USART0
+#    p.ADDI('t3', 'zero', 1)
+#    p.SLLI('t3', 't3', 14)
+#    p.OR('t2', 't2', 't3')
+#
+#    # set GPIO clock enable bits
+#    p.OR('t1', 't1', 't2')
+#    p.SW('t0', 't1', 0)  # store the ABP2 config
+#
+#    # next
+#    p.JAL('zero', 'next')
 
 # red LED: GPIO port C, ctrl 1, pin 13
 # offset: ((PIN - 8) * 4) = 20
-with defword(p, 'r'):
+with defword(p, 'rled'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
@@ -631,39 +642,39 @@ with defword(p, 'r'):
     # next
     p.JAL('zero', 'next')
 
-## green LED: GPIO port A, ctrl 0, pin 1
-## offset: (PIN * 4) = 4
-#with defword(p, 'gled'):
-#    # load GPIO base addr into t0
-#    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-#    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-#
-#    # move t0 forward to control 0 register
-#    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
-#
-#    # load current GPIO config into t1
-#    p.LW('t1', 't0', 0)
-#
-#    # clear existing config
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 4)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings
-#    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-#    p.SLLI('t2', 't2', 4)
-#    p.OR('t1', 't1', 't2')
-#
-#    # store the GPIO config
-#    p.SW('t0', 't1', 0)
-#
-#    # next
-#    p.JAL('zero', 'next')
+# green LED: GPIO port A, ctrl 0, pin 1
+# offset: (PIN * 4) = 4
+with defword(p, 'gled'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+
+    # move t0 forward to control 0 register
+    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 4)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 4)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
+    # next
+    p.JAL('zero', 'next')
 
 # blue LED: GPIO port A, ctrl 0, pin 2
 # offset: (PIN * 4) = 8
-with defword(p, 'b'):
+with defword(p, 'bled'):
     # load GPIO base addr into t0
     p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
     p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
@@ -909,9 +920,9 @@ with defword(p, '0='):
     p.ADDI(DSP, DSP, -4)
     p.LW('t0', DSP, 0)
     # check equality between t0 and 0
-    p.ADDI('t1', 'zero', 0)
+    p.ADDI('t1', 'zero', 0)  # setup result (0 if nonzero)
     p.BNE('t0', 'zero', 'notzero')
-    p.ADDI('t1', 't1', -1)  # -1 if zero, 0 otherwise
+    p.ADDI('t1', 'zero', -1)  # -1 if zero
 with p.LABEL('notzero'):
     # push result of comparison onto stack
     p.SW(DSP, 't1', 0)
