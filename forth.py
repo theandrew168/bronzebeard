@@ -6,6 +6,8 @@ from simpleriscv import asm
 # Types of Immediate values (one of Literal / Position / Location / Address):
 # An Immediate can be resolved to a Number given a map[string]int of labels (can be nil, too)
 # Resolution wouldn't happen until subsequent passes of the assembler
+# Usually I just want the number (imm args to insts) but sometimes I want bytes
+#   kinda like a blob. Usually a 32-bit LE encoding of a number (4 blob bytes).
 #
 # 1. Literal numeric value (needs no resolution)
 #       Number -> Number            0x42
@@ -130,7 +132,7 @@ USART_GP_OFFSET = 0x18
 # | x11 |  a1  | token length    |
 # | x12 |  a2  | lookup address  |
 # | x13 |  a3  | align arg / ret |
-# | x14 |  a4  | <unused>        |
+# | x14 |  a4  | pad arg / ret   |
 # | x15 |  a5  | <unused>        |
 # | x16 |  a6  | <unused>        |
 # | x17 |  a7  | <unused>        |
@@ -238,6 +240,7 @@ def defword(p, name, flags=0):
     p.BLOB(struct.pack('<I', addr))
 
     # create helper label for word's actual code / address list
+    #   used by COLON for writing addr of ENTER machine code
     body_label = 'body_' + name
     p.LABEL(body_label)
 
@@ -353,12 +356,9 @@ with p.LABEL('interpreter_execute'):
     # word is found and located at a2
     p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
     p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
-with p.LABEL('interpreter_padding'):
-    p.ANDI('t0', W, 0b11)  # isolate bottom two bits of W
-    p.BEQ('t0', 'zero', 'interpreter_padding_done')  # done if they are zero (which means W is a multiple of 4)
-    p.ADDI(W, W, 1)  # W += 1
-    p.JAL('zero', 'interpreter_padding')  # keep on padding
-with p.LABEL('interpreter_padding_done'):
+    p.ADDI('a4', W, 0)  # setup arg for pad (a4 = W)
+    p.JAL('ra', 'pad')  # call pad procedure
+    p.ADDI(W, 'a4', 0)  # handle ret from pad (W = a4)
     # At this point, W holds the addr of the target word's code field
     p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
     p.JALR('zero', 't0', 0)  # execute the word!
@@ -366,6 +366,8 @@ with p.LABEL('interpreter_padding_done'):
 # TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
 #   OffsetFrom(RAM_BASE_ADDR, 'interpreter')
 #   AbsolutePosition(RAM_BASE_ADDR, 'interpreter')
+# This situation also differs because I want the imm value as LE bytes, not a number.
+# What special keyword denotes that? ImmAsLE32(Position(RAM_BASE_ADDR, 'interp')), ImmAsLE16, etc?
 with p.LABEL('interpreter_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter']
     p.BLOB(struct.pack('<I', addr))
@@ -448,6 +450,19 @@ with p.LABEL('align'):
     p.ADDI('a3', 'a3', 1)  # else inc a3 by 1
     p.JAL('zero', 'align')  # and loop again
 with p.LABEL('align_done'):
+    p.JALR('zero', 'ra', 0)  # return
+
+# Procedure: pad
+# Usage: p.JAL('ra', 'pad')
+# Arg: a4 = addr to be padded
+# Ret: a4 = addr after padding
+with p.LABEL('pad'):
+    p.ANDI('t0', 'a4', 0b11)  # t0 = bottom 2 bits of a3
+    p.BEQ('t0', 'zero', 'pad_done')  # if they are zero, a4 is aligned
+    p.SB('a4', 'zero', 0)  # write a 0 to addr at a4
+    p.ADDI('a4', 'a4', 1)  # inc a4 by 1
+    p.JAL('zero', 'pad')  # loop again
+with p.LABEL('pad_done'):
     p.JALR('zero', 'ra', 0)  # return
 
 with p.LABEL('tib'):
@@ -540,17 +555,11 @@ with p.LABEL('strncpy_next'):
     p.JAL('zero', 'strncpy_body')  # copy next char
 with p.LABEL('strncpy_done'):
     p.ADDI(HERE, 't1', 1)  # HERE = end of word, start of padding / code, need +1 cuz still on last char
-with p.LABEL('padding_body'):
-    p.ANDI('t0', HERE, 0b11)  # isolate bottom two bits of HERE
-    p.BEQ('t0', 'zero', 'padding_done')  # done if they are zero (which means HERE is a multiple of 4)
-    p.SB(HERE, 'zero', 0)  # else store a zero
-with p.LABEL('padding_next'):
-    p.ADDI(HERE, HERE, 1)  # HERE++
-    p.JAL('zero', 'padding_body')  # loop again
-with p.LABEL('padding_done'):
+    p.ADDI('a4', HERE, 0)  # setup arg for pad (a4 = HERE)
+    p.JAL('ra', 'pad')  # call pad procedure
+    p.ADDI(HERE, 'a4', 0)  # handle ret from pad (HERE = a4)
     #   OffsetFrom(RAM_BASE_ADDR, 'word_enter')
     #   AddressFrom(RAM_BASE_ADDR, 'word_enter')
-    #addr = RAM_BASE_ADDR + p.labels['word_enter']
     addr = RAM_BASE_ADDR + p.labels['body_enter']
     p.LUI('t0', p.HI(addr))  # load addr of ENTER into t0
     p.ADDI('t0', 't0', p.LO(addr))  # ...
@@ -996,11 +1005,6 @@ with defword(p, 'nand'):
 
 p.LABEL('here')  # mark the location of the next new word
 
-print(hex(RAM_BASE_ADDR + p.labels['latest']))
-print(hex(RAM_BASE_ADDR + p.labels['here']))
-print(hex(RAM_BASE_ADDR + p.labels['word_enter']))
-print(hex(RAM_BASE_ADDR + p.labels['word_rcu']))
-print(hex(RAM_BASE_ADDR + p.labels['word_exit']))
 
 with open('forth.bin', 'wb') as f:
     f.write(p.machine_code)
