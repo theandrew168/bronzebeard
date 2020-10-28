@@ -500,20 +500,33 @@ with p.LABEL('tib'):
     # more logic
     p.BLOB(b': or invert swap invert and invert ; ')
 
-    # left shift 1, 2, 4, 8 bits
-    p.BLOB(b': 2* dup + ; ')
-    p.BLOB(b': 4* 2* 2* ; ')
-    p.BLOB(b': 16* 4* 4* ; ')
-    p.BLOB(b': 256* 16* 16* ; ')
+    # left shift 1, 4, 8 bits
+    p.BLOB(b': 2* dup + ; ')  # shift a single bit
+    p.BLOB(b': 16* 2* 2* 2* 2* ; ')  # shift a nibble
+    p.BLOB(b': 256* 16* 16* ; ')  # shift a byte
 
     # REAL STUFF
-    p.BLOB(b': 0x14 1 16* 1 4* or ; ')  # constant 0x14
-    p.BLOB(b': 0x18 1 16* 1 4* 2* or ; ')  # constant 0x18
-    p.BLOB(b': 0x40021000 1 256* 256* 256* 16* 4* 1 256* 256* 2* 1 256* 16* or or ; ')  # constant 0x40021000
-    p.BLOB(b': rcu 0x14 0x40021000 0x18 + ! ; ')  # rcu enables clock for GPIO ports A and C
+    p.BLOB(b': 0x00 0 ; ')
+    p.BLOB(b': 0x04 1 2* 2* ; ')
+    p.BLOB(b': 0x08 1 2* 2* 2* ; ')
+    p.BLOB(b': 0x0c 0x08 0x04 or ; ')
+    p.BLOB(b': 0x10 1 16* ; ')
+    p.BLOB(b': 0x14 0x10 0x04 or ; ')
+    p.BLOB(b': 0x18 0x10 0x08 or ; ')
+    p.BLOB(b': 0x1c 0x10 0x0c or ; ')
 
-    p.BLOB(b': pled rcu rled bled ; ')
-    p.BLOB(b'pled ')
+    # RCU_BASE_ADDR = 0x40021000
+    p.BLOB(b': RCU_BASE_ADDR 1 256* 256* 256* 16* 2* 2* 1 256* 256* 2* 1 256* 16* or or ; ')
+    p.BLOB(b': RCU_APB2_ENABLE_OFFSET 0x18 ; ')
+    p.BLOB(b': rcu 0x14 RCU_BASE_ADDR RCU_APB2_ENABLE_OFFSET + ! ; ')  # rcu enables clock for GPIO ports A and C
+
+    # GPIO_BASE_ADDR_C = 0x40010c00
+#    p.BLOB(b': GPIO_BASE_ADDR_C 1 256* 256* 256* 16* 2* 2* 1 256* 256* 0x0c 256* or or ; ')
+
+    p.BLOB(b'rcu rled ')
+
+#    p.BLOB(b': pled rcu rled bled ; ')
+#    p.BLOB(b'pled ')
 
     # paranoid align just to be safe
     p.ALIGN()
@@ -543,6 +556,7 @@ with defword(p, 'exit'):
     p.LW(IP, RSP, 0)
     p.JAL('zero', 'next')
 
+# TODO: error if word name is too long (> 63)
 with defword(p, ':'):
     p.JAL('ra', 'token')  # a0 = addr, a1 = len
     p.SW(HERE, LATEST, 0)  # write link to prev word (write LATEST to HERE)
@@ -588,30 +602,6 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
 
-#with defword(p, 'rcu'):
-#    # load RCU base addr into t0
-#    p.LUI('t0', p.HI(RCU_BASE_ADDR))
-#    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
-#
-#    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)  # move t0 forward to APB2 enable register
-#    p.LW('t1', 't0', 0)  # load current APB2 enable config into t1
-#
-#    # prepare enable bits for GPIO A and GPIO C
-#    #                     | EDCBA  |
-#    p.ADDI('t2', 'zero', 0b00010100)
-#
-#    # prepare enable bit for USART0
-#    p.ADDI('t3', 'zero', 1)
-#    p.SLLI('t3', 't3', 14)
-#    p.OR('t2', 't2', 't3')
-#
-#    # set GPIO clock enable bits
-#    p.OR('t1', 't1', 't2')
-#    p.SW('t0', 't1', 0)  # store the ABP2 config
-#
-#    # next
-#    p.JAL('zero', 'next')
-
 # red LED: GPIO port C, ctrl 1, pin 13
 # offset: ((PIN - 8) * 4) = 20
 with defword(p, 'rled'):
@@ -641,200 +631,6 @@ with defword(p, 'rled'):
 
     # next
     p.JAL('zero', 'next')
-
-# green LED: GPIO port A, ctrl 0, pin 1
-# offset: (PIN * 4) = 4
-with defword(p, 'gled'):
-    # load GPIO base addr into t0
-    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-
-    # move t0 forward to control 0 register
-    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
-
-    # load current GPIO config into t1
-    p.LW('t1', 't0', 0)
-
-    # clear existing config
-    p.ADDI('t2', 'zero', 0b1111)
-    p.SLLI('t2', 't2', 4)
-    p.XORI('t2', 't2', -1)
-    p.AND('t1', 't1', 't2')
-
-    # set new config settings
-    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-    p.SLLI('t2', 't2', 4)
-    p.OR('t1', 't1', 't2')
-
-    # store the GPIO config
-    p.SW('t0', 't1', 0)
-
-    # next
-    p.JAL('zero', 'next')
-
-# blue LED: GPIO port A, ctrl 0, pin 2
-# offset: (PIN * 4) = 8
-with defword(p, 'bled'):
-    # load GPIO base addr into t0
-    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-
-    # move t0 forward to control 0 register
-    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
-
-    # load current GPIO config into t1
-    p.LW('t1', 't0', 0)
-
-    # clear existing config
-    p.ADDI('t2', 'zero', 0b1111)
-    p.SLLI('t2', 't2', 8)
-    p.XORI('t2', 't2', -1)
-    p.AND('t1', 't1', 't2')
-
-    # set new config settings
-    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-    p.SLLI('t2', 't2', 8)
-    p.OR('t1', 't1', 't2')
-
-    # store the GPIO config
-    p.SW('t0', 't1', 0)
-
-    # next
-    p.JAL('zero', 'next')
-
-# USART0: GPIO port A, ctrl 1, pins 9 and 10
-# offset: ((PIN - 8) * 4) = 4 (pin 9)
-# offset: ((PIN - 8) * 4) = 8 (pin 10)
-#with defword(p, 'usart0'):
-#    # load GPIO base addr into t0
-#    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-#    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-#
-#    # move t0 forward to control 1 register
-#    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
-#
-#    # load current GPIO config into t1
-#    p.LW('t1', 't0', 0)
-#
-#    # clear existing config (pin 9)
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 4)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings (pin 9)
-#    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_ALT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-#    p.SLLI('t2', 't2', 4)
-#    p.OR('t1', 't1', 't2')
-#
-#    # clear existing config (pin 10)
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 8)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings (pin 10)
-#    p.ADDI('t2', 'zero', (GPIO_CTL_IN_FLOATING << 2) | GPIO_MODE_IN)
-#    p.SLLI('t2', 't2', 8)
-#    p.OR('t1', 't1', 't2')
-#
-#    # store the GPIO config
-#    p.SW('t0', 't1', 0)
-#
-#    # USART config: 115200 8N1
-#    # enabled (USART_CTL0 bit 13)
-#    # rx/tx enabled (USART_CTL0 bits 2 and 3)
-#    # 115200 baud (USART_BAUD)
-#    # 8 bits per word (USART_CTL0 bit 12, default)
-#    # 1 stop bit (USART_CTL1 bits 13:12, default)
-#    # 0 parity bits (USART_CTL0 bit 10, default)
-#
-#    # load RCU base addr into t0
-#    p.LUI('t0', p.HI(RCU_BASE_ADDR))
-#    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
-#    # move t0 forward to APB2 reset register
-#    p.ADDI('t0', 't0', RCU_APB2_RESET_OFFSET)
-#
-#    # reset USART0
-#    p.ADDI('t1', 'zero', 1)
-#    p.SLLI('t1', 't1', 14)
-#    p.SW('t0', 't1', 0)
-#    p.ADDI('t1', 'zero', 0)
-#    p.SLLI('t1', 't1', 14)
-#    p.SW('t0', 't1', 0)
-#
-#    # NOTE: This math yields the same results achieved from
-#    #   following the GD32VF103 manual (16.3.2). I'm not sure
-#    #   if this is always the case or just happens to work out
-#    #   for a few common baud rates (9600 and 115200, at least).
-#    #
-#    # Example 1:
-#    # >>> import math
-#    # >>> PCLK = 8000000
-#    # >>> BAUD = 9600
-#    # >>> PCLK // BAUD
-#    # 833
-#    # >>>
-#    # >>> d = PCLK / BAUD / 16
-#    # >>> fracdiv, intdiv = math.modf(d)
-#    # >>> intdiv = int(intdiv)
-#    # >>> fracdiv = round(16 * fracdiv)
-#    # >>> intdiv << 4 | fracdiv
-#    # 833
-#    #
-#    # Example 2:
-#    # >>> import math
-#    # >>> PCLK = 8000000
-#    # >>> BAUD = 115200
-#    # >>> PCLK // BAUD
-#    # 69
-#    # >>>
-#    # >>> d = PCLK / BAUD / 16
-#    # >>> fracdiv, intdiv = math.modf(d)
-#    # >>> intdiv = int(intdiv)
-#    # >>> fracdiv = round(16 * fracdiv)
-#    # >>> intdiv << 4 | fracdiv
-#    # 69
-#
-#    CLOCK = 8000000  # 8MHz
-#    BAUD = 115200  # 115200 bits per second
-#    udiv = CLOCK // BAUD
-#
-#    # load USART0 base address
-#    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
-#    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
-#
-#    # configure USART0 baud rate
-#    p.ADDI('t1', 't0', USART_BAUD_OFFSET)
-#    p.ADDI('t2', 'zero', udiv)
-#    p.SW('t1', 't2', 0)
-#
-#    # enable TX and RX
-#    p.ADDI('t1', 't0', USART_CTL0_OFFSET)
-#    p.ADDI('t2', 'zero', 0b1100)
-#    p.SW('t1', 't2', 0)
-#
-#    # enable USART0 (but don't overwrite TX/RX config)
-#    p.ADDI('t1', 't0', USART_CTL0_OFFSET)
-#    p.ADDI('t2', 'zero', 0b1100)
-#    p.ADDI('t3', 'zero', 1)
-#    p.SLLI('t3', 't3', 13)
-#    p.OR('t2', 't2', 't3')
-#    p.SW('t1', 't2', 0)
-#
-#    # write out a continuous stream of '!' to serial
-#    p.ADDI('t1', 't0', USART_STAT_OFFSET)
-#    p.ADDI('t2', 't0', USART_DATA_OFFSET)
-#    p.ADDI('t3', 'zero', 33)
-#    p.LABEL('usart_loop')
-#    p.LW('t4', 't1', 0)  # load stat
-#    p.ANDI('t4', 't4', 1 << 7)
-#    p.BEQ('t4', 'zero', 'usart_loop')  # loop til TBE
-#    p.SW('t2', 't3', 0)  # write the '!'
-#    p.JAL('zero', 'usart_loop')  # loop again
-#
-#    # next
-#    p.JAL('zero', 'next')
 
 with defword(p, 'state'):
     # push STATE onto stack
