@@ -441,7 +441,6 @@ with p.LABEL('start'):
     p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
 
     # set baud rate
-    print(CLOCK_FREQ // USART_BAUD)
     p.ADDI('t1', 't0', USART_BAUD_OFFSET)
     p.ADDI('t2', 'zero', CLOCK_FREQ // USART_BAUD)
     p.SW('t1', 't2', 0)
@@ -468,18 +467,23 @@ with p.LABEL('start'):
     # store USART0 config
     p.SW('t0', 't1', 0)
 
-    # DEBUG USART
+    # USART ECHO PROGRAM
     p.LUI('t0', p.HI(USART_BASE_ADDR_0))
     p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
     p.ADDI('t1', 't0', USART_STAT_OFFSET)
     p.ADDI('t2', 't0', USART_DATA_OFFSET)
-    p.ADDI('t3', 'zero', 33)
-    p.LABEL('usart_loop')
+    p.LABEL('usart_read')
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
+    p.BEQ('t4', 'zero', 'usart_read')  # keep looping until a char comes in
+    p.LABEL('usart_echo')
+    p.LW('t3', 't2', 0)  # load char into t3
+    p.SW('t2', 't3', 0)  # echo char back
+    p.LABEL('usart_write')
     p.LW('t4', 't1', 0)  # load stat into t4
     p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'usart_loop')  # loop again if TBE isn't set
-    p.SW('t2', 't3', 0)  # write the '!'
-    p.JAL('zero', 'usart_loop')  # loop again
+    p.BEQ('t4', 'zero', 'usart_write')  # keep looping until char gets sent
+    p.JAL('zero', 'usart_read')
 
     p.JAL('zero', 'init')
 with p.LABEL('error'):
