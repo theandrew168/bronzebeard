@@ -453,7 +453,8 @@ with p.LABEL('align_done'):
 with p.LABEL('tib'):
 #    p.BLOB(b'rcu rled gled usart0 gled ')
 
-    p.BLOB(b': pled rcu r b ; pled ')
+    p.BLOB(b': pled rcu r b ; ')
+    p.BLOB(b'pled ')
 
 #    # make some numbers
 #    p.BLOB(b': dup sp@ @ ; ')
@@ -549,7 +550,8 @@ with p.LABEL('padding_next'):
 with p.LABEL('padding_done'):
     #   OffsetFrom(RAM_BASE_ADDR, 'word_enter')
     #   AddressFrom(RAM_BASE_ADDR, 'word_enter')
-    addr = RAM_BASE_ADDR + p.labels['word_enter']
+    #addr = RAM_BASE_ADDR + p.labels['word_enter']
+    addr = RAM_BASE_ADDR + p.labels['body_enter']
     p.LUI('t0', p.HI(addr))  # load addr of ENTER into t0
     p.ADDI('t0', 't0', p.LO(addr))  # ...
     p.SW(HERE, 't0', 0)  # write addr of ENTER to word definition
