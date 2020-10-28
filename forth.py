@@ -38,6 +38,7 @@ ROM_BASE_ADDR = 0x08000000  # 128K
 RAM_BASE_ADDR = 0x20000000  # 32K
 CLOCK_FREQ = 8000000
 MTIME_FREQ = CLOCK_FREQ // 4
+USART_BAUD = 115200
 
 # FE310-G002: HiFive1 Rev B
 #ROM_BASE_ADDR  = 0x20000000  # 4M
@@ -182,12 +183,12 @@ LATEST = 's5'
 
 #  16KB      Memory Map
 # 0x0000 |----------------|
-#        |                |
 #        |  Interpreter   |
 #        |       +        |
-# 0x1000 |      TIB       |
-#        |       +        |
 #        |   Dictionary   |
+# 0x1000 |----------------|
+#        |                |
+#        |      TIB       |
 #        |                |
 # 0x2000 |----------------|
 #        |                |
@@ -200,6 +201,7 @@ LATEST = 's5'
 # 0x3FFF |----------------|
 
 INTERPRETER_BASE = 0x0000
+TIB_BASE = 0x1000
 DATA_STACK_BASE = 0x2000
 RETURN_STACK_BASE = 0x3000
 
@@ -276,108 +278,6 @@ with p.LABEL('copy_done'):
     p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
     p.ADDI('t0', 't0', 'start')
     p.JALR('zero', 't0', 0)
-
-with p.LABEL('start'):
-    p.JAL('zero', 'init')
-with p.LABEL('error'):
-    # TODO: print error indicator ("?" or something like that)
-    # can do this once UART works and can print stuff using "emit"
-    pass
-with p.LABEL('init'):
-    # setup data stack pointer
-    p.LUI(DSP, p.HI(RAM_BASE_ADDR + DATA_STACK_BASE))
-    p.ADDI(DSP, DSP, p.LO(RAM_BASE_ADDR + DATA_STACK_BASE))
-
-    # setup return stack pointer
-    p.LUI(RSP, p.HI(RAM_BASE_ADDR + RETURN_STACK_BASE))
-    p.ADDI(RSP, RSP, p.LO(RAM_BASE_ADDR + RETURN_STACK_BASE))
-
-    # set working register to zero
-    p.ADDI(W, 'zero', 0)
-
-    # set STATE var to zero
-    p.ADDI(STATE, 'zero', 0)
-
-    # set TIB var to "tib" location
-    p.LUI(TIB, p.HI(RAM_BASE_ADDR))
-    p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR))
-    p.ADDI(TIB, TIB, 'tib')
-
-    # fill TIB with zeroes
-#    p.LABEL('tib_clear')
-#    p.ADDI('t0', TIB, 9)  # t0 = addr
-#    p.ADDI('t1', 'zero', 1)  # t1 = 1
-#    p.SLLI('t1', 't1', 10)  # t1 = 1024 (count)
-#    p.LABEL('tib_clear_body')
-#    p.SB('t0', 'zero', 0)  # [t0] = 0
-#    p.LABEL('tib_clear_next')
-#    p.ADDI('t0', 't0', 1)  # t0 += 1
-#    p.ADDI('t1', 't1', -1)  # t1 -= 1
-#    p.BNE('t1', 'zero', 'tib_clear_body')  # keep looping til t1 == 0
-
-    # set TOIN var to zero
-    p.ADDI(TOIN, 'zero', 0)
-
-    # set HERE var to "here" location
-    #   Position(RAM_BASE_ADDR, 'here') -> Number, not bytes
-    p.LUI(HERE, p.HI(RAM_BASE_ADDR))
-    p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
-    p.ADDI(HERE, HERE, 'here')
-
-    # set LATEST var to "latest" location
-    p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
-    p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
-    p.ADDI(LATEST, LATEST, 'latest')
-
-# main interpreter loop
-with p.LABEL('interpreter'):
-    p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-    p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
-    p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
-
-    p.LB('t0', 'a2', 4)  # load word flags + len into t0
-    p.ANDI('t0', 't0', F_IMMEDIATE)  # isolate immediate flag
-    p.BNE('t0', 'zero', 'interpreter_execute')  # execute if word is immediate
-    p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
-with p.LABEL('interpreter_compile'):
-    # otherwise compile!
-    p.ADDI('t0', 'a2', 5)  # set t0 = start of word name
-    p.ADD('t0', 't0', 'a1')  # skip to end of word name
-    p.ADDI('a3', 't0', 0)  # setup arg for align
-    p.JAL('ra', 'align')  # align to start of code word (a3 = addr of code word)
-    p.SW(HERE, 'a3', 0)  # write addr of code word to definition
-    p.ADDI(HERE, HERE, 4)  # HERE += 4
-    p.JAL('zero', 'interpreter')
-with p.LABEL('interpreter_execute'):
-    # set interpreter pointer to indirect addr back to interpreter loop
-    # TODO: can't just pre-calc addr here because its a forward ref
-    #   and I can't dig into p.labels yet. Fix in v3.
-    p.LUI(IP, p.HI(RAM_BASE_ADDR))
-    p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
-    p.ADDI(IP, IP, 'interpreter_addr_addr')
-    # word is found and located at a2
-    p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
-    p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
-    p.ADDI('a4', W, 0)  # setup arg for pad (a4 = W)
-    p.JAL('ra', 'pad')  # call pad procedure
-    p.ADDI(W, 'a4', 0)  # handle ret from pad (W = a4)
-    # At this point, W holds the addr of the target word's code field
-    p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
-    p.JALR('zero', 't0', 0)  # execute the word!
-
-# TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
-#   OffsetFrom(RAM_BASE_ADDR, 'interpreter')
-#   AbsolutePosition(RAM_BASE_ADDR, 'interpreter')
-# This situation also differs because I want the imm value as LE bytes, not a number.
-# What special keyword denotes that? ImmAsLE32(Position(RAM_BASE_ADDR, 'interp')), ImmAsLE16, etc?
-with p.LABEL('interpreter_addr'):
-    addr = RAM_BASE_ADDR + p.labels['interpreter']
-    p.BLOB(struct.pack('<I', addr))
-with p.LABEL('interpreter_addr_addr'):
-    addr = RAM_BASE_ADDR + p.labels['interpreter_addr']
-    p.BLOB(struct.pack('<I', addr))
-
-p.ALIGN()  # not required but should be here since this is data between insts
 
 # Procedure: token
 # Usage: p.JAL('ra', 'token')
@@ -467,70 +367,219 @@ with p.LABEL('pad'):
 with p.LABEL('pad_done'):
     p.JALR('zero', 'ra', 0)  # return
 
-with p.LABEL('tib'):
-    # make some numbers
-    p.BLOB(b': dup sp@ @ ; ')
-    p.BLOB(b': -1 dup dup nand dup dup nand nand ; ')
-    p.BLOB(b': 0 -1 dup nand ; ')
-    p.BLOB(b': 1 -1 dup + dup nand ; ')
-    p.BLOB(b': 2 1 1 + ; ')
-    p.BLOB(b': 4 2 2 + ; ')
-    p.BLOB(b': 8 4 4 + ; ')
-    p.BLOB(b': 12 4 8 + ; ')
-    p.BLOB(b': 16 8 8 + ; ')
+# Main program starts here!
+with p.LABEL('start'):
+    # Init serial comm via USART0:
+    # 1. RCU APB2 enable GPIOA (1 << 2)
+    # 2. RCU APB2 enable USART0 (1 << 14)
+    # 3. GPIOA config pin 9 (ctl = OUT_ALT_PUSH_PULL, mode = OUT_50MHZ)
+    #   Pin 9 offset = ((PIN - 8) * 4) = 4
+    # 4. GPIOA config pin 10 (ctl = IN_FLOATING, mode = IN)
+    #   Pin 10 offset = ((PIN - 8) * 4) = 8
+    # 5. USART0 config baud (CLOCK // BAUD = 69)
+    # 6. USART0 enable RX (1 << 2)
+    # 7. USART0 enable TX (1 << 3)
+    # 7. USART0 enable USART (1 << 13)
 
-    # logic and arithmetic operators
-    p.BLOB(b': invert dup nand ; ')
-    p.BLOB(b': and nand invert ; ')
-    p.BLOB(b': negate invert 1 + ; ')
-    p.BLOB(b': - negate + ; ')
+    # setup addr and load current APB2 config into t1
+    p.LUI('t0', p.HI(RCU_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RCU_BASE_ADDR))
+    p.ADDI('t0', 't0', RCU_APB2_ENABLE_OFFSET)
+    p.LW('t1', 't0', 0)
 
-    # equality checks
-    p.BLOB(b': = - 0= ; ')
-    p.BLOB(b': <> = invert ; ')
+    # setup enable bit for GPIOA
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 2)
+    p.OR('t1', 't1', 't2')
 
-    # stack manipulation words
-    p.BLOB(b': drop dup - + ; ')
-    p.BLOB(b': over sp@ 4 - @ ; ')
-    p.BLOB(b': swap over over sp@ 12 - ! sp@ 4 - ! ; ')
-    p.BLOB(b': nip swap drop ; ')
-    p.BLOB(b': 2dup over over ; ')
-    p.BLOB(b': 2drop drop drop ; ')
+    # setup enable bit for GPIOC
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 4)
+    p.OR('t1', 't1', 't2')
 
-    # more logic
-    p.BLOB(b': or invert swap invert and invert ; ')
+    # setup enable bit for USART0
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 14)
+    p.OR('t1', 't1', 't2')
 
-    # left shift 1, 4, 8 bits
-    p.BLOB(b': 2* dup + ; ')  # shift a single bit
-    p.BLOB(b': 16* 2* 2* 2* 2* ; ')  # shift a nibble
-    p.BLOB(b': 256* 16* 16* ; ')  # shift a byte
+    # store APB2 config
+    p.SW('t0', 't1', 0)
 
-    # REAL STUFF
-    p.BLOB(b': 0x00 0 ; ')
-    p.BLOB(b': 0x04 1 2* 2* ; ')
-    p.BLOB(b': 0x08 1 2* 2* 2* ; ')
-    p.BLOB(b': 0x0c 0x08 0x04 or ; ')
-    p.BLOB(b': 0x10 1 16* ; ')
-    p.BLOB(b': 0x14 0x10 0x04 or ; ')
-    p.BLOB(b': 0x18 0x10 0x08 or ; ')
-    p.BLOB(b': 0x1c 0x10 0x0c or ; ')
+    # setup addr and load current GPIOA config into t1
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
+    p.LW('t1', 't0', 0)
 
-    # RCU_BASE_ADDR = 0x40021000
-    p.BLOB(b': RCU_BASE_ADDR 1 256* 256* 256* 16* 2* 2* 1 256* 256* 2* 1 256* 16* or or ; ')
-    p.BLOB(b': RCU_APB2_ENABLE_OFFSET 0x18 ; ')
-    p.BLOB(b': rcu 0x14 RCU_BASE_ADDR RCU_APB2_ENABLE_OFFSET + ! ; ')  # rcu enables clock for GPIO ports A and C
+    # clear existing config (pin 9)
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 4)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
 
-    # GPIO_BASE_ADDR_C = 0x40010c00
-#    p.BLOB(b': GPIO_BASE_ADDR_C 1 256* 256* 256* 16* 2* 2* 1 256* 256* 0x0c 256* or or ; ')
+    # setup config bits (pin 9)
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_ALT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 4)
+    p.OR('t1', 't1', 't2')
 
-    p.BLOB(b'rcu rled ')
+    # clear existing config (pin 10)
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 8)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
 
-#    p.BLOB(b': pled rcu rled bled ; ')
-#    p.BLOB(b'pled ')
+    # setup config bits (pin 10)
+    p.ADDI('t2', 'zero', (GPIO_CTL_IN_FLOATING << 2) | GPIO_MODE_IN)
+    p.SLLI('t2', 't2', 8)
+    p.OR('t1', 't1', 't2')
 
-    # paranoid align just to be safe
-    p.ALIGN()
+    # store GPIOA config
+    p.SW('t0', 't1', 0)
 
+    # setup addr for USART0
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+
+    # set baud rate
+    print(CLOCK_FREQ // USART_BAUD)
+    p.ADDI('t1', 't0', USART_BAUD_OFFSET)
+    p.ADDI('t2', 'zero', CLOCK_FREQ // USART_BAUD)
+    p.SW('t1', 't2', 0)
+
+    # load current USART0 config into t1
+    p.ADDI('t0', 't0', USART_CTL0_OFFSET)
+    p.LW('t1', 't0', 0)
+
+    # setup enable bit for RX
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 2)
+    p.OR('t1', 't1', 't2')
+
+    # setup enable bit for TX
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 3)
+    p.OR('t1', 't1', 't2')
+
+    # setup enable bit for USART
+    p.ADDI('t2', 'zero', 1)
+    p.SLLI('t2', 't2', 13)
+    p.OR('t1', 't1', 't2')
+
+    # store USART0 config
+    p.SW('t0', 't1', 0)
+
+    # DEBUG USART
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)
+    p.ADDI('t3', 'zero', 33)
+    p.LABEL('usart_loop')
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
+    p.BEQ('t4', 'zero', 'usart_loop')  # loop again if TBE isn't set
+    p.SW('t2', 't3', 0)  # write the '!'
+    p.JAL('zero', 'usart_loop')  # loop again
+
+    p.JAL('zero', 'init')
+with p.LABEL('error'):
+    # TODO: print error indicator ("?" or something like that)
+    # can do this once UART works and can print stuff using "emit"
+    pass
+with p.LABEL('init'):
+    # setup data stack pointer
+    p.LUI(DSP, p.HI(RAM_BASE_ADDR + DATA_STACK_BASE))
+    p.ADDI(DSP, DSP, p.LO(RAM_BASE_ADDR + DATA_STACK_BASE))
+
+    # setup return stack pointer
+    p.LUI(RSP, p.HI(RAM_BASE_ADDR + RETURN_STACK_BASE))
+    p.ADDI(RSP, RSP, p.LO(RAM_BASE_ADDR + RETURN_STACK_BASE))
+
+    # set working register to zero
+    p.ADDI(W, 'zero', 0)
+
+    # set STATE var to zero
+    p.ADDI(STATE, 'zero', 0)
+
+    # set TIB var to TIB_BASE
+    p.LUI(TIB, p.HI(RAM_BASE_ADDR + TIB_BASE))
+    p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR + TIB_BASE))
+
+    # set TOIN var to zero
+    p.ADDI(TOIN, 'zero', 0)
+
+    # set HERE var to "here" location
+    #   Position(RAM_BASE_ADDR, 'here') -> Number, not bytes
+    p.LUI(HERE, p.HI(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, 'here')
+
+    # set LATEST var to "latest" location
+    p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, 'latest')
+
+    # fill TIB with zeroes
+    p.LABEL('tib_clear')
+    p.ADDI('t0', TIB, 0)  # t0 = addr
+    p.ADDI('t1', 'zero', 1)  # t1 = 4096 (count)
+    p.SLLI('t1', 't1', 12)  # ...
+    p.LABEL('tib_clear_body')
+    p.SB('t0', 'zero', 0)  # [t0] = 0
+    p.LABEL('tib_clear_next')
+    p.ADDI('t0', 't0', 1)  # t0 += 1
+    p.ADDI('t1', 't1', -1)  # t1 -= 1
+    p.BNE('t1', 'zero', 'tib_clear_body')  # keep looping til t1 == 0
+
+# main interpreter loop
+with p.LABEL('interpreter'):
+    p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
+    p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
+    p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
+
+    p.LB('t0', 'a2', 4)  # load word flags + len into t0
+    p.ANDI('t0', 't0', F_IMMEDIATE)  # isolate immediate flag
+    p.BNE('t0', 'zero', 'interpreter_execute')  # execute if word is immediate
+    p.BEQ(STATE, 'zero', 'interpreter_execute')  # execute if STATE is zero
+with p.LABEL('interpreter_compile'):
+    # otherwise compile!
+    p.ADDI('t0', 'a2', 5)  # set t0 = start of word name
+    p.ADD('t0', 't0', 'a1')  # skip to end of word name
+    p.ADDI('a3', 't0', 0)  # setup arg for align
+    p.JAL('ra', 'align')  # align to start of code word (a3 = addr of code word)
+    p.SW(HERE, 'a3', 0)  # write addr of code word to definition
+    p.ADDI(HERE, HERE, 4)  # HERE += 4
+    p.JAL('zero', 'interpreter')
+with p.LABEL('interpreter_execute'):
+    # set interpreter pointer to indirect addr back to interpreter loop
+    # TODO: can't just pre-calc addr here because its a forward ref
+    #   and I can't dig into p.labels yet. Fix in v3.
+    p.LUI(IP, p.HI(RAM_BASE_ADDR))
+    p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
+    p.ADDI(IP, IP, 'interpreter_addr_addr')
+    # word is found and located at a2
+    p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
+    p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
+    p.ADDI('a4', W, 0)  # setup arg for pad (a4 = W)
+    p.JAL('ra', 'pad')  # call pad procedure
+    p.ADDI(W, 'a4', 0)  # handle ret from pad (W = a4)
+    # At this point, W holds the addr of the target word's code field
+    p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
+    p.JALR('zero', 't0', 0)  # execute the word!
+
+# TODO: this feels real hacky (v3: Location('interpreter'), abs or rel? abs in this case)
+#   OffsetFrom(RAM_BASE_ADDR, 'interpreter')
+#   AbsolutePosition(RAM_BASE_ADDR, 'interpreter')
+# This situation also differs because I want the imm value as LE bytes, not a number.
+# What special keyword denotes that? ImmAsLE32(Position(RAM_BASE_ADDR, 'interp')), ImmAsLE16, etc?
+with p.LABEL('interpreter_addr'):
+    addr = RAM_BASE_ADDR + p.labels['interpreter']
+    p.BLOB(struct.pack('<I', addr))
+with p.LABEL('interpreter_addr_addr'):
+    addr = RAM_BASE_ADDR + p.labels['interpreter_addr']
+    p.BLOB(struct.pack('<I', addr))
+
+p.ALIGN()  # not required but should be here since this is data between insts
 
 # standard forth routine: next
 with p.LABEL('next'):
@@ -601,36 +650,6 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
-
-# red LED: GPIO port C, ctrl 1, pin 13
-# offset: ((PIN - 8) * 4) = 20
-with defword(p, 'rled'):
-    # load GPIO base addr into t0
-    p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
-    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
-
-    # move t0 forward to control 1 register
-    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
-
-    # load current GPIO config into t1
-    p.LW('t1', 't0', 0)
-
-    # clear existing config
-    p.ADDI('t2', 'zero', 0b1111)
-    p.SLLI('t2', 't2', 20)
-    p.XORI('t2', 't2', -1)
-    p.AND('t1', 't1', 't2')
-
-    # set new config settings
-    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-    p.SLLI('t2', 't2', 20)
-    p.OR('t1', 't1', 't2')
-
-    # store the GPIO config
-    p.SW('t0', 't1', 0)
-
-    # next
-    p.JAL('zero', 'next')
 
 with defword(p, 'state'):
     # push STATE onto stack
