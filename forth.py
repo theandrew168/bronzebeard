@@ -136,7 +136,7 @@ USART_GP_OFFSET = 0x18
 # | x12 |  a2  | lookup address  |
 # | x13 |  a3  | align arg / ret |
 # | x14 |  a4  | pad arg / ret   |
-# | x15 |  a5  | <unused>        |
+# | x15 |  a5  | getc / putc     |
 # | x16 |  a6  | <unused>        |
 # | x17 |  a7  | <unused>        |
 # | x18 |  s2  | TIB             |
@@ -384,6 +384,38 @@ with p.LABEL('pad'):
 with p.LABEL('pad_done'):
     p.JALR('zero', 'ra', 0)  # return
 
+# Procedure: getc
+# Usage: p.JAL('ra', 'getc')
+# Ret: a5 = character received from serial
+with p.LABEL('getc'):
+    # t1 = stat, t2 = data
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)
+with p.LABEL('getc_wait'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
+    p.BEQ('t4', 'zero', 'getc_wait')  # keep looping until a char comes in
+    p.LW('a5', 't2', 0)  # load char into a5
+    p.JALR('zero', 'ra', 0)  # return
+
+# Procedure: putc
+# Usage: p.JAL('ra', 'putc')
+# Arg: a5 = character to send over serial
+with p.LABEL('putc'):
+    # t1 = stat, t2 = data
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)
+    p.SW('t2', 'a5', 0)  # write char from a5
+with p.LABEL('putc_wait'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
+    p.BEQ('t4', 'zero', 'putc_wait')  # keep looping until char gets sent
+    p.JALR('zero', 'ra', 0)  # return
+
 # Main program starts here!
 with p.LABEL('start'):
     # Init serial comm via USART0:
@@ -485,22 +517,10 @@ with p.LABEL('start'):
     p.SW('t0', 't1', 0)
 
     # USART ECHO PROGRAM
-    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
-    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
-    p.ADDI('t1', 't0', USART_STAT_OFFSET)
-    p.ADDI('t2', 't0', USART_DATA_OFFSET)
-    p.LABEL('usart_read')
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
-    p.BEQ('t4', 'zero', 'usart_read')  # keep looping until a char comes in
-    p.LABEL('usart_echo')
-    p.LW('t3', 't2', 0)  # load char into t3
-    p.SW('t2', 't3', 0)  # echo char back
-    p.LABEL('usart_write')
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'usart_write')  # keep looping until char gets sent
-    p.JAL('zero', 'usart_read')
+    p.LABEL('echo')
+    p.JAL('ra', 'getc')
+    p.JAL('ra', 'putc')
+    p.JAL('zero', 'echo')
 
     p.JAL('zero', 'init')
 
@@ -510,7 +530,7 @@ with p.LABEL('error'):
     p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))  # ...
     p.ADDI('t1', 't0', USART_STAT_OFFSET)  # t1 = stat reg
     p.ADDI('t2', 't0', USART_DATA_OFFSET)  # t2 = data reg
-    p.ADDI('t3', 'zero', 63)  # t3 = '?'
+    p.ADDI('t3', 'zero', ord('?'))  # t3 = '?'
     p.SW('t2', 't3', 0)  # write qmark to terminal
 with p.LABEL('error_loop'):
     p.LW('t4', 't1', 0)  # load stat into t4
@@ -550,6 +570,25 @@ with p.LABEL('init'):
     p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
     p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
     p.ADDI(LATEST, LATEST, 'latest')
+
+p.JAL('zero', 'interpreter')
+
+with p.LABEL('interpreter_ok'):
+    # print "ok" and fall through into interpreter
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))  # t0 = USART0 base
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))  # ...
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)  # t1 = stat reg
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)  # t2 = data reg
+    p.ADDI('t3', 'zero', ord('o'))  # t3 = 'o'
+    p.SW('t2', 't3', 0)  # write to terminal
+    p.ADDI('t3', 'zero', ord('k'))  # t3 = 'k'
+    p.SW('t2', 't3', 0)  # write to terminal
+    p.ADDI('t3', 'zero', ord('\n'))  # t3 = '\n'
+    p.SW('t2', 't3', 0)  # write to terminal
+with p.LABEL('interpreter_ok_loop'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
+    p.BEQ('t4', 'zero', 'interpreter_ok_loop')  # keep looping until char gets sent
 
 # main interpreter loop
 with p.LABEL('interpreter'):
@@ -598,7 +637,7 @@ with p.LABEL('interpreter_echo'):
 
 with p.LABEL('interpreter_interpret'):
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-    p.BEQ('a0', 'zero', 'interpreter')  # loop back to repl if no tokens were found in TBUF
+    p.BEQ('a0', 'zero', 'interpreter_ok')  # loop back to repl if no tokens were found in TBUF
 
     p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
     p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
@@ -742,6 +781,66 @@ with defword(p, 'rled'):
     # set new config settings
     p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
     p.SLLI('t2', 't2', 20)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
+    # next
+    p.JAL('zero', 'next')
+
+# green LED: GPIO port A, ctrl 0, pin 1
+# offset: (PIN * 4) = 4
+with defword(p, 'gled'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+
+    # move t0 forward to control 0 register
+    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 4)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 4)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
+    # next
+    p.JAL('zero', 'next')
+
+# blue LED: GPIO port A, ctrl 0, pin 2
+# offset: (PIN * 4) = 8
+with defword(p, 'bled'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
+
+    # move t0 forward to control 0 register
+    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
+
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
+
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 8)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
+
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 8)
     p.OR('t1', 't1', 't2')
 
     # store the GPIO config
