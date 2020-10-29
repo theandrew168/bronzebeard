@@ -517,25 +517,21 @@ with p.LABEL('start'):
     p.SW('t0', 't1', 0)
 
     # USART ECHO PROGRAM
-    p.LABEL('echo')
-    p.JAL('ra', 'getc')
-    p.JAL('ra', 'putc')
-    p.JAL('zero', 'echo')
+#    p.LABEL('echo')
+#    p.JAL('ra', 'getc')
+#    p.JAL('ra', 'putc')
+#    p.JAL('zero', 'echo')
 
     p.JAL('zero', 'init')
 
 with p.LABEL('error'):
     # print error indicator and fall through into reset
-    p.LUI('t0', p.HI(USART_BASE_ADDR_0))  # t0 = USART0 base
-    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))  # ...
-    p.ADDI('t1', 't0', USART_STAT_OFFSET)  # t1 = stat reg
-    p.ADDI('t2', 't0', USART_DATA_OFFSET)  # t2 = data reg
-    p.ADDI('t3', 'zero', ord('?'))  # t3 = '?'
-    p.SW('t2', 't3', 0)  # write qmark to terminal
-with p.LABEL('error_loop'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'error_loop')  # keep looping until char gets sent
+    p.ADDI('a5', 'zero', ord(' '))
+    p.JAL('ra', 'putc')
+    p.ADDI('a5', 'zero', ord('?'))
+    p.JAL('ra', 'putc')
+    p.ADDI('a5', 'zero', ord('\n'))
+    p.JAL('ra', 'putc')
 
 with p.LABEL('init'):
     # set working register to zero
@@ -573,22 +569,16 @@ with p.LABEL('init'):
 
 p.JAL('zero', 'interpreter')
 
+# print "ok" and fall through into interpreter
 with p.LABEL('interpreter_ok'):
-    # print "ok" and fall through into interpreter
-    p.LUI('t0', p.HI(USART_BASE_ADDR_0))  # t0 = USART0 base
-    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))  # ...
-    p.ADDI('t1', 't0', USART_STAT_OFFSET)  # t1 = stat reg
-    p.ADDI('t2', 't0', USART_DATA_OFFSET)  # t2 = data reg
-    p.ADDI('t3', 'zero', ord('o'))  # t3 = 'o'
-    p.SW('t2', 't3', 0)  # write to terminal
-    p.ADDI('t3', 'zero', ord('k'))  # t3 = 'k'
-    p.SW('t2', 't3', 0)  # write to terminal
-    p.ADDI('t3', 'zero', ord('\n'))  # t3 = '\n'
-    p.SW('t2', 't3', 0)  # write to terminal
-with p.LABEL('interpreter_ok_loop'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'interpreter_ok_loop')  # keep looping until char gets sent
+    p.ADDI('a5', 'zero', ord(' '))
+    p.JAL('ra', 'putc')
+    p.ADDI('a5', 'zero', ord('o'))
+    p.JAL('ra', 'putc')
+    p.ADDI('a5', 'zero', ord('k'))
+    p.JAL('ra', 'putc')
+    p.ADDI('a5', 'zero', ord('\n'))
+    p.JAL('ra', 'putc')
 
 # main interpreter loop
 with p.LABEL('interpreter'):
@@ -612,32 +602,19 @@ with p.LABEL('interpreter'):
     # set TPOS to zero
     p.ADDI(TPOS, 'zero', 0)
 
-    # setup USART registers (t1 = stat, t2 = data)
-    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
-    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
-    p.ADDI('t1', 't0', USART_STAT_OFFSET)
-    p.ADDI('t2', 't0', USART_DATA_OFFSET)
-
 with p.LABEL('interpreter_repl'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
-    p.BEQ('t4', 'zero', 'interpreter_repl')  # keep looping until a char comes in
-    p.LW('t3', 't2', 0)  # load char into t3
-    p.SW('t2', 't3', 0)  # echo char back
-    p.ADD('t5', TBUF, TLEN)  # t5 = location of next char
-    p.SW('t5', 't3', 0)  # write char into buffer
+    p.JAL('ra', 'getc')  # read char into a5
+    p.JAL('ra', 'putc')  # echo back
+    p.ADD('t0', TBUF, TLEN)  # t0 = TBUF addr for this char
+    p.SW('t0', 'a5', 0)  # write char into TBUF
     p.ADDI(TLEN, TLEN, 1)  # TLEN += 1
-with p.LABEL('interpreter_echo'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'interpreter_echo')  # keep looping until char gets sent
-    p.ADDI('t6', 'zero', 10)  # t6 = newline char
-    p.BEQ('t3', 't6', 'interpreter_interpret')  # interpret the code if a newline was found
+    p.ADDI('t0', 'zero', ord('\n'))  # t0 = newline char
+    p.BEQ('a5', 't0', 'interpreter_interpret')  # interpret the input upon newline
     p.JAL('zero', 'interpreter_repl')  # else wait for more input
 
 with p.LABEL('interpreter_interpret'):
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
-    p.BEQ('a0', 'zero', 'interpreter_ok')  # loop back to repl if no tokens were found in TBUF
+    p.BEQ('a0', 'zero', 'interpreter_ok')  # loop back to repl if input is expended
 
     p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
     p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
