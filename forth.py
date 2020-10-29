@@ -123,14 +123,14 @@ USART_GP_OFFSET = 0x18
 # |------------------------------|
 # |  x0 | zero | always 0        |
 # |  x1 |  ra  | return address  |
-# |  x2 |  sp  | data stack ptr  |
-# |  x3 |  gp  | interpreter ptr |
-# |  x4 |  tp  | ret stack ptr   |
+# |  x2 |  sp  | DSP             |
+# |  x3 |  gp  | IP              |
+# |  x4 |  tp  | RSP             |
 # |  x5 |  t0  | scratch         |
 # |  x6 |  t1  | scratch         |
 # |  x7 |  t2  | scratch         |
-# |  x8 |  s0  | working reg     |
-# |  x9 |  s1  | STATE var       |
+# |  x8 |  s0  | W               |
+# |  x9 |  s1  | STATE           |
 # | x10 |  a0  | token address   |
 # | x11 |  a1  | token length    |
 # | x12 |  a2  | lookup address  |
@@ -139,12 +139,12 @@ USART_GP_OFFSET = 0x18
 # | x15 |  a5  | <unused>        |
 # | x16 |  a6  | <unused>        |
 # | x17 |  a7  | <unused>        |
-# | x18 |  s2  | TIB var         |
-# | x19 |  s3  | >IN var         |
-# | x20 |  s4  | HERE var        |
-# | x21 |  s5  | LATEST var      |
-# | x22 |  s6  | <unused>        |
-# | x23 |  s7  | <unused>        |
+# | x18 |  s2  | TIB             |
+# | x19 |  s3  | TBUF            |
+# | x20 |  s4  | TLEN            |
+# | x21 |  s5  | TPOS            |
+# | x22 |  s6  | HERE            |
+# | x23 |  s7  | LATEST          |
 # | x24 |  s8  | <unused>        |
 # | x25 |  s9  | <unused>        |
 # | x26 |  s10 | <unused>        |
@@ -167,43 +167,52 @@ RSP = 'tp'  # return stack pointer
 # |  name  |          description          |
 # |----------------------------------------|
 # | STATE  | 0 = execute, 1 = compile      |
-# | TIB    | terminal input buffer         |
-# | >IN    | current offset into TIB       |
-# | HERE   | ptr to next free pos in dict  |
-# | LATEST | ptr to most recent dict entry |
+# | TIB    | text input buffer addr        |
+# | TBUF   | text buffer addr              |
+# | TLEN   | text buffer length            |
+# | TPOS   | text buffer current position  |
+# | HERE   | next dict entry addr          |
+# | LATEST | latest dict entry addr        |
 # |----------------------------------------|
 
 # Variable registers
 STATE = 's1'
 TIB = 's2'
-TOIN = 's3'
-HERE = 's4'
-LATEST = 's5'
+TBUF = 's3'
+TLEN = 's4'
+TPOS = 's5'
+HERE = 's6'
+LATEST = 's7'
 
 
 #  16KB      Memory Map
 # 0x0000 |----------------|
+#        |                |
 #        |  Interpreter   |
-#        |       +        |
+#        |       +        | 7K
 #        |   Dictionary   |
-# 0x1000 |----------------|
 #        |                |
-#        |      TIB       |
-#        |                |
+# 0x1c00 |----------------|
+#        |      TIB       | 1K
 # 0x2000 |----------------|
 #        |                |
-#        |   Data Stack   |
+#        |   Data Stack   | 4K
 #        |                |
 # 0x3000 |----------------|
 #        |                |
-#        |  Return Stack  |
+#        |  Return Stack  | 4K
 #        |                |
 # 0x3FFF |----------------|
 
 INTERPRETER_BASE = 0x0000
-TIB_BASE = 0x1000
+TIB_BASE = 0x1c00
 DATA_STACK_BASE = 0x2000
 RETURN_STACK_BASE = 0x3000
+
+INTERPRETER_SIZE = 0x1c00  # 7K
+TIB_SIZE = 0x0400  # 1K
+DATA_STACK_SIZE = 0x1000  # 4K
+RETURN_STACK_SIZE = 0x1000  # 4K
 
 F_IMMEDIATE = 0b10000000
 F_HIDDEN    = 0b01000000
@@ -274,6 +283,7 @@ with p.LABEL('copy_loop'):
     p.JAL('zero', 'copy_loop')
 with p.LABEL('copy_done'):
     # jump to RAM:start
+    #   PositionFrom('start', RAM_BASE_ADDR)
     p.LUI('t0', p.HI(RAM_BASE_ADDR))
     p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
     p.ADDI('t0', 't0', 'start')
@@ -281,29 +291,36 @@ with p.LABEL('copy_done'):
 
 # Procedure: token
 # Usage: p.JAL('ra', 'token')
-# Ret: a0 = addr of word name
-# Ret: a1 = length of word name
+# Ret: a0 = addr of word name (0 if not found)
+# Ret: a1 = length of word name (0 if not found)
+# TODO: Make TBUF / TLEN / TPOS args of some sort?
 with p.LABEL('token'):
-    # TODO: handle running off the TIB (max 1024 bytes or something)
     p.ADDI('t0', 'zero', 33)  # put whitespace threshold value into t0
 with p.LABEL('token_skip_whitespace'):
-    p.ADD('t1', TIB, TOIN)  # point t1 at current char
+    p.ADD('t1', TBUF, TPOS)  # point t1 at current char
     p.LBU('t2', 't1', 0)  # load current char into t2
     p.BGE('t2', 't0', 'token_scan')  # check if done skipping whitespace
-    p.ADDI(TOIN, TOIN, 1)  # inc TOIN
+    p.ADDI(TPOS, TPOS, 1)  # inc TPOS
+    p.BGE(TPOS, TLEN, 'token_not_found')  # no token if TPOS exceeds TLEN
     p.JAL('zero', 'token_skip_whitespace')  # check again
 with p.LABEL('token_scan'):
-    p.ADDI('t1', TOIN, 0)  # put current TOIN value into t1
+    p.ADDI('t1', TPOS, 0)  # put current TPOS value into t1
 with p.LABEL('token_scan_loop'):
-    p.ADD('t2', TIB, 't1')  # point t2 at next char
+    p.ADD('t2', TBUF, 't1')  # point t2 at next char
     p.LBU('t3', 't2', 0)  # load next char into t3
-    p.BLT('t3', 't0', 'token_done')  # check for whitespace
+    p.BLT('t3', 't0', 'token_found')  # check for whitespace
     p.ADDI('t1', 't1', 1)  # increment offset
+    p.BGE('t1', TLEN, 'token_not_found')  # no token if t1 exceeds TLEN
     p.JAL('zero', 'token_scan_loop')  # scan the next char
-with p.LABEL('token_done'):
-    p.ADD('a0', TIB, TOIN)  # a0 = address of word
-    p.SUB('a1', 't1', TOIN)  # a1 = length of word
-    p.ADDI(TOIN, 't1', 0)  # update TOIN
+with p.LABEL('token_found'):
+    p.ADD('a0', TBUF, TPOS)  # a0 = address of word
+    p.SUB('a1', 't1', TPOS)  # a1 = length of word
+    p.ADDI(TPOS, 't1', 0)  # update TPOS
+    p.JALR('zero', 'ra', 0)  # return
+with p.LABEL('token_not_found'):
+    p.ADDI('a0', 'zero', 0)  # a0 = 0
+    p.ADDI('a1', 'zero', 0)  # a1 = 0
+    p.ADDI(TPOS, 't1', 0)  # update TPOS
     p.JALR('zero', 'ra', 0)  # return
 
 # Procedure: lookup
@@ -486,11 +503,24 @@ with p.LABEL('start'):
     p.JAL('zero', 'usart_read')
 
     p.JAL('zero', 'init')
+
 with p.LABEL('error'):
-    # TODO: print error indicator ("?" or something like that)
-    # can do this once UART works and can print stuff using "emit"
-    pass
+    # print error indicator and fall through into reset
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))  # t0 = USART0 base
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))  # ...
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)  # t1 = stat reg
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)  # t2 = data reg
+    p.ADDI('t3', 'zero', 63)  # t3 = '?'
+    p.SW('t2', 't3', 0)  # write qmark to terminal
+with p.LABEL('error_loop'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
+    p.BEQ('t4', 'zero', 'error_loop')  # keep looping until char gets sent
+
 with p.LABEL('init'):
+    # set working register to zero
+    p.ADDI(W, 'zero', 0)
+
     # setup data stack pointer
     p.LUI(DSP, p.HI(RAM_BASE_ADDR + DATA_STACK_BASE))
     p.ADDI(DSP, DSP, p.LO(RAM_BASE_ADDR + DATA_STACK_BASE))
@@ -499,35 +529,34 @@ with p.LABEL('init'):
     p.LUI(RSP, p.HI(RAM_BASE_ADDR + RETURN_STACK_BASE))
     p.ADDI(RSP, RSP, p.LO(RAM_BASE_ADDR + RETURN_STACK_BASE))
 
-    # set working register to zero
-    p.ADDI(W, 'zero', 0)
-
-    # set STATE var to zero
+    # set STATE to zero
     p.ADDI(STATE, 'zero', 0)
 
     # set TIB var to TIB_BASE
+    #   Number(RAM_BASE_ADDR + TIB_BASE)
+    #   Literal(RAM_BASE_ADDR + TIB_BASE)
+    #   Immediate(RAM_BASE_ADDR + TIB_BASE)
     p.LUI(TIB, p.HI(RAM_BASE_ADDR + TIB_BASE))
     p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR + TIB_BASE))
 
-    # set TOIN var to zero
-    p.ADDI(TOIN, 'zero', 0)
-
     # set HERE var to "here" location
-    #   Position(RAM_BASE_ADDR, 'here') -> Number, not bytes
+    #   PositionFrom('here', RAM_BASE_ADDR)
     p.LUI(HERE, p.HI(RAM_BASE_ADDR))
     p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
     p.ADDI(HERE, HERE, 'here')
 
     # set LATEST var to "latest" location
+    #   PositionFrom('latest', RAM_BASE_ADDR)
     p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
     p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
     p.ADDI(LATEST, LATEST, 'latest')
 
+# main interpreter loop
+with p.LABEL('interpreter'):
     # fill TIB with zeroes
     p.LABEL('tib_clear')
     p.ADDI('t0', TIB, 0)  # t0 = addr
-    p.ADDI('t1', 'zero', 1)  # t1 = 4096 (count)
-    p.SLLI('t1', 't1', 12)  # ...
+    p.ADDI('t1', 'zero', TIB_SIZE)  # t1 = TIB_SIZE (1024)
     p.LABEL('tib_clear_body')
     p.SB('t0', 'zero', 0)  # [t0] = 0
     p.LABEL('tib_clear_next')
@@ -535,12 +564,46 @@ with p.LABEL('init'):
     p.ADDI('t1', 't1', -1)  # t1 -= 1
     p.BNE('t1', 'zero', 'tib_clear_body')  # keep looping til t1 == 0
 
-# main interpreter loop
-with p.LABEL('interpreter'):
+    # set TBUF to TIB
+    p.ADDI(TBUF, TIB, 0)
+
+    # set TLEN to zero
+    p.ADDI(TLEN, 'zero', 0)
+
+    # set TPOS to zero
+    p.ADDI(TPOS, 'zero', 0)
+
+    # setup USART registers (t1 = stat, t2 = data)
+    p.LUI('t0', p.HI(USART_BASE_ADDR_0))
+    p.ADDI('t0', 't0', p.LO(USART_BASE_ADDR_0))
+    p.ADDI('t1', 't0', USART_STAT_OFFSET)
+    p.ADDI('t2', 't0', USART_DATA_OFFSET)
+
+with p.LABEL('interpreter_repl'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
+    p.BEQ('t4', 'zero', 'interpreter_repl')  # keep looping until a char comes in
+    p.LW('t3', 't2', 0)  # load char into t3
+    p.SW('t2', 't3', 0)  # echo char back
+    p.ADD('t5', TBUF, TLEN)  # t5 = location of next char
+    p.SW('t5', 't3', 0)  # write char into buffer
+    p.ADDI(TLEN, TLEN, 1)  # TLEN += 1
+with p.LABEL('interpreter_echo'):
+    p.LW('t4', 't1', 0)  # load stat into t4
+    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
+    p.BEQ('t4', 'zero', 'interpreter_echo')  # keep looping until char gets sent
+    p.ADDI('t6', 'zero', 10)  # t6 = newline char
+    p.BEQ('t3', 't6', 'interpreter_interpret')  # interpret the code if a newline was found
+    p.JAL('zero', 'interpreter_repl')  # else wait for more input
+
+with p.LABEL('interpreter_interpret'):
     p.JAL('ra', 'token')  # call token procedure (a0 = addr, a1 = len)
+    p.BEQ('a0', 'zero', 'interpreter')  # loop back to repl if no tokens were found in TBUF
+
     p.JAL('ra', 'lookup')  # call lookup procedure (a2 = addr)
     p.BEQ('a2', 'zero', 'error')  # error and reset if word isn't found
 
+    # decide whether to compile or execute the word
     p.LB('t0', 'a2', 4)  # load word flags + len into t0
     p.ANDI('t0', 't0', F_IMMEDIATE)  # isolate immediate flag
     p.BNE('t0', 'zero', 'interpreter_execute')  # execute if word is immediate
@@ -553,11 +616,12 @@ with p.LABEL('interpreter_compile'):
     p.JAL('ra', 'align')  # align to start of code word (a3 = addr of code word)
     p.SW(HERE, 'a3', 0)  # write addr of code word to definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
-    p.JAL('zero', 'interpreter')
+    p.JAL('zero', 'interpreter_interpret')
 with p.LABEL('interpreter_execute'):
     # set interpreter pointer to indirect addr back to interpreter loop
     # TODO: can't just pre-calc addr here because its a forward ref
     #   and I can't dig into p.labels yet. Fix in v3.
+    #   PositionFrom('interpreter_addr_addr', RAM_BASE_ADDR)
     p.LUI(IP, p.HI(RAM_BASE_ADDR))
     p.ADDI(IP, IP, p.LO(RAM_BASE_ADDR))
     p.ADDI(IP, IP, 'interpreter_addr_addr')
@@ -577,7 +641,7 @@ with p.LABEL('interpreter_execute'):
 # This situation also differs because I want the imm value as LE bytes, not a number.
 # What special keyword denotes that? ImmAsLE32(Position(RAM_BASE_ADDR, 'interp')), ImmAsLE16, etc?
 with p.LABEL('interpreter_addr'):
-    addr = RAM_BASE_ADDR + p.labels['interpreter']
+    addr = RAM_BASE_ADDR + p.labels['interpreter_interpret']
     p.BLOB(struct.pack('<I', addr))
 with p.LABEL('interpreter_addr_addr'):
     addr = RAM_BASE_ADDR + p.labels['interpreter_addr']
@@ -609,7 +673,7 @@ with defword(p, 'exit'):
     p.LW(IP, RSP, 0)
     p.JAL('zero', 'next')
 
-# TODO: error if word name is too long (> 63)
+# TODO: error if word name is too long (> 63) (if len & F_LENGTH != 0)
 with defword(p, ':'):
     p.JAL('ra', 'token')  # a0 = addr, a1 = len
     p.SW(HERE, LATEST, 0)  # write link to prev word (write LATEST to HERE)
@@ -655,38 +719,34 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
 
-with defword(p, 'state'):
-    # push STATE onto stack
-    p.SW(DSP, STATE, 0)
-    p.ADDI(DSP, DSP, 4)
-    # next
-    p.JAL('zero', 'next')
+# TODO: remove after debugging
+# red LED: GPIO port C, ctrl 1, pin 13
+# offset: ((PIN - 8) * 4) = 20
+with defword(p, 'rled'):
+    # load GPIO base addr into t0
+    p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
+    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
 
-with defword(p, 'tib'):
-    # push TIB onto stack
-    p.SW(DSP, TIB, 0)
-    p.ADDI(DSP, DSP, 4)
-    # next
-    p.JAL('zero', 'next')
+    # move t0 forward to control 1 register
+    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
 
-with defword(p, '>in'):
-    # push TOIN onto stack
-    p.SW(DSP, TOIN, 0)
-    p.ADDI(DSP, DSP, 4)
-    # next
-    p.JAL('zero', 'next')
+    # load current GPIO config into t1
+    p.LW('t1', 't0', 0)
 
-with defword(p, 'here'):
-    # push HERE onto stack
-    p.SW(DSP, HERE, 0)
-    p.ADDI(DSP, DSP, 4)
-    # next
-    p.JAL('zero', 'next')
+    # clear existing config
+    p.ADDI('t2', 'zero', 0b1111)
+    p.SLLI('t2', 't2', 20)
+    p.XORI('t2', 't2', -1)
+    p.AND('t1', 't1', 't2')
 
-with defword(p, 'latest'):
-    # push LATEST onto stack
-    p.SW(DSP, LATEST, 0)
-    p.ADDI(DSP, DSP, 4)
+    # set new config settings
+    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
+    p.SLLI('t2', 't2', 20)
+    p.OR('t1', 't1', 't2')
+
+    # store the GPIO config
+    p.SW('t0', 't1', 0)
+
     # next
     p.JAL('zero', 'next')
 
