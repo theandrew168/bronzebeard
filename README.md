@@ -29,7 +29,7 @@ Need udev rules (for the Longan Nano and serial cable[s]):
 sudo vim /etc/udev/rules.d/99-bronzebeard.rules
 ```
 ```
-# Longan Nano
+# Longan Nano / Wio Lite
 ATTRS{idVendor}=="28e9", ATTRS{idProduct}=="0189", MODE="0666"
 # Adafruit USB to TTL Serial Cable
 ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
