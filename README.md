@@ -8,7 +8,7 @@ TODO [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b)
 
 ## Cables
 USB-C for programming  
-USB-to-Serial for interacting (VCC attached to 5V, not 3.3V!)  
+USB to TTL Serial for interacting (VCC attached to 5V, not 3.3V!)  
 
 ## Setup
 Need custom build of dfu-util:
@@ -28,9 +28,12 @@ Need udev rules (for the Longan Nano and serial cable[s]):
 sudo vim /etc/udev/rules.d/99-longan-nano.rules
 ```
 ```
+# Longan Nano
 ATTRS{idVendor}=="28e9", ATTRS{idProduct}=="0189", MODE="0666"
+# Adafruit USB to TTL Serial Cable
 ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
-TODO: Other serial cable I just bought
+# SparkFun USB to TTL Serial Cable
+ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 ```
 ```
 sudo udevadm control --reload
@@ -49,7 +52,6 @@ dfu-util --download forth.bin --alt 0 --dfuse-address 0x08000000:0x20000
 ```
 
 ## Usage
-With a USB-to-Serial cable properly connected:
 ```
 python -m serial.tools.miniterm /dev/ttyUSB0 115200
 ```
