@@ -1,5 +1,5 @@
 # bronzebeard
-Bare-metal RISC-V development with Python and Forth
+Bare-metal RISC-V Forth implementation
 
 # Supported Devices
 [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html)  
@@ -8,7 +8,7 @@ TODO [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b)
 
 # Cables
 USB-C for programming  
-USB-to-Serial for interacting (VCC jumped to 5V, not 3.3V!)  
+USB-to-Serial for interacting (VCC attached to 5V, not 3.3V!)  
 
 # Setup
 Need custom build of dfu-util:
