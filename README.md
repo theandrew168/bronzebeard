@@ -23,9 +23,10 @@ cd ..
 rm -r dfu-util/
 ```
 
+If you want to be able to do this stuff as non-root:  
 Need udev rules (for the Longan Nano and serial cable[s]):
 ```
-sudo vim /etc/udev/rules.d/99-longan-nano.rules
+sudo vim /etc/udev/rules.d/99-bronzebeard.rules
 ```
 ```
 # Longan Nano
