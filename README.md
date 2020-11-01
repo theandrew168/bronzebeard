@@ -85,6 +85,7 @@ python forth.py
 ```
 
 ## Program
+Enable DFU mode: press BOOT, press RESET, release RESET, release BOOT.
 ```
 dfu-util --download forth.bin --alt 0 --dfuse-address 0x08000000:0x20000
 ```
