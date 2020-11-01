@@ -1,26 +1,30 @@
 \ duplicate the item on top of the stack
 : dup sp@ @ ;
 
-\ make some numbers
+\ basic decimal numbers
 : -1 dup dup nand dup dup nand nand ;
 : 0 -1 dup nand ;
 : 1 -1 dup + dup nand ;
 : 2 1 1 + ;
-: 3 1 2 + ;
+: 3 2 1 + ;
 : 4 2 2 + ;
+: 5 4 1 + ;
+: 6 4 2 + ;
+: 7 4 3 + ;
 : 8 4 4 + ;
-: 12 4 8 + ;
+: 9 8 1 + ;
+: 10 8 2 + ;
+: 11 8 3 + ;
+: 12 8 4 + ;
+: 13 12 1 + ;
+: 14 12 2 + ;
+: 15 12 3 + ;
 : 16 8 8 + ;
 
-\ logic and arithmetic operators
+\ inversion and negation
 : invert dup nand ;
-: and nand invert ;
 : negate invert 1 + ;
 : - negate + ;
-
-\ equality checks
-: = - 0= ;
-: <> = invert ;
 
 \ stack manipulation words
 : drop dup - + ;
@@ -30,8 +34,13 @@
 : 2dup over over ;
 : 2drop drop drop ;
 
-\ more logic
+\ logic operators
+: and nand invert ;
 : or invert swap invert and invert ;
+
+\ equality checks
+: = - 0= ;
+: <> = invert ;
 
 \ left shift operators (1, 4, and 8 bits)
 : 2* dup + ;
@@ -43,6 +52,7 @@
 : 0b01 1 ;
 : 0b10 2 ;
 : 0b11 3 ;
+: 0b1111 15 ;
 
 \ basic hex numbers
 : 0x00 0 ;

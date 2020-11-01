@@ -9,6 +9,13 @@
 : GPIO_D_OFFSET 0x0c 256* ;
 : GPIO_E_OFFSET 0x10 256* ;
 
+\ define addresses for each GPIO port
+: GPIO_A_ADDR GPIO_BASE_ADDR GPIO_A_OFFSET + ;
+: GPIO_B_ADDR GPIO_BASE_ADDR GPIO_B_OFFSET + ;
+: GPIO_C_ADDR GPIO_BASE_ADDR GPIO_C_OFFSET + ;
+: GPIO_D_ADDR GPIO_BASE_ADDR GPIO_D_OFFSET + ;
+: GPIO_E_ADDR GPIO_BASE_ADDR GPIO_E_OFFSET + ;
+
 \ define GPIO register offsets
 : GPIO_CTL0_OFFSET 0x00 ;
 : GPIO_CTL1_OFFSET 0x04 ;
@@ -26,12 +33,21 @@
 
 \ define GPIO input control constants
 : GPIO_CTL_IN_ANALOG 0b00 ;
-: GPIO_CTL_IN_FLOATING 0b10 ;
-: GPIO_CTL_IN_PULL 0b01 ;
+: GPIO_CTL_IN_FLOATING 0b01 ;
+: GPIO_CTL_IN_PULL 0b10 ;
 : GPIO_CTL_IN_RESERVED 0b11 ;
 
 \ define GPIO output control constants
 : GPIO_CTL_OUT_PUSH_PULL 0b00 ;
-: GPIO_CTL_OUT_OPEN_DRAIN 0b10 ;
-: GPIO_CTL_OUT_ALT_PUSH_PULL 0b01 ;
+: GPIO_CTL_OUT_OPEN_DRAIN 0b01 ;
+: GPIO_CTL_OUT_ALT_PUSH_PULL 0b10 ;
 : GPIO_CTL_OUT_ALT_OPEN_DRAIN 0b11 ;
+
+: rled
+    GPIO_C_ADDR GPIO_CTL1_OFFSET + @                     \ load current control
+    0b1111                                               \ setup mask for config pins
+    256* 256* 16* invert and                             \ shift over and clear existing config for pin 13
+    GPIO_CTL_OUT_PUSH_PULL 2* 2* GPIO_MODE_OUT_50MHZ or  \ setup GPIO CTL and MODE
+    256* 256* 16* or                                     \ shift over and set new config for pin 13
+    GPIO_C_ADDR GPIO_CTL1_OFFSET + !                     \ store new control
+;

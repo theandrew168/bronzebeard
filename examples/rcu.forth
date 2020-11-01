@@ -24,7 +24,6 @@
 : RCU_GPIO_D_BIT 1 2* 2* 2* 2* 2* ;
 : RCU_GPIO_E_BIT 1 2* 2* 2* 2* 2* 2* ;
 
-\ TODO: move to led.forth
 \ enable RCU for the bit pattern on top of the stack
 : rcu_enable RCU_BASE_ADDR RCU_APB2EN_OFFSET + ! ;
 
