@@ -599,6 +599,12 @@ with p.LABEL('interpreter'):
 with p.LABEL('interpreter_repl'):
     p.JAL('ra', 'getc')  # read char into a5
     p.JAL('ra', 'putc')  # echo back
+    p.ADDI('t0', 'zero', ord('\b'))  # load backspace char into t0
+    p.BNE('a5', 't0', 'interpreter_repl_char')  # proceed normally if not a BS
+    p.BEQ(TLEN, 'zero', 'interpreter_repl')  # skip BS if TLEN is zero
+    p.ADDI(TLEN, TLEN, -1)  # reduce TLEN, effectively erasing a character
+    p.JAL('zero', 'interpreter_repl')  # loop back to top of REPL
+with p.LABEL('interpreter_repl_char'):
     p.ADD('t0', TBUF, TLEN)  # t0 = TBUF addr for this char
     p.SW('t0', 'a5', 0)  # write char into TBUF
     p.ADDI(TLEN, TLEN, 1)  # TLEN += 1
