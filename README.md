@@ -1,6 +1,43 @@
 # bronzebeard
 Bare-metal RISC-V Forth implementation
 
+## What
+Bronzebeard is an implementation of the [Forth programming language](https://en.wikipedia.org/wiki/Forth_(programming_language)) for the [RISC-V ISA](https://en.wikipedia.org/wiki/RISC-V).
+It is designed to run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an operating system or existing softwaree of any kind.
+
+## Why
+Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
+Can useful software be developed without relying on any of it?
+That's the question that this project seeks to answer.
+I believe that the rise of RISC-V provides a great opportunity to explore different methods of program development.
+Installing a full operating system isn't always a prerequisite to building something valuable.
+
+## How
+Bronzebeard is written directly in RISC-V assembly.
+The [simpleriscv](https://github.com/theandrew168/simpleriscv) assembler is used because of its independence from large, complex toolchains.
+It is portable, simple, and easy to understand.
+
+## Prior Art
+Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
+Many folks have adapted its ideas and principles to solve their own problems.
+[Moving Forth](http://www.bradrodriguez.com/papers/moving1.htm) by Brad Rodriguez is an amazing source of Forth implementation details and tradeoffs.
+[Sectorforth](https://github.com/cesarblum/sectorforth) by Cesar Blum is the source of Bronzebeard's general structure.
+He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
+
+## Primitive Words
+This minimal selection of primitive words comes from Sectorforth and the Usenet thread it references.
+
+| Word   | Stack Effects | Description                                   |
+| ------ | ------------- | --------------------------------------------- |
+| `@`    | ( addr -- x ) | Fetch memory contents at addr                 |
+| `!`    | ( x addr -- ) | Store x at addr                               |
+| `sp@`  | ( -- sp )     | Get pointer to top of data stack              |
+| `rp@`  | ( -- rp )     | Get pointer to top of return stack            |
+| `0=`   | ( x -- flag ) | -1 if top of stack is 0, 0 otherwise          |
+| `+`    | ( x y -- z )  | Sum the two numbers at the top of the stack   |
+| `nand` | ( x y -- z )  | NAND the two numbers at the top of the stack  |
+
+
 ## Supported Devices
 [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html)  
 TODO [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html)  
