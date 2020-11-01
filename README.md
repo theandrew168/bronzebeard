@@ -3,7 +3,7 @@ Bare-metal RISC-V Forth implementation
 
 ## What
 Bronzebeard is an implementation of the [Forth programming language](https://en.wikipedia.org/wiki/Forth_(programming_language)) for the [RISC-V ISA](https://en.wikipedia.org/wiki/RISC-V).
-It is designed to run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an operating system or existing softwaree of any kind.
+It is designed to run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an [operating system](https://en.wikipedia.org/wiki/Operating_system) or existing software of any kind.
 
 ## Why
 Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
@@ -15,7 +15,7 @@ Installing a full operating system isn't always a prerequisite to building somet
 ## How
 Bronzebeard is written directly in RISC-V assembly.
 The [simpleriscv](https://github.com/theandrew168/simpleriscv) assembler is used because of its independence from large, complex toolchains.
-It is portable, simple, and easy to understand.
+It is portable, minimal, and easy to understand.
 
 ## Prior Art
 Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
