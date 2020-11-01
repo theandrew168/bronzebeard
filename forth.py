@@ -516,11 +516,17 @@ with p.LABEL('start'):
     # store USART0 config
     p.SW('t0', 't1', 0)
 
-    # USART ECHO PROGRAM
-#    p.LABEL('echo')
-#    p.JAL('ra', 'getc')
-#    p.JAL('ra', 'putc')
-#    p.JAL('zero', 'echo')
+    # set HERE var to "here" location
+    #   PositionFrom('here', RAM_BASE_ADDR)
+    p.LUI(HERE, p.HI(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
+    p.ADDI(HERE, HERE, 'here')
+
+    # set LATEST var to "latest" location
+    #   PositionFrom('latest', RAM_BASE_ADDR)
+    p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
+    p.ADDI(LATEST, LATEST, 'latest')
 
     p.JAL('zero', 'init')
 
@@ -554,18 +560,6 @@ with p.LABEL('init'):
     #   Immediate(RAM_BASE_ADDR + TIB_BASE)
     p.LUI(TIB, p.HI(RAM_BASE_ADDR + TIB_BASE))
     p.ADDI(TIB, TIB, p.LO(RAM_BASE_ADDR + TIB_BASE))
-
-    # set HERE var to "here" location
-    #   PositionFrom('here', RAM_BASE_ADDR)
-    p.LUI(HERE, p.HI(RAM_BASE_ADDR))
-    p.ADDI(HERE, HERE, p.LO(RAM_BASE_ADDR))
-    p.ADDI(HERE, HERE, 'here')
-
-    # set LATEST var to "latest" location
-    #   PositionFrom('latest', RAM_BASE_ADDR)
-    p.LUI(LATEST, p.HI(RAM_BASE_ADDR))
-    p.ADDI(LATEST, LATEST, p.LO(RAM_BASE_ADDR))
-    p.ADDI(LATEST, LATEST, 'latest')
 
 p.JAL('zero', 'interpreter')
 
