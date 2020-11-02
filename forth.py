@@ -33,12 +33,21 @@ from simpleriscv import asm
 # https://github.com/cesarblum/sectorforth
 # https://www.bradrodriguez.com/papers/moving1.htm
 
-# GD32VF103[CBT6]: Longan Nano, Wio Lite
-ROM_BASE_ADDR = 0x08000000  # 128K
-RAM_BASE_ADDR = 0x20000000  # 32K
-CLOCK_FREQ = 8000000
-MTIME_FREQ = CLOCK_FREQ // 4
+# Bronzebeard details
+FORTH_SIZE = 16 * 1024  # 16K
 USART_BAUD = 115200
+
+# GD32VF103[CBT6]: Longan Nano, Wio Lite
+ROM_BASE_ADDR = 0x08000000
+ROM_SIZE = 128 * 1024  # 128K
+RAM_BASE_ADDR = 0x20000000
+RAM_SIZE = 32 * 1024  # 32K
+DISK_BASE_ADDR = ROM_BASE_ADDR + FORTH_SIZE
+DISK_SIZE = ROM_SIZE - FORTH_SIZE
+HEAP_BASE_ADDR = RAM_BASE_ADDR + FORTH_SIZE
+HEAP_SIZE = RAM_SIZE - FORTH_SIZE
+CLOCK_FREQ = 8000000
+MTIME_FREQ = 2000000
 
 # FE310-G002: HiFive1 Rev B
 #ROM_BASE_ADDR  = 0x20000000  # 4M
@@ -735,96 +744,26 @@ with defword(p, ';', flags=F_IMMEDIATE):
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
     p.JAL('zero', 'next')  # next
 
-## TODO: remove after debugging
-## red LED: GPIO port C, ctrl 1, pin 13
-## offset: ((PIN - 8) * 4) = 20
-#with defword(p, 'rled'):
-#    # load GPIO base addr into t0
-#    p.LUI('t0', p.HI(GPIO_BASE_ADDR_C))
-#    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_C))
-#
-#    # move t0 forward to control 1 register
-#    p.ADDI('t0', 't0', GPIO_CTL1_OFFSET)
-#
-#    # load current GPIO config into t1
-#    p.LW('t1', 't0', 0)
-#
-#    # clear existing config
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 20)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings
-#    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-#    p.SLLI('t2', 't2', 20)
-#    p.OR('t1', 't1', 't2')
-#
-#    # store the GPIO config
-#    p.SW('t0', 't1', 0)
-#
-#    # next
-#    p.JAL('zero', 'next')
-#
-## green LED: GPIO port A, ctrl 0, pin 1
-## offset: (PIN * 4) = 4
-#with defword(p, 'gled'):
-#    # load GPIO base addr into t0
-#    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-#    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-#
-#    # move t0 forward to control 0 register
-#    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
-#
-#    # load current GPIO config into t1
-#    p.LW('t1', 't0', 0)
-#
-#    # clear existing config
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 4)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings
-#    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-#    p.SLLI('t2', 't2', 4)
-#    p.OR('t1', 't1', 't2')
-#
-#    # store the GPIO config
-#    p.SW('t0', 't1', 0)
-#
-#    # next
-#    p.JAL('zero', 'next')
-#
-## blue LED: GPIO port A, ctrl 0, pin 2
-## offset: (PIN * 4) = 8
-#with defword(p, 'bled'):
-#    # load GPIO base addr into t0
-#    p.LUI('t0', p.HI(GPIO_BASE_ADDR_A))
-#    p.ADDI('t0', 't0', p.LO(GPIO_BASE_ADDR_A))
-#
-#    # move t0 forward to control 0 register
-#    p.ADDI('t0', 't0', GPIO_CTL0_OFFSET)
-#
-#    # load current GPIO config into t1
-#    p.LW('t1', 't0', 0)
-#
-#    # clear existing config
-#    p.ADDI('t2', 'zero', 0b1111)
-#    p.SLLI('t2', 't2', 8)
-#    p.XORI('t2', 't2', -1)
-#    p.AND('t1', 't1', 't2')
-#
-#    # set new config settings
-#    p.ADDI('t2', 'zero', (GPIO_CTL_OUT_PUSH_PULL << 2) | GPIO_MODE_OUT_50MHZ)
-#    p.SLLI('t2', 't2', 8)
-#    p.OR('t1', 't1', 't2')
-#
-#    # store the GPIO config
-#    p.SW('t0', 't1', 0)
-#
-#    # next
-#    p.JAL('zero', 'next')
+with defword(p, 'load'):
+    # TBUF = disk_start
+    p.LUI(TBUF, p.HI(ROM_BASE_ADDR))
+    p.ADDI(TBUF, TBUF, p.LO(ROM_BASE_ADDR))
+    # TODO: allow HI/LO relocations to deferred labels in ASMv3
+    p.ADDI('t0', 'zero', 1)
+    p.SLLI('t0', 't0', 14)
+    p.ADD(TBUF, TBUF, 't0')
+
+    # TLEN = disk_end - dist_start
+    # TLEN = 4096
+    # TODO: fix this hard-coded value in ASMv3
+    p.ADDI('t0', 'zero', 1)
+    p.SLLI(TLEN, 't0', 12)
+
+    # TPOS = 0
+    p.ADDI(TPOS, 'zero', 0)
+
+    # next
+    p.JAL('zero', 'next')
 
 with defword(p, '@'):
     # pop address into t0
@@ -919,6 +858,162 @@ with defword(p, 'nand'):
     p.JAL('zero', 'next')
 
 p.LABEL('here')  # mark the location of the next new word
+
+p.ALIGN(FORTH_SIZE)  # pad binary out to start of disk memory
+p.LABEL('disk_start')
+
+# duplicate the item on top of the stack
+p.BLOB(b': dup sp@ @ ; ')
+
+# basic decimal numbers
+p.BLOB(b': -1 dup dup nand dup dup nand nand ; ')
+p.BLOB(b': 0 -1 dup nand ; ')
+p.BLOB(b': 1 -1 dup + dup nand ; ')
+p.BLOB(b': 2 1 1 + ; ')
+p.BLOB(b': 3 2 1 + ; ')
+p.BLOB(b': 4 2 2 + ; ')
+p.BLOB(b': 5 4 1 + ; ')
+p.BLOB(b': 6 4 2 + ; ')
+p.BLOB(b': 7 4 3 + ; ')
+p.BLOB(b': 8 4 4 + ; ')
+p.BLOB(b': 9 8 1 + ; ')
+p.BLOB(b': 10 8 2 + ; ')
+p.BLOB(b': 11 8 3 + ; ')
+p.BLOB(b': 12 8 4 + ; ')
+p.BLOB(b': 13 12 1 + ; ')
+p.BLOB(b': 14 12 2 + ; ')
+p.BLOB(b': 15 12 3 + ; ')
+p.BLOB(b': 16 8 8 + ; ')
+
+# inversion and negation
+p.BLOB(b': invert dup nand ; ')
+p.BLOB(b': negate invert 1 + ; ')
+p.BLOB(b': - negate + ; ')
+
+# stack manipulation words
+p.BLOB(b': drop dup - + ; ')
+p.BLOB(b': over sp@ 4 - @ ; ')
+p.BLOB(b': swap over over sp@ 12 - ! sp@ 4 - ! ; ')
+p.BLOB(b': nip swap drop ; ')
+p.BLOB(b': 2dup over over ; ')
+p.BLOB(b': 2drop drop drop ; ')
+
+# logic operators
+p.BLOB(b': and nand invert ; ')
+p.BLOB(b': or invert swap invert and invert ; ')
+
+# equality checks
+p.BLOB(b': = - 0= ; ')
+p.BLOB(b': <> = invert ; ')
+
+# left shift operators (1, 4, and 8 bits)
+p.BLOB(b': 2* dup + ; ')
+p.BLOB(b': 16* 2* 2* 2* 2* ; ')
+p.BLOB(b': 256* 16* 16* ; ')
+
+# basic binary numbers
+p.BLOB(b': 0b00 0 ; ')
+p.BLOB(b': 0b01 1 ; ')
+p.BLOB(b': 0b10 2 ; ')
+p.BLOB(b': 0b11 3 ; ')
+p.BLOB(b': 0b1111 15 ; ')
+
+# basic hex numbers
+p.BLOB(b': 0x00 0 ; ')
+p.BLOB(b': 0x04 1 2* 2* ; ')
+p.BLOB(b': 0x08 1 2* 2* 2* ; ')
+p.BLOB(b': 0x0c 0x08 0x04 or ; ')
+p.BLOB(b': 0x10 1 16* ; ')
+p.BLOB(b': 0x14 0x10 0x04 or ; ')
+p.BLOB(b': 0x18 0x10 0x08 or ; ')
+p.BLOB(b': 0x1c 0x10 0x0c or ; ')
+p.BLOB(b': 0x20 1 16* 2* ; ')
+p.BLOB(b': 0x24 0x20 0x04 or ; ')
+p.BLOB(b': 0x28 0x20 0x08 or ; ')
+p.BLOB(b': 0x2c 0x20 0x0c or ; ')
+p.BLOB(b': 0x30 0x20 0x10 or ; ')
+p.BLOB(b': 0x34 0x30 0x04 or ; ')
+p.BLOB(b': 0x38 0x30 0x08 or ; ')
+p.BLOB(b': 0x3c 0x30 0x0c or ; ')
+
+# define GPIO base address
+p.BLOB(b': 0x40010800 1 256* 256* 256* 16* 2* 2* 1 256* 256* 1 256* 2* 2* 2* or or ; ')
+p.BLOB(b': GPIO_BASE_ADDR 0x40010800 ; ')
+
+# define offsets for each GPIO port
+p.BLOB(b': GPIO_A_OFFSET 0x00 256* ; ')
+p.BLOB(b': GPIO_B_OFFSET 0x04 256* ; ')
+p.BLOB(b': GPIO_C_OFFSET 0x08 256* ; ')
+p.BLOB(b': GPIO_D_OFFSET 0x0c 256* ; ')
+p.BLOB(b': GPIO_E_OFFSET 0x10 256* ; ')
+
+# define addresses for each GPIO port
+p.BLOB(b': GPIO_A_ADDR GPIO_BASE_ADDR GPIO_A_OFFSET + ; ')
+p.BLOB(b': GPIO_B_ADDR GPIO_BASE_ADDR GPIO_B_OFFSET + ; ')
+p.BLOB(b': GPIO_C_ADDR GPIO_BASE_ADDR GPIO_C_OFFSET + ; ')
+p.BLOB(b': GPIO_D_ADDR GPIO_BASE_ADDR GPIO_D_OFFSET + ; ')
+p.BLOB(b': GPIO_E_ADDR GPIO_BASE_ADDR GPIO_E_OFFSET + ; ')
+
+# define GPIO register offsets
+p.BLOB(b': GPIO_CTL0_OFFSET 0x00 ; ')
+p.BLOB(b': GPIO_CTL1_OFFSET 0x04 ; ')
+p.BLOB(b': GPIO_ISTAT_OFFSET 0x08 ; ')
+p.BLOB(b': GPIO_OCTL_OFFSET 0x0c ; ')
+p.BLOB(b': GPIO_BOP_OFFSET 0x10 ; ')
+p.BLOB(b': GPIO_BC_OFFSET 0x14 ; ')
+p.BLOB(b': GPIO_LOCK_OFFSET 0x18 ; ')
+
+# define GPIO mode constants
+p.BLOB(b': GPIO_MODE_IN 0b00 ; ')
+p.BLOB(b': GPIO_MODE_OUT_10MHZ 0b01 ; ')
+p.BLOB(b': GPIO_MODE_OUT_2MHZ 0b10 ; ')
+p.BLOB(b': GPIO_MODE_OUT_50MHZ 0b11 ; ')
+
+# define GPIO input control constants
+p.BLOB(b': GPIO_CTL_IN_ANALOG 0b00 ; ')
+p.BLOB(b': GPIO_CTL_IN_FLOATING 0b01 ; ')
+p.BLOB(b': GPIO_CTL_IN_PULL 0b10 ; ')
+p.BLOB(b': GPIO_CTL_IN_RESERVED 0b11 ; ')
+
+# define GPIO output control constants
+p.BLOB(b': GPIO_CTL_OUT_PUSH_PULL 0b00 ; ')
+p.BLOB(b': GPIO_CTL_OUT_OPEN_DRAIN 0b01 ; ')
+p.BLOB(b': GPIO_CTL_OUT_ALT_PUSH_PULL 0b10 ; ')
+p.BLOB(b': GPIO_CTL_OUT_ALT_OPEN_DRAIN 0b11 ; ')
+
+# turn on the red LED from Forth!
+p.BLOB(b': rled ')
+p.BLOB(b'    GPIO_C_ADDR GPIO_CTL1_OFFSET + @ ')  # load current control
+p.BLOB(b'    0b1111 ')  # setup mask for config pins
+p.BLOB(b'    256* 256* 16* invert and ')  # shift over and clear existing config for pin 13
+p.BLOB(b'    GPIO_CTL_OUT_PUSH_PULL 2* 2* GPIO_MODE_OUT_50MHZ or ')  # setup GPIO CTL and MODE
+p.BLOB(b'    256* 256* 16* or ')  # shift over and set new config for pin 13
+p.BLOB(b'    GPIO_C_ADDR GPIO_CTL1_OFFSET + ! ')  # store new control
+p.BLOB(b'; ')
+
+# turn on the green LED from Forth!
+p.BLOB(b': gled ')
+p.BLOB(b'    GPIO_A_ADDR GPIO_CTL0_OFFSET + @ ')  # load current control
+p.BLOB(b'    0b1111 ')  # setup mask for config pins
+p.BLOB(b'    16* invert and ')  # shift over and clear existing config for pin 1
+p.BLOB(b'    GPIO_CTL_OUT_PUSH_PULL 2* 2* GPIO_MODE_OUT_50MHZ or ')  # setup GPIO CTL and MODE
+p.BLOB(b'    16* or ')  # shift over and set new config for pin 1
+p.BLOB(b'    GPIO_A_ADDR GPIO_CTL0_OFFSET + ! ')  # store new control
+p.BLOB(b'; ')
+
+# turn on the blue LED from Forth!
+p.BLOB(b': bled ')
+p.BLOB(b'    GPIO_A_ADDR GPIO_CTL0_OFFSET + @ ')  # load current control
+p.BLOB(b'    0b1111 ')  # setup mask for config pins
+p.BLOB(b'    256* invert and ')  # shift over and clear existing config for pin 2
+p.BLOB(b'    GPIO_CTL_OUT_PUSH_PULL 2* 2* GPIO_MODE_OUT_50MHZ or ')  # setup GPIO CTL and MODE
+p.BLOB(b'    256* or ')  # shift over and set new config for pin 2
+p.BLOB(b'    GPIO_A_ADDR GPIO_CTL0_OFFSET + ! ')  # store new control
+p.BLOB(b'; ')
+
+p.LABEL('disk_end')
+
+print('disk:', p.labels['disk_end'] - p.labels['disk_start'])
 
 
 with open('forth.bin', 'wb') as f:
