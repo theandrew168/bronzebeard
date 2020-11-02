@@ -38,10 +38,16 @@ This minimal selection of primitive words comes from Sectorforth and the Usenet 
 | `nand` | ( x y -- z )  | NAND the two numbers at the top of the stack  |
 
 
-## Supported Devices
-[Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html)  
-TODO [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html)  
-TODO [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b)  
+## Portability
+At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
+However, there are plans in the near future to broaden support to also include the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html) and [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
+As far as portability goes, Bronzebeard only requires a few pieces of information and functionality.
+
+1. ROM base address and size
+2. RAM base address and size
+3. Ability to read and write characters over serial UART
+
+All three of the aforementioned devices are capable of running Bronzebeard: it is just a matter of collecting the memory info, implementing basic UART interaction, and then flashing the ROM.
 
 ## Cables
 USB-C for programming  
