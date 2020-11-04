@@ -29,7 +29,12 @@ import usb.util
 #   dfuse_special_command(iface, addr, ERASE_PAGE)
 # for each page:
 #   dfuse_special_command(iface, addr, SET_ADDRESS)
-#   dfuse_dnload_chunk(iface, data + offset, xfer_size, 2)
+#   dfuse_dnload_chunk(iface, data + offset, xfer_size, 2)  # trans = 2 for no addr offset?
+#   dfuse_download(iface, size, data, 2)
+#     ctrl_transfer(OUT, DFU_DNLOAD, 2, iface, data, len)
+#   dfu_get_status
+#   sleep(poll_timeout)
+#   ensure STATUS_OK
 
 DFU_DEVICE_CLASS = 0xfe
 DFU_DEVICE_SUBCLASS = 0x01
