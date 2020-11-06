@@ -121,95 +121,72 @@ STATE_DESCRIPTION = {
     STATE_DFU_ERROR: 'An error has occurred. Awaiting the DFU_CLRSTATUS request.',
 }
 
-DFU_STATUS_LENGTH = 6
-
 USB_ENDPOINT_OUT = 0b00000000
 USB_ENDPOINT_IN = 0b10000000
 USB_REQUEST_TYPE_CLASS = 0b00100000
 USB_RECIPIENT_INTERFACE = 0b00000001
 
 
-def find_dfu_conf_and_iface(dev):
-    for conf in dev:
-        for iface in conf:
-            if iface.bInterfaceClass != DFU_DEVICE_CLASS:
-                continue
-            if iface.bInterfaceSubClass != DFU_DEVICE_SUBCLASS:
-                continue
-            return conf.bConfigurationValue, iface.bInterfaceNumber
-
-    raise RuntimeError('device lacks a DFU interface')
-
-
-# ensure correct args
-if len(sys.argv) != 2:
-    usage = '{} <vendor:product>'.format(sys.argv[0])
-    raise RuntimeError(usage)
-
-# parse args and find device
-device_id = sys.argv[1]
-vendor, product = device_id.split(':')
-vendor, product = int(vendor, 16), int(product, 16)
-dev = usb.core.find(idVendor=vendor, idProduct=product)
-if dev is None:
-    raise RuntimeError('device not found')
-
-# TODO: get page_size and page_count via the protocol
-
-# quirks for GD32 devices (Longan Nano, Wio Lite)
-if vendor == 0x28e9 and product == 0x0189:
-    print('Found GD32 device, overriding page size and count')
-    # fix mis-encoded serial number
-    sn = dev.serial_number.encode('utf-16-le').decode('utf-8')
-    # page size is always 1024
-    page_size = 1024
-    # page count can be determined based on the serial number
-    if sn[2] == 'B':
-        page_count = 128
-    elif sn[2] == '8':
-        page_count = 64
-    elif sn[2] == '6':
-        page_count = 32
-    elif sn[2] == '4':
-        page_count = 16
-    else:
-        raise RuntimeError('invalid serial number for a GD32 device')
-
-conf, iface = find_dfu_conf_and_iface(dev)
-
-# use the DFU configuration and interface
-dev.set_configuration(conf)
-dev.set_interface_altsetting(iface)
-
-# get DFU status
-response = dev.ctrl_transfer(
-    USB_ENDPOINT_IN | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
-    REQUEST_DFU_GETSTATUS, 0, iface, 6, 5000)
-status, pt0, pt1, pt2, state, desc = struct.unpack('<BBBBBB', response)
-poll_timeout = pt2 << 16 | pt1 << 8 | pt0  # rebuild timeout from 3 bytes (little-endian)
-poll_timeout = poll_timeout / 1000  # convert timeout to seconds
-print('status:', status)
-print('timeout:', poll_timeout)
-print('state:', state)
-print('state_desc:', STATE_DESCRIPTION[state])
-time.sleep(poll_timeout)
-
-# clear DFU error if present
-if state == STATE_DFU_ERROR:
-    print('Device is in error, sending DFU_CLRSTATUS')
-    dev.ctrl_transfer(
-        USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
-        REQUEST_DFU_CLRSTATUS, 0, iface, 0, 5000)
-
-    # get DFU status again
-    response = dev.ctrl_transfer(
+def dfu_get_status(device):
+    response = device.ctrl_transfer(
         USB_ENDPOINT_IN | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
-        REQUEST_DFU_GETSTATUS, 0, iface, 6, 5000)
+        REQUEST_DFU_GETSTATUS, 0, 0, 6, 1000)
     status, pt0, pt1, pt2, state, desc = struct.unpack('<BBBBBB', response)
     poll_timeout = pt2 << 16 | pt1 << 8 | pt0  # rebuild timeout from 3 bytes (little-endian)
     poll_timeout = poll_timeout / 1000  # convert timeout to seconds
-    print('status:', status)
-    print('timeout:', poll_timeout)
-    print('state:', state)
-    print('state_desc:', STATE_DESCRIPTION[state])
     time.sleep(poll_timeout)
+    return status, state
+
+
+def dfu_clear_status(device):
+    device.ctrl_transfer(
+        USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
+        REQUEST_DFU_CLRSTATUS, 0, 0, 0, 1000)
+
+
+def main():
+    # ensure correct args
+    if len(sys.argv) != 2:
+        usage = '{} <vendor:product>'.format(sys.argv[0])
+        raise RuntimeError(usage)
+
+    # parse args and find device
+    device_id = sys.argv[1]
+    vendor, product = device_id.split(':')
+    vendor, product = int(vendor, 16), int(product, 16)
+    dev = usb.core.find(idVendor=vendor, idProduct=product)
+    if dev is None:
+        raise RuntimeError('device not found: {}'.format(device_id))
+
+    # TODO: get page_size and page_count via the protocol
+
+    # quirks for GD32 devices (Longan Nano, Wio Lite)
+    if vendor == 0x28e9 and product == 0x0189:
+        print('Found GD32 device, overriding page size and count')
+        # fix mis-encoded serial number
+        sn = dev.serial_number.encode('utf-16-le').decode('utf-8')
+        # page size is always 1024
+        page_size = 1024
+        # page count can be determined based on the serial number
+        if sn[2] == 'B':
+            page_count = 128
+        elif sn[2] == '8':
+            page_count = 64
+        elif sn[2] == '6':
+            page_count = 32
+        elif sn[2] == '4':
+            page_count = 16
+        else:
+            raise RuntimeError('invalid serial number for a GD32 device: {}'.format(sn))
+
+    status, state = dfu_get_status(dev)
+    print(STATE_DESCRIPTION[state])
+    if state == STATE_DFU_ERROR:
+        print('Device is in error, sending DFU_CLRSTATUS')
+        dfu_clear_status(dev)
+        status, state = dfu_get_status(dev)
+        print(STATE_DESCRIPTION[state])
+
+
+if __name__ == '__main__':
+    main()
