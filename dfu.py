@@ -18,6 +18,7 @@ import usb.util
 
 # References:
 # https://usb.org/sites/default/files/DFU_1.1.pdf
+# https://sourceforge.net/p/dfu-util/dfu-util/ci/master/tree/
 # https://github.com/usb-tools/pyfwup/blob/master/fwup/dfu.py
 
 # From dfu-util:
@@ -130,24 +131,62 @@ USB_RECIPIENT_INTERFACE = 0b00000001
 def dfu_get_status(device):
     response = device.ctrl_transfer(
         USB_ENDPOINT_IN | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
-        REQUEST_DFU_GETSTATUS, 0, 0, 6, 1000)
+        REQUEST_DFU_GETSTATUS,
+        data_or_wLength=6,
+        timeout=1000)
+    assert len(response) == 6
+
     status, pt0, pt1, pt2, state, desc = struct.unpack('<BBBBBB', response)
     poll_timeout = pt2 << 16 | pt1 << 8 | pt0  # rebuild timeout from 3 bytes (little-endian)
     poll_timeout = poll_timeout / 1000  # convert timeout to seconds
+
     time.sleep(poll_timeout)
     return status, state
 
 
 def dfu_clear_status(device):
-    device.ctrl_transfer(
+    count = device.ctrl_transfer(
         USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
-        REQUEST_DFU_CLRSTATUS, 0, 0, 0, 1000)
+        REQUEST_DFU_CLRSTATUS,
+        data_or_wLength=b'',
+        timeout=1000)
+    assert count == 0
+
+
+def dfuse_erase_page(device, address):
+    request = struct.pack('<BI', DFUSE_CMD_ERASE_PAGE, address)
+    count = device.ctrl_transfer(
+        USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
+        REQUEST_DFU_DNLOAD,
+        data_or_wLength=request,
+        timeout=1000)
+    assert count == 5
+
+
+def dfuse_set_address(device, address):
+    request = struct.pack('<BI', DFUSE_CMD_SET_ADDRESS, address)
+    count = device.ctrl_transfer(
+        USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
+        REQUEST_DFU_DNLOAD,
+        data_or_wLength=request,
+        timeout=1000)
+    assert count == 5
+
+
+def dfuse_download(device, code):
+    count = device.ctrl_transfer(
+        USB_ENDPOINT_OUT | USB_REQUEST_TYPE_CLASS | USB_RECIPIENT_INTERFACE,
+        REQUEST_DFU_DNLOAD,
+        wValue=2,  # transaction = 2 for no address offset
+        data_or_wLength=code,
+        timeout=1000)
+    assert count == len(code)
 
 
 def main():
     # ensure correct args
-    if len(sys.argv) != 2:
-        usage = '{} <vendor:product>'.format(sys.argv[0])
+    if len(sys.argv) != 3:
+        usage = '{} <vendor:product> <firmware>'.format(sys.argv[0])
         raise RuntimeError(usage)
 
     # parse args and find device
@@ -179,13 +218,81 @@ def main():
         else:
             raise RuntimeError('invalid serial number for a GD32 device: {}'.format(sn))
 
+    print('page_size:', page_size)
+    print('page_count:', page_count)
+
+    # read firmware file
+    with open(sys.argv[2], 'rb') as f:
+        firmware = f.read()
+
+    # ensure firmware will fit
+    if len(firmware) > (page_size * page_count):
+        raise RuntimeError('Firmware file is too large for device')
+
+    # pad firmware with zeroes
+    while len(firmware) < (page_size * page_count):
+        firmware += b'\x00'
+
+    # check initial status and clear any errors
     status, state = dfu_get_status(dev)
-    print(STATE_DESCRIPTION[state])
+    #print(STATE_DESCRIPTION[state])
     if state == STATE_DFU_ERROR:
         print('Device is in error, sending DFU_CLRSTATUS')
         dfu_clear_status(dev)
         status, state = dfu_get_status(dev)
         print(STATE_DESCRIPTION[state])
+
+    # erase flash
+    for page in range(page_count):
+        start = 0x08000000
+        addr = start + (page * page_size)
+
+        # print progress and erase page
+        print('\rerasing: 0x{:08x}'.format(addr), end='', flush=True)
+        dfuse_erase_page(dev, addr)
+
+        # poll state til not busy
+        status, state = dfu_get_status(dev)
+        while state == STATE_DFU_DNBUSY:
+            status, state = dfu_get_status(dev)
+
+        if status != STATUS_OK:
+            print('error erasing page:')
+            print(STATUS_DESCRIPTION[status])
+
+    print()
+
+    # write flash
+    for page in range(page_count):
+        addr_start = 0x08000000
+        addr = addr_start + (page * page_size)
+        code_start = page * page_size
+        code_end = code_start + page_size
+        code = firmware[code_start:code_end]
+
+        # print progress and set address
+        print('\rwriting: 0x{:08x}'.format(addr), end='', flush=True)
+        dfuse_set_address(dev, addr)
+
+        # poll state til not busy
+        status, state = dfu_get_status(dev)
+        while state == STATE_DFU_DNBUSY:
+            status, state = dfu_get_status(dev)
+
+        # write the code chunk
+        dfuse_download(dev, code)
+
+        # poll status til not idle or error
+        status, state = dfu_get_status(dev)
+        while state not in [STATE_DFU_DNLOAD_IDLE, STATE_DFU_ERROR]:
+            status, state = dfu_get_status(dev)
+
+        if status != STATUS_OK:
+            print('error writing page:')
+            print(STATUS_DESCRIPTION[status])
+
+    print()
+    print('done!')
 
 
 if __name__ == '__main__':
