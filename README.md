@@ -77,7 +77,7 @@ brew install libusb
 ```
 
 ### Linux
-Programming devices over DFU requires [libusb](https://libusb.info).
+Programming devices over DFU requires [libusb](https://libusb.info) version 1.0 or greater.
 The following command will install the library on Debian-based Linux systems such as Debian, Ubuntu, Linux Mint, and Pop!\_OS.
 ```
 sudo apt install libusb-1.0-0-dev

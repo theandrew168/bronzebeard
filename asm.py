@@ -241,9 +241,6 @@ SRL = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
 SRA = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
-FENCE = partial(i_type, opcode=0b0001111, funct3=0b000)
-ECALL = partial(i_type, opcode=0b1110011, funct3=0b000)
-EBREAK = partial(i_type, opcode=0b1110011, funct3=0b000)
 
 
 class Program:
@@ -415,6 +412,3 @@ class Program:
     SRA = partialmethod(_r_type, instruction=SRA)
     OR = partialmethod(_r_type, instruction=OR)
     AND = partialmethod(_r_type, instruction=AND)
-    FENCE = partialmethod(_i_type, instruction=FENCE)
-    ECALL = partialmethod(_i_type, rd=0b00000, rs1=0b00000, imm=0b000000000000, instruction=ECALL)
-    EBREAK = partialmethod(_i_type, rd=0b00000, rs1=0b00000, imm=0b000000000001, instruction=EBREAK)
