@@ -33,8 +33,8 @@ This minimal selection of primitive words comes from Sectorforth and the Usenet 
 | ------ | ------------- | --------------------------------------------- |
 | `:`    | ( -- )        | Start the definition of a new secondary word  |
 | `;`    | ( -- )        | Finish the definition of a new secondary word |
-| `key`  | ( -- x )      | Read ASCII character from serial              |
-| `emit` | ( x -- )      | Write ASCII character to serial               |
+| `key`  | ( -- x )      | Read ASCII character from serial input        |
+| `emit` | ( x -- )      | Write ASCII character to serial output        |
 | `@`    | ( addr -- x ) | Fetch memory contents at addr                 |
 | `!`    | ( x addr -- ) | Store x at addr                               |
 | `sp@`  | ( -- sp )     | Get pointer to top of data stack              |
