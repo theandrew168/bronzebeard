@@ -21,7 +21,7 @@ It is portable, minimal, and easy to understand.
 Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
 Many folks have adapted its ideas and principles to solve their own problems.
 [Moving Forth](http://www.bradrodriguez.com/papers/moving1.htm) by Brad Rodriguez is an amazing source of Forth implementation details and tradeoffs.
-Additionally, if you are looking for some introductory content surrounding the Forth language in general, I recommend the book [Starting Forth](https://www.forth.com/starting-forth/) by Leo Brodie.
+If you are looking for some introductory content surrounding the Forth language in general, I recommend the book [Starting Forth](https://www.forth.com/starting-forth/) by Leo Brodie.
 
 [Sectorforth](https://github.com/cesarblum/sectorforth) by Cesar Blum is the source of Bronzebeard's general structure.
 He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
@@ -53,29 +53,25 @@ As far as portability goes, Bronzebeard only requires a few pieces of informatio
 
 All three of the aforementioned devices are capable of running Bronzebeard: it is just a matter of collecting the memory info, implementing basic UART interaction, and then flashing the ROM.
 
-## Cables
-USB-C for programming  
-USB to TTL Serial for interacting (VCC attached to 5V, not 3.3V!)  
-
 ## Setup
-Need custom build of dfu-util:
-```
-git clone git://git.code.sf.net/p/dfu-util/dfu-util
-cd dfu-util
-./autogen.sh
-./configure
-make
-sudo make install
-cd ..
-rm -r dfu-util/
-```
+All major operating system platforms are supported: Windows, macOS, and Linux.
+In order to utilize Bronzebeard's tools and features, you need to first download and install a recent version of [Python](https://www.python.org/downloads/).
+Follow the setup documentation on Python's website for whichever platform you are using.
 
-If you want to be able to do this stuff as non-root:  
-Need udev rules (for the Longan Nano and serial cable[s]):
+### Windows
+The devices that Bronzebeard targets don't work well with Windows out of the box.
+They each need to be associated with the generic [WinUSB](https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb) driver.
+The easiest way to accomplish this is with a tool called [Zadig](https://zadig.akeo.ie/).
+With the device attached to your computer (and in DFU mode, if applicable), use Zadig to assign the WinUSB driver to the device.
+
+### macOS
+Everything should simply work out of the box on macOS!
+
+### Linux
+If you'd like to program and interact with the device as a normal, non-root user, setup the following [udev](https://en.wikipedia.org/wiki/Udev) rules:
 ```
-sudo vim /etc/udev/rules.d/99-bronzebeard.rules
-```
-```
+# /etc/udev/rules.d/99-bronzebeard.rules
+
 # Longan Nano / Wio Lite
 ATTRS{idVendor}=="28e9", ATTRS{idProduct}=="0189", MODE="0666"
 # Adafruit USB to TTL Serial Cable
@@ -83,24 +79,34 @@ ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
 # SparkFun USB to TTL Serial Cable
 ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 ```
-```
-sudo udevadm control --reload
-```
 
-## Build
+After the rules file is setup, reload udev via `sudo udevadm control --reload`.
+
+## Longan Nano
+This section details how to run Bronzebeard on the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
+
+### Cables
+1. Attach the USB to USB-C cable for programming via DFU
+1. Attach the USB to TTL Serial cable for interacting over serial
+  1. Attach GND to GND
+  2. Attach TX to RX
+  3. Attach RX to TX
+  4. Don't attach VCC (or jump to the 5V input if you want power over via cable)
+
+### Build
 ```
 python3 -m venv venv
 . venv/bin/activate
 python forth.py
 ```
 
-## Program
+### Program
 Enable DFU mode: press BOOT, press RESET, release RESET, release BOOT.
 ```
-dfu-util --download forth.bin --alt 0 --dfuse-address 0x08000000:0x20000
+python dfu.py 28e9:0189 forth.bin
 ```
 
-## Usage
+### Interact
 ```
 python -m serial.tools.miniterm /dev/ttyUSB0 115200
 ```
