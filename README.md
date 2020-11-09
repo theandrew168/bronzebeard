@@ -40,6 +40,8 @@ This minimal selection of primitive words comes from Sectorforth and the Usenet 
 | `0=`   | ( x -- flag ) | -1 if top of stack is 0, 0 otherwise          |
 | `+`    | ( x y -- z )  | Sum the two numbers at the top of the stack   |
 | `nand` | ( x y -- z )  | NAND the two numbers at the top of the stack  |
+| `key`  | ( -- x )      | Read ASCII character from serial              |
+| `emit` | ( x -- )      | Write ASCII character to serial               |
 
 ## Portability
 At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).

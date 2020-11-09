@@ -765,6 +765,34 @@ with defword(p, 'load'):
     # next
     p.JAL('zero', 'next')
 
+with defword(p, 'key'):
+    # call getc (a5 = char)
+    p.JAL('ra', 'getc')
+
+    # isolate bottom 8 bits
+    p.ANDI('a5', 'a5', 0xff)
+
+    # push char onto stack
+    p.SW(DSP, 'a5', 0)
+    p.ADDI(DSP, DSP, 4)
+
+    # next
+    p.JAL('zero', 'next')
+
+with defword(p, 'emit'):
+    # pop char into a5
+    p.ADDI(DSP, DSP, -4)
+    p.LW('a5', DSP, 0)
+
+    # isolate bottom 8 bits
+    p.ANDI('a5', 'a5', 0xff)
+
+    # call putc (char = a5)
+    p.JAL('ra', 'putc')
+
+    # next
+    p.JAL('zero', 'next')
+
 with defword(p, '@'):
     # pop address into t0
     p.ADDI(DSP, DSP, -4)
@@ -1012,8 +1040,6 @@ p.BLOB(b'    GPIO_A_ADDR GPIO_CTL0_OFFSET + ! ')  # store new control
 p.BLOB(b'; ')
 
 p.LABEL('disk_end')
-
-print('disk:', p.labels['disk_end'] - p.labels['disk_start'])
 
 
 with open('forth.bin', 'wb') as f:
