@@ -55,20 +55,20 @@ All three of the aforementioned devices are capable of running Bronzebeard: it i
 
 ## Setup
 All major operating system platforms are supported: Windows, macOS, and Linux.
-In order to utilize Bronzebeard's tools and features, you need to first download and install a recent version of [Python](https://www.python.org/downloads/).
-Follow the setup documentation on Python's website for whichever platform you are using.
+In order to utilize Bronzebeard, you need to download and install a recent version of [Python](https://www.python.org/downloads/).
+For more info, [Real Python](https://realpython.com/) has a great [installation and setup guide](https://realpython.com/installing-python/) that I recommend following.
 
 ### Windows
-The devices that Bronzebeard targets don't work well with Windows out of the box.
-They each need to be associated with the generic [WinUSB](https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb) driver.
+The USB-based devices that Bronzebeard targets don't work well with Windows by default.
+They each need to be associated with the generic [WinUSB](https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb) driver in order to be identified and programmed.
 The easiest way to accomplish this is with a tool called [Zadig](https://zadig.akeo.ie/).
 With the device attached to your computer (and in DFU mode, if applicable), use Zadig to assign the WinUSB driver to the device.
 
 ### macOS
-Everything should simply work out of the box on macOS!
+Once Python is installed, everything else should simply work out of the box!
 
 ### Linux
-If you'd like to program and interact with the device as a normal, non-root user, setup the following [udev](https://en.wikipedia.org/wiki/Udev) rules:
+If you'd like to program and interact with the device as a normal, non-root user, create the following [udev](https://en.wikipedia.org/wiki/Udev) rules file:
 ```
 # /etc/udev/rules.d/99-bronzebeard.rules
 
@@ -82,31 +82,40 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
+## Dependencies
+Firstly, create a [virtual environment](https://docs.python.org/3/library/venv.html) to hold Bronzebeard's dependencies.
+If you are unfamiliar with this process, the Python docs provide a great [tutorial](https://docs.python.org/3/tutorial/venv.html) for getting started with virtual environments and packages.
+
+With the virtual environment setup and activated, we can install Bronzebeard's dependencies.
+```
+pip install -r requirements.txt
+```
+
 ## Longan Nano
 This section details how to run Bronzebeard on the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
 
 ### Cables
 1. Attach the USB to USB-C cable for programming via DFU
-1. Attach the USB to TTL Serial cable for interacting over serial
+2. Attach the USB to TTL Serial cable for interacting over serial
   1. Attach GND to GND
   2. Attach TX to RX
   3. Attach RX to TX
   4. Don't attach VCC (or jump to the 5V input if you want power over via cable)
 
 ### Build
+With the virtual environment activated and dependencies installed:
 ```
-python3 -m venv venv
-. venv/bin/activate
 python forth.py
 ```
 
 ### Program
-Enable DFU mode: press BOOT, press RESET, release RESET, release BOOT.
+Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, release BOOT.
 ```
 python dfu.py 28e9:0189 forth.bin
 ```
 
 ### Interact
+TODO: what does this look like on other platforms?
 ```
 python -m serial.tools.miniterm /dev/ttyUSB0 115200
 ```
