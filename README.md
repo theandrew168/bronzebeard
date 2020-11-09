@@ -14,8 +14,8 @@ Installing a full operating system isn't always a prerequisite to building somet
 
 ## How
 Bronzebeard is written directly in RISC-V assembly.
-The [simpleriscv](https://github.com/theandrew168/simpleriscv) assembler is used because of its independence from large, complex toolchains.
-It is portable, minimal, and easy to understand.
+A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/asm.py) has been written in order to be free from large, complex toolchains.
+This keeps the project portable, minimal, and easy to understand.
 
 ## Prior Art
 Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
@@ -41,7 +41,6 @@ This minimal selection of primitive words comes from Sectorforth and the Usenet 
 | `+`    | ( x y -- z )  | Sum the two numbers at the top of the stack   |
 | `nand` | ( x y -- z )  | NAND the two numbers at the top of the stack  |
 
-
 ## Portability
 At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
 However, there are plans in the near future to broaden support to also include the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html) and [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
@@ -58,6 +57,12 @@ All major operating system platforms are supported: Windows, macOS, and Linux.
 In order to utilize Bronzebeard, you need to download and install a recent version of [Python](https://www.python.org/downloads/).
 For more info, [Real Python](https://realpython.com/) has a great [installation and setup guide](https://realpython.com/installing-python/) that I recommend following.
 
+Additionally, you will need to install [git](https://git-scm.com/downloads) in order to clone this project's source code.
+To obtain the code, execute the following command:
+```
+git clone https://github.com/theandrew168/bronzebeard.git
+```
+
 ### Windows
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.
 They each need to be associated with the generic [WinUSB](https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb) driver in order to be identified and programmed.
@@ -65,9 +70,21 @@ The easiest way to accomplish this is with a tool called [Zadig](https://zadig.a
 With the device attached to your computer (and in DFU mode, if applicable), use Zadig to assign the WinUSB driver to the device.
 
 ### macOS
-Once Python is installed, everything else should simply work out of the box!
+The only extra requirement on macOS is [libusb](https://libusb.info).
+It can be easily installed via [homebrew](https://brew.sh/).
+```
+brew install libusb
+```
 
 ### Linux
+Programming devices over DFU requires [libusb](https://libusb.info).
+The following command will install the library on Debian-based Linux systems such as Debian, Ubuntu, Linux Mint, and Pop!\_OS.
+```
+sudo apt install libusb-1.0-0-dev
+```
+
+For other Linux ecosystems, consult their respective package repositories.
+
 If you'd like to program and interact with the device as a normal, non-root user, create the following [udev](https://en.wikipedia.org/wiki/Udev) rules file:
 ```
 # /etc/udev/rules.d/99-bronzebeard.rules

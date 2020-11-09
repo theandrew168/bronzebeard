@@ -1,9 +1,10 @@
+import os
 import struct
 import sys
 import time
 
 import usb.core
-import usb.util
+import usb.backend.libusb1
 
 # Example:
 # python dfu.py 28e9:0189
@@ -21,26 +22,6 @@ import usb.util
 # https://sourceforge.net/p/dfu-util/dfu-util/ci/master/tree/
 # https://github.com/usb-tools/pyfwup/blob/master/fwup/dfu.py
 
-# From dfu-util:
-# main
-# dfuse_do_dnload(iface, xfer_size, file, opts)
-# dfuse_do_bin_dnload(iface, xfer_size, file, 0x0800_0000)
-# dfuse_dnload_element(iface, 0x0800_0000, len(data), data, xfer_size)
-# for each page:
-#   dfuse_special_command(iface, addr, ERASE_PAGE)
-# for each page:
-#   dfuse_special_command(iface, addr, SET_ADDRESS)
-#   dfuse_dnload_chunk(iface, data + offset, xfer_size, 2)  # trans = 2 for no addr offset?
-#   dfuse_download(iface, size, data, 2)
-#     ctrl_transfer(OUT, DFU_DNLOAD, 2, iface, data, len)
-#   dfu_get_status
-#   sleep(poll_timeout)
-#   ensure STATUS_OK
-
-DFU_DEVICE_CLASS = 0xfe
-DFU_DEVICE_SUBCLASS = 0x01
-DFU_DESCRIPTOR_TYPE = 0x21
-
 # DFU 1.1 Spec: Table 3.2
 REQUEST_DFU_DETACH = 0
 REQUEST_DFU_DNLOAD = 1
@@ -50,7 +31,7 @@ REQUEST_DFU_CLRSTATUS = 4
 REQUEST_DFU_GETSTATE = 5
 REQUEST_DFU_ABORT = 6
 
-# DfuSe-specific commands (sent in-band over DFU_UPLOAD / DFU_DNLOAD)
+# DfuSe-specific commands (sent in-band over DFU_DNLOAD)
 DFUSE_CMD_SET_ADDRESS = 0x21  # includes addr, len = 5
 DFUSE_CMD_ERASE_PAGE = 0x41  # includes addr, len = 5
 DFUSE_CMD_MASS_ERASE = 0x41  # len = 1
@@ -184,6 +165,17 @@ def dfuse_download(device, code):
 
 
 def main():
+    # build abs dir to bundled libraries
+    root = os.path.abspath(os.path.dirname(__file__))
+    libs = os.path.join(root, 'libs')
+
+    # point pyusb at platform-specific libraries if necessary
+    if sys.platform == 'win32':
+        win32_lib = os.path.join(libs, 'libusb-1.0.dll')
+        backend = usb.backend.libusb1.get_backend(find_library=lambda x: win32_lib)
+    else:
+        backend = usb.backend.libusb1.get_backend()
+
     # ensure correct args
     if len(sys.argv) != 3:
         usage = '{} <vendor:product> <firmware>'.format(sys.argv[0])
@@ -193,7 +185,7 @@ def main():
     device_id = sys.argv[1]
     vendor, product = device_id.split(':')
     vendor, product = int(vendor, 16), int(product, 16)
-    dev = usb.core.find(idVendor=vendor, idProduct=product)
+    dev = usb.core.find(idVendor=vendor, idProduct=product, backend=backend)
     if dev is None:
         raise RuntimeError('device not found: {}'.format(device_id))
 
