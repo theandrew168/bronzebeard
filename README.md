@@ -24,7 +24,7 @@ Many folks have adapted its ideas and principles to solve their own problems.
 If you are looking for some introductory content surrounding the Forth language in general, I recommend the book [Starting Forth](https://www.forth.com/starting-forth/) by Leo Brodie.
 
 [Sectorforth](https://github.com/cesarblum/sectorforth) by Cesar Blum is the source of Bronzebeard's general structure.
-He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
+He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ/m/ohh9v4KphygJ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
 
 ## Primitive Words
 This minimal selection of primitive words comes from Sectorforth and the Usenet thread it references.
