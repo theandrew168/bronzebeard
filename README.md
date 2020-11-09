@@ -100,7 +100,7 @@ This section details how to run Bronzebeard on the [Longan Nano](https://www.see
     * Attach GND to GND
     * Attach TX to RX
     * Attach RX to TX
-    * Don't attach VCC (or jump to the 5V input if you want power over via cable)
+    * Don't attach VCC (or jump to the 5V input if you want power via this cable)
 
 ### Build
 With the virtual environment activated and dependencies installed:
