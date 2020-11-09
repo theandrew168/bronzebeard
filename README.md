@@ -21,6 +21,8 @@ It is portable, minimal, and easy to understand.
 Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
 Many folks have adapted its ideas and principles to solve their own problems.
 [Moving Forth](http://www.bradrodriguez.com/papers/moving1.htm) by Brad Rodriguez is an amazing source of Forth implementation details and tradeoffs.
+Additionally, if you are looking for some introductory content surrounding the Forth language in general, I recommend the book [Starting Forth](https://www.forth.com/starting-forth/) by Leo Brodie.
+
 [Sectorforth](https://github.com/cesarblum/sectorforth) by Cesar Blum is the source of Bronzebeard's general structure.
 He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
 
@@ -29,6 +31,8 @@ This minimal selection of primitive words comes from Sectorforth and the Usenet 
 
 | Word   | Stack Effects | Description                                   |
 | ------ | ------------- | --------------------------------------------- |
+| `:`    | ( -- )        | Start the definition of a new secondary word  |
+| `;`    | ( -- )        | Finish the definition of a new secondary word |
 | `@`    | ( addr -- x ) | Fetch memory contents at addr                 |
 | `!`    | ( x addr -- ) | Store x at addr                               |
 | `sp@`  | ( -- sp )     | Get pointer to top of data stack              |
