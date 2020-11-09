@@ -97,10 +97,10 @@ This section details how to run Bronzebeard on the [Longan Nano](https://www.see
 ### Cables
 1. Attach the USB to USB-C cable for programming via DFU
 2. Attach the USB to TTL Serial cable for interacting over serial
-  1. Attach GND to GND
-  2. Attach TX to RX
-  3. Attach RX to TX
-  4. Don't attach VCC (or jump to the 5V input if you want power over via cable)
+    * Attach GND to GND
+    * Attach TX to RX
+    * Attach RX to TX
+    * Don't attach VCC (or jump to the 5V input if you want power over via cable)
 
 ### Build
 With the virtual environment activated and dependencies installed:
