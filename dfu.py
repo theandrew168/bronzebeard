@@ -221,13 +221,20 @@ def main():
     if len(firmware) > (page_size * page_count):
         raise RuntimeError('Firmware file is too large for device')
 
-    # pad firmware with zeroes
-    while len(firmware) < (page_size * page_count):
-        firmware += b'\x00'
+    print('size:', len(firmware))
+
+    # pad the firmware binary up to a page boundary
+    pages, rem = divmod(len(firmware), page_size)
+    if rem != 0:
+        for _ in range(1024 - rem):
+            firmware += b'\x00'
+        pages += 1
+
+    print('padding:', 1024 - rem)
+    print('pages:', pages)
 
     # check initial status and clear any errors
     status, state = dfu_get_status(dev)
-    #print(STATE_DESCRIPTION[state])
     if state == STATE_DFU_ERROR:
         print('Device is in error, sending DFU_CLRSTATUS')
         dfu_clear_status(dev)
@@ -235,7 +242,7 @@ def main():
         print(STATE_DESCRIPTION[state])
 
     # erase flash
-    for page in range(page_count):
+    for page in range(pages):
         start = 0x08000000
         addr = start + (page * page_size)
 
@@ -255,7 +262,7 @@ def main():
     print()
 
     # write flash
-    for page in range(page_count):
+    for page in range(pages):
         addr_start = 0x08000000
         addr = addr_start + (page * page_size)
         code_start = page * page_size
