@@ -221,15 +221,16 @@ def main():
     if len(firmware) > (page_size * page_count):
         raise RuntimeError('Firmware file is too large for device')
 
-    print('size:', len(firmware))
+    print('old size:', len(firmware))
 
     # pad the firmware binary up to a page boundary
     pages, rem = divmod(len(firmware), page_size)
     if rem != 0:
+        pages += 1
         for _ in range(1024 - rem):
             firmware += b'\x00'
-        pages += 1
 
+    print('new size:', len(firmware))
     print('padding:', 1024 - rem)
     print('pages:', pages)
 
