@@ -964,7 +964,7 @@ p.BLOB(b': 0x34 0x30 0x04 or ; ')
 p.BLOB(b': 0x38 0x30 0x08 or ; ')
 p.BLOB(b': 0x3c 0x30 0x0c or ; ')
 p.BLOB(b': 0x40 1 16* 2* 2* ; ')
-p.BLOB(b': 0x80 0x08 16* ; ')
+p.BLOB(b': 0x80 1 16* 2* 2* 2* ; ')
 
 # define GPIO base address
 p.BLOB(b': 0x40010800 1 256* 256* 256* 16* 2* 2* 1 256* 256* 1 256* 2* 2* 2* or or ; ')
