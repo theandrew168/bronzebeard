@@ -70,6 +70,7 @@ The USB-based devices that Bronzebeard targets don't work well with Windows by d
 They each need to be associated with the generic [WinUSB](https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb) driver in order to be identified and programmed.
 The easiest way to accomplish this is with a tool called [Zadig](https://zadig.akeo.ie/).
 With the device attached to your computer (and in DFU mode, if applicable), use Zadig to assign the WinUSB driver to the device.
+Note that you will have to apply this driver assignment to each physical USB port that you want to use for programming the device.
 
 ### macOS
 The only extra requirement on macOS is [libusb](https://libusb.info).
@@ -134,7 +135,25 @@ python dfu.py 28e9:0189 forth.bin
 ```
 
 ### Interact
-TODO: what does this look like on other platforms?
+We can use [pySerial's](https://pyserial.readthedocs.io/en/latest/index.html) built-in terminal to communiate with the device.
+
+To get a list of available serial ports, run the following command:
 ```
+python -m serial.tools.list_ports
+```
+
+One of them should be the device we want to communicate with.
+You can specify the device port in the following command in order to initiate the connection.
+```
+python -m serial.tools.miniterm <device_port> 115200
+```
+
+Here are a few potential examples:
+```
+# Windows
+python -m serial.tools.miniterm COM3 115200
+# macOS
+python -m serial.tools.miniterm /dev/TODO_what_goes_here 115200
+# Linux
 python -m serial.tools.miniterm /dev/ttyUSB0 115200
 ```
