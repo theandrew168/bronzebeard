@@ -227,11 +227,11 @@ def main():
     pages, rem = divmod(len(firmware), page_size)
     if rem != 0:
         pages += 1
-        for _ in range(1024 - rem):
+        for _ in range(page_size - rem):
             firmware += b'\x00'
 
     print('new size:', len(firmware))
-    print('padding:', 1024 - rem)
+    print('padding:', page_size - rem)
     print('pages:', pages)
 
     # check initial status and clear any errors
