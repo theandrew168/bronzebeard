@@ -134,6 +134,8 @@ Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, rele
 python dfu.py 28e9:0189 forth.bin
 ```
 
+After programming, press and release RESET in order to put the device back into normal mode.
+
 ### Interact
 We can use [pySerial's](https://pyserial.readthedocs.io/en/latest/index.html) built-in terminal to communiate with the device.
 
