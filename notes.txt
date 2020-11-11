@@ -1,3 +1,29 @@
+Software
+--------
+Separate packages for the assembler, dfu, and forth?
+
+simpleriscv/
+  asm/
+  dis/
+  sim/
+  gui/
+  tui/
+simpledfu?
+bronzebeard?
+
+All in one (at least for now?)
+
+bronzebeard/
+  asm/
+  dis/
+  sim/
+  gui/
+  tui/
+  dfu/
+  forth/
+
+
+
 GD32VF103[CBT6] (Longan Nano, Wio Lite)
 ---------------------------------------
 
