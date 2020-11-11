@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from asm import *
+from bronzebeard.asm import *
 
 
 @pytest.mark.parametrize(
