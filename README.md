@@ -118,7 +118,7 @@ This section details how to run Bronzebeard on the [Longan Nano](https://www.see
 
 ### Cables
 1. Attach the USB to USB-C cable for programming via DFU
-2. Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977))for interacting over serial
+2. Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977)) for interacting over serial
     * Attach GND to GND
     * Attach TX to RX
     * Attach RX to TX
