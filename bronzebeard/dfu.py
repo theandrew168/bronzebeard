@@ -178,8 +178,8 @@ def main():
 
     # ensure correct args
     if len(sys.argv) != 3:
-        usage = '{} <vendor:product> <firmware>'.format(sys.argv[0])
-        raise RuntimeError(usage)
+        usage = 'usage: python -m bronzebeard.dfu <vendor:product> <firmware>'
+        raise SystemExit(usage)
 
     # parse args and find device
     device_id = sys.argv[1]
@@ -187,7 +187,7 @@ def main():
     vendor, product = int(vendor, 16), int(product, 16)
     dev = usb.core.find(idVendor=vendor, idProduct=product, backend=backend)
     if dev is None:
-        raise RuntimeError('device not found: {}'.format(device_id))
+        raise SystemExit('device not found: {}'.format(device_id))
 
     # TODO: get page_size and page_count via the protocol
 
@@ -208,7 +208,7 @@ def main():
         elif sn[2] == '4':
             page_count = 16
         else:
-            raise RuntimeError('invalid serial number for a GD32 device: {}'.format(sn))
+            raise SystemExit('invalid serial number for a GD32 device: {}'.format(sn))
 
     print('page_size:', page_size)
     print('page_count:', page_count)
@@ -219,7 +219,7 @@ def main():
 
     # ensure firmware will fit
     if len(firmware) > (page_size * page_count):
-        raise RuntimeError('Firmware file is too large for device')
+        raise SystemExit('Firmware file is too large for device')
 
     print('old size:', len(firmware))
 

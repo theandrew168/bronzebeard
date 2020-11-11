@@ -20,8 +20,12 @@ bronzebeard/
   gui/
   tui/
   dfu/
-  forth/
-
+examples/
+  led.asm
+  forth.asm
+tests/
+  test_asm.py
+  test_dfu.py
 
 
 GD32VF103[CBT6] (Longan Nano, Wio Lite)

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import struct
 
-import asm
+from bronzebeard import asm
 
 # Types of Immediate values (one of Literal / Position / Location / Address):
 # An Immediate can be resolved to a Number given a map[string]int of labels (can be nil, too)

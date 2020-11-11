@@ -1,7 +1,8 @@
 # bronzebeard
-Bare-metal RISC-V Forth implementation
+Minimal ecosystem for bare-metal RISC-V development
 
 ## What
+TODO update this  
 Bronzebeard is an implementation of the [Forth programming language](https://en.wikipedia.org/wiki/Forth_(programming_language)) for the [RISC-V ISA](https://en.wikipedia.org/wiki/RISC-V).
 It is designed to run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an [operating system](https://en.wikipedia.org/wiki/Operating_system) or existing software of any kind.
 
@@ -13,6 +14,7 @@ I believe that the rise of RISC-V provides a great opportunity to explore differ
 Installing a full operating system isn't always a prerequisite to building something valuable.
 
 ## How
+TODO update this  
 Bronzebeard is written directly in RISC-V assembly.
 A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/asm.py) has been written in order to be free from large, complex toolchains.
 This keeps the project portable, minimal, and easy to understand.
@@ -116,7 +118,7 @@ This section details how to run Bronzebeard on the [Longan Nano](https://www.see
 
 ### Cables
 1. Attach the USB to USB-C cable for programming via DFU
-2. Attach the USB to TTL Serial cable for interacting over serial
+2. Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977))for interacting over serial
     * Attach GND to GND
     * Attach TX to RX
     * Attach RX to TX
@@ -131,7 +133,7 @@ python forth.py
 ### Program
 Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, release BOOT.
 ```
-python dfu.py 28e9:0189 forth.bin
+python -m bronzebeard.dfu 28e9:0189 forth.bin
 ```
 
 After programming, press and release RESET in order to put the device back into normal mode.
