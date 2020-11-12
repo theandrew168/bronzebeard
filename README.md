@@ -2,9 +2,8 @@
 Minimal ecosystem for bare-metal RISC-V development
 
 ## What
-TODO update this  
-Bronzebeard is an implementation of the [Forth programming language](https://en.wikipedia.org/wiki/Forth_(programming_language)) for the [RISC-V ISA](https://en.wikipedia.org/wiki/RISC-V).
-It is designed to run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an [operating system](https://en.wikipedia.org/wiki/Operating_system) or existing software of any kind.
+Bronzebeard is a collection of tools for writing [RISC-V](https://en.wikipedia.org/wiki/Riscv) assembly and working with hobbyist development devices.
+It is designed for programs that will run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or existing software of any kind.
 
 ## Why
 Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
@@ -14,58 +13,26 @@ I believe that the rise of RISC-V provides a great opportunity to explore differ
 Installing a full operating system isn't always a prerequisite to building something valuable.
 
 ## How
-TODO update this  
-Bronzebeard is written directly in RISC-V assembly.
-A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/asm.py) has been written in order to be free from large, complex toolchains.
+Bronzebeard and its tools are implemented purely in Python.
+A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) is the centerpiece.
+It has been written in order to be free from large, complex toolchains.
 This keeps the project portable, minimal, and easy to understand.
-
-## Prior Art
-Forth was initially designed and created by [Charles Moore](https://en.wikipedia.org/wiki/Charles_H._Moore).
-Many folks have adapted its ideas and principles to solve their own problems.
-[Moving Forth](http://www.bradrodriguez.com/papers/moving1.htm) by Brad Rodriguez is an amazing source of Forth implementation details and tradeoffs.
-If you are looking for some introductory content surrounding the Forth language in general, I recommend the book [Starting Forth](https://www.forth.com/starting-forth/) by Leo Brodie.
-
-[Sectorforth](https://github.com/cesarblum/sectorforth) by Cesar Blum is the source of Bronzebeard's general structure.
-He took inspiration from a [1996 Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ/m/ohh9v4KphygJ) wherein folks discussed requirements for a minimal yet fully functional Forth implementation.
-
-## Primitive Words
-This minimal selection of primitive words comes from Sectorforth and the Usenet thread it references.
-
-| Word   | Stack Effects | Description                                   |
-| ------ | ------------- | --------------------------------------------- |
-| `:`    | ( -- )        | Start the definition of a new secondary word  |
-| `;`    | ( -- )        | Finish the definition of a new secondary word |
-| `@`    | ( addr -- x ) | Fetch memory contents at addr                 |
-| `!`    | ( x addr -- ) | Store x at addr                               |
-| `sp@`  | ( -- sp )     | Get pointer to top of data stack              |
-| `rp@`  | ( -- rp )     | Get pointer to top of return stack            |
-| `0=`   | ( x -- flag ) | -1 if top of stack is 0, 0 otherwise          |
-| `+`    | ( x y -- z )  | Sum the two numbers at the top of the stack   |
-| `nand` | ( x y -- z )  | NAND the two numbers at the top of the stack  |
-| `key`  | ( -- x )      | Read ASCII character from serial input        |
-| `emit` | ( x -- )      | Write ASCII character to serial output        |
-
-## Portability
 At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
 However, there are plans in the near future to broaden support to also include the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html) and [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
-As far as portability goes, Bronzebeard only requires a few pieces of information and functionality.
 
-1. ROM base address and size
-2. RAM base address and size
-3. Ability to read and write characters over serial UART
+## Installation
+If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest you a take a brief moment to learn about them and set one up.
+The Python docs provide a great [tutorial](https://docs.python.org/3/tutorial/venv.html) for getting started with virtual environments and packages.
 
-All three of the aforementioned devices are capable of running Bronzebeard: it is just a matter of collecting the memory info, implementing basic UART interaction, and then flashing the ROM.
+Bronzebeard can be installed via pip:
+```
+pip install bronzebeard
+```
 
 ## Setup
 All major operating system platforms are supported: Windows, macOS, and Linux.
 In order to utilize Bronzebeard, you need to download and install a recent version of [Python](https://www.python.org/downloads/).
 For more info, [Real Python](https://realpython.com/) has a great [installation and setup guide](https://realpython.com/installing-python/) that I recommend following.
-
-Additionally, you will need to install [git](https://git-scm.com/downloads) in order to clone this project's source code.
-To obtain the code, execute the following command:
-```
-git clone https://github.com/theandrew168/bronzebeard.git
-```
 
 ### Windows
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.
@@ -104,43 +71,33 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
-## Dependencies
-Firstly, create a [virtual environment](https://docs.python.org/3/library/venv.html) to hold Bronzebeard's dependencies.
-If you are unfamiliar with this process, the Python docs provide a great [tutorial](https://docs.python.org/3/tutorial/venv.html) for getting started with virtual environments and packages.
-
-With the virtual environment setup and activated, we can install Bronzebeard's dependencies.
-```
-pip install wheel
-pip install -r requirements.txt
-```
-
 ## Longan Nano
-This section details how to run Bronzebeard on the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
+This section details how to run programs on the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
 
 ### Cables
 1. Attach the USB to USB-C cable for programming via DFU
-2. Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977)) for interacting over serial
+2. (Optional) Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977))
     * Attach GND to GND
     * Attach TX to RX
     * Attach RX to TX
     * Don't attach VCC (or jump to the 5V input if you want power via this cable)
 
-### Build
-With the virtual environment activated and dependencies installed:
+### Assemble
+With Bronzebeard installed:
 ```
-python forth.py
+python -m bronzebeard.asm examples/led.asm -o led.bin
 ```
 
 ### Program
 Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, release BOOT.
 ```
-python -m bronzebeard.dfu 28e9:0189 forth.bin
+python -m bronzebeard.dfu 28e9:0189 led.bin
 ```
 
 After programming, press and release RESET in order to put the device back into normal mode.
 
 ### Interact
-We can use [pySerial's](https://pyserial.readthedocs.io/en/latest/index.html) built-in terminal to communiate with the device.
+If you have flashed a program that includes serial interaction, We can use [pySerial's](https://pyserial.readthedocs.io/en/latest/index.html) built-in terminal to communiate with the device.
 
 To get a list of available serial ports, run the following command:
 ```
