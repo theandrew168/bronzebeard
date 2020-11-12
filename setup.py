@@ -5,7 +5,7 @@ with open('README.md') as f:
 
 setup(
     name='bronzebeard',
-    version='0.0.1',
+    version='0.0.2',
     author='Andrew Dailey',
     description='Minimal ecosystem for bare-metal RISC-V development',
     long_description=readme,
