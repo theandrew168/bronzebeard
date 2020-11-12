@@ -110,6 +110,7 @@ If you are unfamiliar with this process, the Python docs provide a great [tutori
 
 With the virtual environment setup and activated, we can install Bronzebeard's dependencies.
 ```
+pip install wheel
 pip install -r requirements.txt
 ```
 
