@@ -3,6 +3,15 @@ import struct
 
 
 # definitions for the "items" that can be found in an assembly program
+# name: str
+# argN: rd rs1 rs2 imm
+# rd, rs1, rs2: int, str
+# imm: int, Position, Offset
+# alignment: int
+# data: str, bytes
+# format: str
+# value: int
+# label: str
 Instruction = namedtuple('Instruction', 'name arg0 arg1 arg2', defaults=[None, None, None])
 RTypeInstruction = namedtuple('RTypeInstruction', 'name rd rs1 rs2')
 ITypeInstruction = namedtuple('ITypeInstruction', 'name rd rs1 imm')
@@ -13,15 +22,11 @@ JTypeInstruction = namedtuple('JTypeInstruction', 'name rd imm')
 Label = namedtuple('Label', 'name')
 Align = namedtuple('Align', 'alignment')
 Blob = namedtuple('Blob', 'data')
-Pack = namedtuple('Pack', 'format value')
-Hi = namedtuple('Hi', 'imm')
-Lo = namedtuple('Lo', 'imm')
-#Position = namedtuple('Position', 'label')  # not common? can be done with PosFrom('foo', 0)
-#PositionFrom = namedtuple('PositionFrom', 'label imm')
-Position = namedtuple('Position', 'label imm')
+Pack = namedtuple('Pack', 'format imm')
+Position = namedtuple('Position', 'label value')
 Offset = namedtuple('Offset', 'label')
-#OffsetFrom = namedtuple('OffsetFrom', 'label imm')  # not common?
-# OffsetBetween? do the args make sense?
+Hi = namedtuple('Hi', 'value')
+Lo = namedtuple('Lo', 'value')
 
 # name rd rs1 rs2
 R_TYPE_INSTRUCTIONS = [
@@ -121,6 +126,12 @@ def resolve_instructions(program):
         else:
             output.append(item)
 
+    return output
+
+def resolve_immediates(program, labels):
+    output = []
+    for item in program:
+        output.append(item)
     return output
 
 
@@ -259,6 +270,9 @@ prog = resolve_instructions(prog)
 pprint(prog)
 
 print('pass 3: resolve immediates - Position / Offset')
+prog = resolve_immediates(prog, labels)
+pprint(prog)
+
 print('pass 4: resolve relocations - Hi / Lo')
 print('pass 5: resolve registers')
 print('pass 6: assemble!')
