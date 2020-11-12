@@ -16,10 +16,11 @@ Blob = namedtuple('Blob', 'data')
 Pack = namedtuple('Pack', 'format value')
 Hi = namedtuple('Hi', 'imm')
 Lo = namedtuple('Lo', 'imm')
-Position = namedtuple('Position', 'label')
-PositionFrom = namedtuple('PositionFrom', 'label imm')
+#Position = namedtuple('Position', 'label')  # not common? can be done with PosFrom('foo', 0)
+#PositionFrom = namedtuple('PositionFrom', 'label imm')
+Position = namedtuple('Position', 'label imm')
 Offset = namedtuple('Offset', 'label')
-#OffsetFrom = namedtuple('OffsetFrom', 'label imm')
+#OffsetFrom = namedtuple('OffsetFrom', 'label imm')  # not common?
 # OffsetBetween? do the args make sense?
 
 # name rd rs1 rs2
@@ -170,7 +171,7 @@ prog += [
     UTypeInstruction('lui', 't1', Hi(RAM_BASE_ADDR)),
     ITypeInstruction('addi', 't1', 't1', Lo(RAM_BASE_ADDR)),
     # setup copy count (everything up to "here" label)
-    Instruction('addi', 't2', 0, Position('here')),
+    Instruction('addi', 't2', 0, Position('here', 0)),
 
     Label('token_skip_whitespace'),
     Instruction('add', 't1', TBUF, TPOS),
@@ -179,17 +180,17 @@ prog += [
     Instruction('addi', TPOS, TPOS, 1),
     Instruction('jal', 'zero', Offset('token_skip_whitespace')),
 
-    Instruction('lui', HERE, Hi(PositionFrom('here', RAM_BASE_ADDR))),
-    Instruction('addi', HERE, HERE, Lo(PositionFrom('here', RAM_BASE_ADDR))),
+    Instruction('lui', HERE, Hi(Position('here', RAM_BASE_ADDR))),
+    Instruction('addi', HERE, HERE, Lo(Position('here', RAM_BASE_ADDR))),
 
     Label('interpreter_interpret'),
     Instruction('jal', 'ra', Offset('token')),
 
     # dub ref to interpreter hack
     Label('interpreter_addr'),
-    Pack('<I', PositionFrom('interpreter_interpret', RAM_BASE_ADDR)),
+    Pack('<I', Position('interpreter_interpret', RAM_BASE_ADDR)),
     Label('interpreter_addr_addr'),
-    Pack('<I', PositionFrom('interpreter_addr', RAM_BASE_ADDR)),
+    Pack('<I', Position('interpreter_addr', RAM_BASE_ADDR)),
 
     Label('next'),
     Instruction('lw', W, IP, 0),
@@ -203,7 +204,7 @@ prog += [
     Pack('<B', 1),  # flags | len
     Blob('+'),  # name
     Align(4),
-    Pack('<I', PositionFrom('code_+', RAM_BASE_ADDR)),  # code field
+    Pack('<I', Position('code_+', RAM_BASE_ADDR)),  # code field
     Label('code_+'),
     Instruction('addi', DSP, DSP, -4),
     Instruction('lw', 't0', DSP, 0),
@@ -217,11 +218,11 @@ prog += [
     # literal output from defword: nand
     Label('latest'),
     Label('word_nand'),
-    Pack('<I', PositionFrom('word_+', RAM_BASE_ADDR)),  # link
+    Pack('<I', Position('word_+', RAM_BASE_ADDR)),  # link
     Pack('<B', 4),  # flags | len
     Blob('nand'),  # name
     Align(4),
-    Pack('<I', PositionFrom('code_nand', RAM_BASE_ADDR)),  # code field
+    Pack('<I', Position('code_nand', RAM_BASE_ADDR)),  # code field
     Label('code_nand'),
     Instruction('addi', DSP, DSP, -4),
     Instruction('lw', 't0', DSP, 0),
@@ -257,7 +258,7 @@ print('pass 2: resolve generic instructions')
 prog = resolve_instructions(prog)
 pprint(prog)
 
-print('pass 3: resolve immediates')
-print('pass 4: resolve relocations')
+print('pass 3: resolve immediates - Position / Offset')
+print('pass 4: resolve relocations - Hi / Lo')
 print('pass 5: resolve registers')
 print('pass 6: assemble!')
