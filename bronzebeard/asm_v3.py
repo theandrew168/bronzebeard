@@ -4,7 +4,6 @@ import struct
 
 # definitions for the "items" that can be found in an assembly program
 # name: str
-# argN: rd rs1 rs2 imm
 # rd, rs1, rs2: int, str
 # imm: int, Position, Offset
 # alignment: int
@@ -12,7 +11,6 @@ import struct
 # format: str
 # value: int
 # label: str
-Instruction = namedtuple('Instruction', 'name arg0 arg1 arg2', defaults=[None, None, None])
 RTypeInstruction = namedtuple('RTypeInstruction', 'name rd rs1 rs2')
 ITypeInstruction = namedtuple('ITypeInstruction', 'name rd rs1 imm')
 STypeInstruction = namedtuple('STypeInstruction', 'name rs1 rs2 imm')
@@ -62,11 +60,10 @@ J_TYPE_INSTRUCTIONS = [
 
 # Passes (labels, position):
 # 1. Resolve aligns and labels  (Aligns -> Blobs, store label locations into dict)
-# 2. Resolve Instructions to xTypeInstructions  (check name and switch, validate params)
-# 3. Resolve immediates  (resolve refs to labels, error if not found, leaves integers)
-# 4. Resolve relocations  (resolve Hi / Lo relocations)
-# 5. Resolve registers  (resolve nice names to integers)
-# 6. Assemble!  (convert everything to bytes)
+# 2. Resolve immediates  (resolve refs to labels, error if not found, leaves integers)
+# 3. Resolve relocations  (resolve Hi / Lo relocations)
+# 4. Resolve registers  (resolve nice names to integers)
+# 5. Assemble!  (convert everything to bytes)
 
 # these two steps occur in the same pass because they both
 # require the same sort of item inspection and counting
@@ -96,37 +93,6 @@ def resolve_aligns_and_labels(program):
             output.append(item)
 
     return output, labels
-
-def resolve_instructions(program):
-    output = []
-
-    for item in program:
-        if isinstance(item, Instruction):
-            name, arg0, arg1, arg2 = item
-            if name in R_TYPE_INSTRUCTIONS:
-                inst = RTypeInstruction(name, arg0, arg1, arg2)
-                output.append(inst)
-            elif name in I_TYPE_INSTRUCTIONS:
-                inst = ITypeInstruction(name, arg0, arg1, arg2)
-                output.append(inst)
-            elif name in S_TYPE_INSTRUCTIONS:
-                inst = STypeInstruction(name, arg0, arg1, arg2)
-                output.append(inst)
-            elif name in B_TYPE_INSTRUCTIONS:
-                inst = BTypeInstruction(name, arg0, arg1, arg2)
-                output.append(inst)
-            elif name in U_TYPE_INSTRUCTIONS:
-                inst = UTypeInstruction(name, arg0, arg1)
-                output.append(inst)
-            elif name in J_TYPE_INSTRUCTIONS:
-                inst = JTypeInstruction(name, arg0, arg1)
-                output.append(inst)
-            else:
-                raise RuntimeError('Invalid instruction: "{}"'.format(name))
-        else:
-            output.append(item)
-
-    return output
 
 def resolve_immediates(program, labels):
     output = []
@@ -176,26 +142,26 @@ prog += [
     # t0 = src, t1 = dest, t2 = count
     Label('copy'),
     # setup copy src (ROM_BASE_ADDR)
-    Instruction('lui', 't0', Hi(ROM_BASE_ADDR)),
-    Instruction('addi', 't0', 't0', Lo(ROM_BASE_ADDR)),
+    UTypeInstruction('lui', 't0', Hi(ROM_BASE_ADDR)),
+    ITypeInstruction('addi', 't0', 't0', Lo(ROM_BASE_ADDR)),
     # setup copy dest (RAM_BASE_ADDR)
     UTypeInstruction('lui', 't1', Hi(RAM_BASE_ADDR)),
     ITypeInstruction('addi', 't1', 't1', Lo(RAM_BASE_ADDR)),
     # setup copy count (everything up to "here" label)
-    Instruction('addi', 't2', 0, Position('here', 0)),
+    ITypeInstruction('addi', 't2', 0, Position('here', 0)),
 
     Label('token_skip_whitespace'),
-    Instruction('add', 't1', TBUF, TPOS),
-    Instruction('lbu', 't2', 't1', 0),
-    Instruction('bge', 't2', 't0', Offset('token_scan')),
-    Instruction('addi', TPOS, TPOS, 1),
-    Instruction('jal', 'zero', Offset('token_skip_whitespace')),
+    RTypeInstruction('add', 't1', TBUF, TPOS),
+    ITypeInstruction('lbu', 't2', 't1', 0),
+    BTypeInstruction('bge', 't2', 't0', Offset('token_scan')),
+    ITypeInstruction('addi', TPOS, TPOS, 1),
+    JTypeInstruction('jal', 'zero', Offset('token_skip_whitespace')),
 
-    Instruction('lui', HERE, Hi(Position('here', RAM_BASE_ADDR))),
-    Instruction('addi', HERE, HERE, Lo(Position('here', RAM_BASE_ADDR))),
+    UTypeInstruction('lui', HERE, Hi(Position('here', RAM_BASE_ADDR))),
+    ITypeInstruction('addi', HERE, HERE, Lo(Position('here', RAM_BASE_ADDR))),
 
     Label('interpreter_interpret'),
-    Instruction('jal', 'ra', Offset('token')),
+    JTypeInstruction('jal', 'ra', Offset('token')),
 
     # dub ref to interpreter hack
     Label('interpreter_addr'),
@@ -204,10 +170,10 @@ prog += [
     Pack('<I', Position('interpreter_addr', RAM_BASE_ADDR)),
 
     Label('next'),
-    Instruction('lw', W, IP, 0),
-    Instruction('addi', IP, IP, 4),
-    Instruction('lw', 't0', W, 0),
-    Instruction('jalr', 'zero', 't0', 0),
+    ITypeInstruction('lw', W, IP, 0),
+    ITypeInstruction('addi', IP, IP, 4),
+    ITypeInstruction('lw', 't0', W, 0),
+    ITypeInstruction('jalr', 'zero', 't0', 0),
 
     # literal output from defword: +
     Label('word_+'),
@@ -217,14 +183,14 @@ prog += [
     Align(4),
     Pack('<I', Position('code_+', RAM_BASE_ADDR)),  # code field
     Label('code_+'),
-    Instruction('addi', DSP, DSP, -4),
-    Instruction('lw', 't0', DSP, 0),
-    Instruction('addi', DSP, DSP, -4),
-    Instruction('lw', 't1', DSP, 0),
-    Instruction('add', 't0', 't0', 't1'),
-    Instruction('sw', DSP, 't0', 0),
-    Instruction('addi', DSP, DSP, 4),
-    Instruction('jal', 'zero', Offset('next')),
+    ITypeInstruction('addi', DSP, DSP, -4),
+    ITypeInstruction('lw', 't0', DSP, 0),
+    ITypeInstruction('addi', DSP, DSP, -4),
+    ITypeInstruction('lw', 't1', DSP, 0),
+    RTypeInstruction('add', 't0', 't0', 't1'),
+    STypeInstruction('sw', DSP, 't0', 0),
+    ITypeInstruction('addi', DSP, DSP, 4),
+    JTypeInstruction('jal', 'zero', Offset('next')),
 
     # literal output from defword: nand
     Label('latest'),
@@ -235,15 +201,15 @@ prog += [
     Align(4),
     Pack('<I', Position('code_nand', RAM_BASE_ADDR)),  # code field
     Label('code_nand'),
-    Instruction('addi', DSP, DSP, -4),
-    Instruction('lw', 't0', DSP, 0),
-    Instruction('addi', DSP, DSP, -4),
-    Instruction('lw', 't1', DSP, 0),
-    Instruction('and', 't0', 't0', 't1'),
-    Instruction('xori', 't0', 't0', -1),
-    Instruction('sw', DSP, 't0', 0),
-    Instruction('addi', DSP, DSP, 4),
-    Instruction('jal', 'zero', Offset('next')),
+    ITypeInstruction('addi', DSP, DSP, -4),
+    ITypeInstruction('lw', 't0', DSP, 0),
+    ITypeInstruction('addi', DSP, DSP, -4),
+    ITypeInstruction('lw', 't1', DSP, 0),
+    RTypeInstruction('and', 't0', 't0', 't1'),
+    ITypeInstruction('xori', 't0', 't0', -1),
+    STypeInstruction('sw', DSP, 't0', 0),
+    ITypeInstruction('addi', DSP, DSP, 4),
+    JTypeInstruction('jal', 'zero', Offset('next')),
 
     Label('here'),
 
@@ -265,14 +231,10 @@ prog, labels = resolve_aligns_and_labels(prog)
 pprint(prog)
 pprint(labels)
 
-print('pass 2: resolve generic instructions')
-prog = resolve_instructions(prog)
-pprint(prog)
-
-print('pass 3: resolve immediates - Position / Offset')
+print('pass 2: resolve immediates - Position / Offset')
 prog = resolve_immediates(prog, labels)
 pprint(prog)
 
-print('pass 4: resolve relocations - Hi / Lo')
-print('pass 5: resolve registers')
-print('pass 6: assemble!')
+print('pass 3: resolve relocations - Hi / Lo')
+print('pass 4: resolve registers')
+print('pass 5: assemble!')
