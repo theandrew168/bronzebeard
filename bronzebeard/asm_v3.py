@@ -1,9 +1,10 @@
 from ctypes import c_uint32
 from functools import partial
+import re
 import struct
+import sys
 
 
-# mapping of register names to their corresponding 5-bit integer values
 REGISTERS = {
     'x0': 0, 'zero': 0,
     'x1': 1, 'ra': 1,
@@ -227,32 +228,7 @@ SRA = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
 
-# mapping of instruction names to their corresponding encode funcs
-INSTRUCTIONS = {
-    'lui': LUI,
-    'auipc': AUIPC,
-    'jal': JAL,
-    'jalr': JALR,
-    'beq': BEQ,
-    'bne': BNE,
-    'blt': BLT,
-    'bge': BGE,
-    'bltu': BLTU,
-    'bgeu': BGEU,
-    'lb': LB,
-    'lh': LH,
-    'lw': LW,
-    'lbu': LBU,
-    'lhu': LHU,
-    'sb': SB,
-    'sh': SH,
-    'sw': SW,
-    'addi': ADDI,
-    'slti': SLTI,
-    'sltiu': SLTIU,
-    'xori': XORI,
-    'ori': ORI,
-    'andi': ANDI,
+R_TYPE_INSTRUCTIONS = {
     'slli': SLLI,
     'srli': SRLI,
     'srai': SRAI,
@@ -268,148 +244,76 @@ INSTRUCTIONS = {
     'and': AND,
 }
 
+I_TYPE_INSTRUCTIONS = {
+    'jalr': JALR,
+    'lb': LB,
+    'lh': LH,
+    'lw': LW,
+    'lbu': LBU,
+    'lhu': LHU,
+    'addi': ADDI,
+    'slti': SLTI,
+    'sltiu': SLTIU,
+    'xori': XORI,
+    'ori': ORI,
+    'andi': ANDI,
+}
 
-class RTypeInstruction:
-    def __init__(self, name, rd, rs1, rs2):
-        self.name = name
-        self.rd = rd
-        self.rs1 = rs1
-        self.rs2 = rs2
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rd, self.rs1, self.rs2)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'RTypeInstruction({}, {}, {}, {})'.format(self.name, self.rd, self.rs1, self.rs2)
+S_TYPE_INSTRUCTIONS = {
+    'sb': SB,
+    'sh': SH,
+    'sw': SW,
+}
 
-class ITypeInstruction:
-    def __init__(self, name, rd, rs1, imm):
-        self.name = name
-        self.rd = rd
-        self.rs1 = rs1
-        self.imm = imm
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rd, self.rs1, self.imm)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'ITypeInstruction({}, {}, {}, {})'.format(self.name, self.rd, self.rs1, self.imm)
+B_TYPE_INSTRUCTIONS = {
+    'beq': BEQ,
+    'bne': BNE,
+    'blt': BLT,
+    'bge': BGE,
+    'bltu': BLTU,
+    'bgeu': BGEU,
+}
 
-class STypeInstruction:
-    def __init__(self, name, rs1, rs2, imm):
-        self.name = name
-        self.rs1 = rs1
-        self.rs2 = rs2
-        self.imm = imm
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rs1, self.rs2, self.imm)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'STypeInstruction({}, {}, {}, {})'.format(self.name, self.rs1, self.rs2, self.imm)
+U_TYPE_INSTRUCTIONS = {
+    'lui': LUI,
+    'auipc': AUIPC,
+}
 
-class BTypeInstruction:
-    def __init__(self, name, rs1, rs2, imm):
-        self.name = name
-        self.rs1 = rs1
-        self.rs2 = rs2
-        self.imm = imm
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rs1, self.rs2, self.imm)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'BTypeInstruction({}, {}, {}, {})'.format(self.name, self.rs1, self.rs2, self.imm)
+J_TYPE_INSTRUCTIONS = {
+    'jal': JAL,
+}
 
-class UTypeInstruction:
-    def __init__(self, name, rd, imm):
-        self.name = name
-        self.rd = rd
-        self.imm = imm
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rd, self.imm)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'UTypeInstruction({}, {}, {})'.format(self.name, self.rd, self.imm)
+INSTRUCTIONS = {}
+INSTRUCTIONS.update(R_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(I_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(S_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 
-class JTypeInstruction:
-    def __init__(self, name, rd, imm):
-        self.name = name
-        self.rd = rd
-        self.imm = imm
-    def __bytes__(self):
-        encode_func = INSTRUCTIONS[self.name]
-        return encode_func(self.rd, self.imm)
-    def __len__(self):
-        return 4
-    def __repr__(self):
-        return 'JTypeInstruction({}, {}, {})'.format(self.name, self.rd, self.imm)
-
-class Blob:
-    def __init__(self, data):
-        self.data = data
-    def __bytes__(self):
-        return self.data
-    def __len__(self):
-        return len(self.data)
-    def __repr__(self):
-        return 'Blob({})'.format(self.data)
-
-class Pack:
-    def __init__(self, fmt, imm):
-        self.fmt = fmt
-        self.imm = imm
-    def __bytes__(self):
-        return struct.pack(self.fmt, self.imm)
-    def __len__(self):
-        return struct.calcsize(self.fmt)
-    def __repr__(self):
-        return 'Pack({}, {})'.format(self.fmt, self.imm)
-
-class Label:
-    def __init__(self, name):
-        self.name = name
-    def __len__(self):
-        return 0
-    def __repr__(self):
-        return 'Label({})'.format(self.name)
-
-class Align:
-    def __init__(self, alignment):
-        self.alignment = alignment
-    def __repr__(self):
-        return 'Align({})'.format(self.alignment)
-
-class Position:
-    def __init__(self, label, base):
-        self.label = label
-        self.base = base
-    def __repr__(self):
-        return 'Position({}, 0x{:08x})'.format(self.label, self.base)
-
-class Offset:
-    def __init__(self, label):
-        self.label = label
-    def __repr__(self):
-        return 'Offset({})'.format(self.label)
-
-class Hi:
-    def __init__(self, imm):
-        self.imm = imm
-    def __repr__(self):
-        return 'Hi({})'.format(self.imm)
-
-class Lo:
-    def __init__(self, imm):
-        self.imm = imm
-    def __repr__(self):
-        return 'Lo({})'.format(self.imm)
+# definitions for the "items" that can be found in an assembly program
+#   name: str
+#   rd, rs1, rs2: int, str
+#   imm: int, Position, Offset, Hi, Lo
+#   alignment: int
+#   data: str, bytes
+#   format: str
+#   value: int
+#   label: str
+RTypeInstruction = namedtuple('RTypeInstruction', 'name rd rs1 rs2')
+ITypeInstruction = namedtuple('ITypeInstruction', 'name rd rs1 imm')
+STypeInstruction = namedtuple('STypeInstruction', 'name rs1 rs2 imm')
+BTypeInstruction = namedtuple('BTypeInstruction', 'name rs1 rs2 imm')
+UTypeInstruction = namedtuple('UTypeInstruction', 'name rd imm')
+JTypeInstruction = namedtuple('JTypeInstruction', 'name rd imm')
+Label = namedtuple('Label', 'name')
+Align = namedtuple('Align', 'alignment')
+Blob = namedtuple('Blob', 'data')
+Pack = namedtuple('Pack', 'fmt imm')
+Position = namedtuple('Position', 'label value')
+Offset = namedtuple('Offset', 'label')
+Hi = namedtuple('Hi', 'value')
+Lo = namedtuple('Lo', 'value')
 
 # Passes (labels, position):
 # 1. Resolve aligns  (convert aligns to blobs based on position)
@@ -430,8 +334,78 @@ def relocate_hi(imm):
 def relocate_lo(imm):
     return sign_extend(imm & 0x00000fff, 12)
 
-def parse_assembly(assembly):
-    return []
+def lex_assembly(assembly):
+    # strip comments
+    assembly = re.sub(r'#.*?$', r'', assembly, flags=re.MULTILINE)
+
+    # split into lines
+    lines = assembly.splitlines()
+
+    # strip whitespace
+    lines = [line.strip() for line in lines]
+
+    # skip empty lines
+    lines = [line for line in lines if len(line) > 0]
+
+    # split lines into tokens
+    items = [re.split(r'[\s,()]+', line) for line in lines]
+
+    # remove empty tokens
+    for item in items:
+        while '' in item:
+            item.remove('')
+
+    return items
+
+def parse_assembly(items):
+    def parse_immediate(imm, context):
+        if imm[0] == 'position':
+            label = imm[1]
+            expr = imm[2:]
+            return Position(label, eval(expr, context))
+        elif imm[0] == 'offset':
+            label = imm[1]
+            return Offset(label)
+        elif imm[0] == '%hi':
+            expr = ' '.join(imm[1:])
+            return Hi(eval(expr, context))
+        elif imm[0] == '%lo':
+            expr = ' '.join(imm[1:])
+            return Lo(eval(expr, context))
+        else:
+            return int(imm[0])
+
+    context = {}
+
+    program = []
+    for item in items:
+        # labels
+        if len(item) == 1 and item[0].endswith(':'):
+            label = item[0]
+            label = label.rstrip(':')
+            program.append(Label(label))
+        # variable assignment
+        elif len(item) >= 3 and item[1] == '=':
+            name, _, *expr = item
+            expr = ' '.join(expr)
+            context[name] = eval(expr)
+        # blobs
+        elif item[0].lower() == 'blob':
+            data = item[1]
+            data = data.encode()
+            program.append(Blob(data))
+        # packs
+        elif item[0].lower() == 'pack':
+            fmt = item[1]
+            imm = parse_immediate(item[2:])
+            program.append(Pack(fmt, imm))
+        # r-type instructions
+        elif item[0].lower() in R_TYPE_INSTRUCTIONS:
+            pass
+        else:
+            raise SystemExit('invalid item:', ' '.join(item))
+
+    return program
 
 def resolve_aligns(program):
     position = 0
@@ -442,11 +416,16 @@ def resolve_aligns(program):
             padding = item.alignment - (position % item.alignment)
             if padding == item.alignment:
                 continue
-
             position += padding
             output.append(Blob(b'\x00' * padding))
+        elif type(item) == Blob:
+            position += len(item.data)
+            output.append(item)
+        elif type(item) == Pack:
+            position += struct.calcsize(item.fmt)
+            output.append(item)
         else:
-            position += len(item)
+            position += 4
             output.append(item)
 
     return output
@@ -535,129 +514,20 @@ def assemble(program):
 
     return output
 
-ROM_BASE_ADDR = 0x08000000
-RAM_BASE_ADDR = 0x20000000
 
-W = 's0'
-IP = 'gp'
-DSP = 'sp'
-RSP = 'tp'
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        usage = 'usage: python -m bronzebeard.asm <input_asm> <output_bin>'
+        raise SystemExit(usage)
 
-STATE = 's1'
-TIB = 's2'
-TBUF = 's3'
-TLEN = 's4'
-TPOS = 's5'
-HERE = 's6'
-LATEST = 's7'
+    input_asm = sys.argv[1]
+    output_bin = sys.argv[2]
 
-prog = [
-    # t0 = src, t1 = dest, t2 = count
-    Label('copy'),
-    # setup copy src (ROM_BASE_ADDR)
-    UTypeInstruction('lui', 't0', Hi(ROM_BASE_ADDR)),
-    ITypeInstruction('addi', 't0', 't0', Lo(ROM_BASE_ADDR)),
-    # setup copy dest (RAM_BASE_ADDR)
-    UTypeInstruction('lui', 't1', Hi(RAM_BASE_ADDR)),
-    ITypeInstruction('addi', 't1', 't1', Lo(RAM_BASE_ADDR)),
-    # setup copy count (everything up to "here" label)
-    ITypeInstruction('addi', 't2', 0, Position('here', 0)),
+    with open(input_asm) as f:
+        assembly = f.read()
 
-    Label('token_skip_whitespace'),
-    RTypeInstruction('add', 't1', TBUF, TPOS),
-    ITypeInstruction('lbu', 't2', 't1', 0),
-    BTypeInstruction('bge', 't2', 't0', Offset('token_scan')),
-    ITypeInstruction('addi', TPOS, TPOS, 1),
-    JTypeInstruction('jal', 'zero', Offset('token_skip_whitespace')),
-    Label('token_scan'),
-    Label('token'),
+    items = lex_assembly(assembly)
+    prog = parse_assembly(items)
 
-    UTypeInstruction('lui', HERE, Hi(Position('here', RAM_BASE_ADDR))),
-    ITypeInstruction('addi', HERE, HERE, Lo(Position('here', RAM_BASE_ADDR))),
-
-    Label('interpreter_interpret'),
-    JTypeInstruction('jal', 'ra', Offset('token')),
-
-    # dub ref to interpreter hack
-    Label('interpreter_addr'),
-    Pack('<I', Position('interpreter_interpret', RAM_BASE_ADDR)),
-    Label('interpreter_addr_addr'),
-    Pack('<I', Position('interpreter_addr', RAM_BASE_ADDR)),
-
-    Label('next'),
-    ITypeInstruction('lw', W, IP, 0),
-    ITypeInstruction('addi', IP, IP, 4),
-    ITypeInstruction('lw', 't0', W, 0),
-    ITypeInstruction('jalr', 'zero', 't0', 0),
-
-    # literal output from defword: +
-    Label('word_+'),
-    Pack('<I', 0),  # link
-    Pack('<B', 1),  # flags | len
-    Blob(b'+'),  # name
-    Align(4),
-    Pack('<I', Position('code_+', RAM_BASE_ADDR)),  # code field
-    Label('code_+'),
-    ITypeInstruction('addi', DSP, DSP, -4),
-    ITypeInstruction('lw', 't0', DSP, 0),
-    ITypeInstruction('addi', DSP, DSP, -4),
-    ITypeInstruction('lw', 't1', DSP, 0),
-    RTypeInstruction('add', 't0', 't0', 't1'),
-    STypeInstruction('sw', DSP, 't0', 0),
-    ITypeInstruction('addi', DSP, DSP, 4),
-    JTypeInstruction('jal', 'zero', Offset('next')),
-
-    # literal output from defword: nand
-    Label('latest'),
-    Label('word_nand'),
-    Pack('<I', Position('word_+', RAM_BASE_ADDR)),  # link
-    Pack('<B', 4),  # flags | len
-    Blob(b'nand'),  # name
-    Align(4),
-    Pack('<I', Position('code_nand', RAM_BASE_ADDR)),  # code field
-    Label('code_nand'),
-    ITypeInstruction('addi', DSP, DSP, -4),
-    ITypeInstruction('lw', 't0', DSP, 0),
-    ITypeInstruction('addi', DSP, DSP, -4),
-    ITypeInstruction('lw', 't1', DSP, 0),
-    RTypeInstruction('and', 't0', 't0', 't1'),
-    ITypeInstruction('xori', 't0', 't0', -1),
-    STypeInstruction('sw', DSP, 't0', 0),
-    ITypeInstruction('addi', DSP, DSP, 4),
-    JTypeInstruction('jal', 'zero', Offset('next')),
-
-    Label('here'),
-
-#    Align(FORTH_SIZE),
-    Label('prelude_start'),
-    Blob(b': dup sp@ @ ; '),
-    Blob(b': -1 dup dup nand dup dup nand nand ; '),
-    Label('prelude_end'),
-]
-
-
-from pprint import pprint
-
-print('pass 0: raw assembly program')
-pprint(prog)
-
-print('pass 1: resolve aligns')
-prog = resolve_aligns(prog)
-pprint(prog)
-
-print('pass 2: resolve labels')
-prog, labels = resolve_labels(prog)
-pprint(prog)
-pprint(labels)
-
-print('pass 3: resolve immediates - Position / Offset')
-prog = resolve_immediates(prog, labels)
-pprint(prog)
-
-print('pass 4: resolve relocations - Hi / Lo')
-prog = resolve_relocations(prog)
-pprint(prog)
-
-print('pass 5: assemble!')
-prog = assemble(prog)
-pprint(prog)
+    from pprint import pprint
+    pprint(prog)

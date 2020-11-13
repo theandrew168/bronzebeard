@@ -1,5 +1,13 @@
 # Turn on the red LED on the Longan Nano
 
+RCU_BASE_ADDR = 0x40021000
+RCU_APB2EN_OFFSET = 0x14
+
+GPIO_BASE_ADDR_C = 0x40011000
+GPIO_CTL1_OFFSET = 0x04
+GPIO_MODE_OUT_50MHZ = 0b11
+GPIO_CTL_OUT_PUSH_PULL = 0b00
+
 rcu_init:
     # load RCU base addr into t0
     lui t0 %hi(RCU_BASE_ADDR)
@@ -41,3 +49,8 @@ gpio_init:
 
     # store the GPIO config
     sw t0 t1 0
+
+blob foobar
+blob \x00\x00\x00\x00
+pack <I 123
+pack <B 42

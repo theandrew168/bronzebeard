@@ -85,7 +85,7 @@ This section details how to run programs on the [Longan Nano](https://www.seeeds
 ### Assemble
 With Bronzebeard installed:
 ```
-python -m bronzebeard.asm examples/led.asm -o led.bin
+python -m bronzebeard.asm examples/led.asm led.bin
 ```
 
 ### Program
