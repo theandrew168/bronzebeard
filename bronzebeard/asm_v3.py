@@ -44,7 +44,7 @@ REGISTERS = {
 }
 
 
-def resolve_register(reg):
+def lookup_register(reg):
     # check if register corresponds to a valid name
     if reg in REGISTERS:
         reg = REGISTERS[reg]
@@ -63,9 +63,9 @@ def resolve_register(reg):
 
 
 def r_type(rd, rs1, rs2, opcode, funct3, funct7):
-    rd = resolve_register(rd)
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     code = 0
     code |= opcode
@@ -79,8 +79,8 @@ def r_type(rd, rs1, rs2, opcode, funct3, funct7):
 
 
 def i_type(rd, rs1, imm, opcode, funct3):
-    rd = resolve_register(rd)
-    rs1 = resolve_register(rs1)
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
 
     if imm < -0x800 or imm > 0x7ff:
         raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
@@ -98,8 +98,8 @@ def i_type(rd, rs1, imm, opcode, funct3):
 
 
 def s_type(rs1, rs2, imm, opcode, funct3):
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     if imm < -0x800 or imm > 0x7ff:
         raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
@@ -121,8 +121,8 @@ def s_type(rs1, rs2, imm, opcode, funct3):
 
 
 def b_type(rs1, rs2, imm, opcode, funct3):
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     if imm < -0x1000 or imm > 0x0fff:
         raise ValueError('12-bit multiple of 2 immediate must be between -0x1000 (-4096) and 0x0fff (4095): {}'.format(imm))
@@ -151,7 +151,7 @@ def b_type(rs1, rs2, imm, opcode, funct3):
 
 
 def u_type(rd, imm, opcode):
-    rd = resolve_register(rd)
+    rd = lookup_register(rd)
 
     if imm < -0x80000 or imm > 0x7ffff:
         raise ValueError('20-bit immediate must be between -0x80000 (-524288) and 0x7ffff (524287): {}'.format(imm))
@@ -167,7 +167,7 @@ def u_type(rd, imm, opcode):
 
 
 def j_type(rd, imm, opcode):
-    rd = resolve_register(rd)
+    rd = lookup_register(rd)
 
     if imm < -0x100000 or imm > 0x0fffff:
         raise ValueError('20-bit multiple of 2 immediate must be between -0x100000 (-1048576) and 0x0fffff (1048575): {}'.format(imm))
@@ -360,11 +360,11 @@ def lex_assembly(assembly):
 
 def parse_assembly(items):
     def parse_immediate(imm):
-        if imm[0].lower() == 'position':
+        if imm[0].lower() == '%position':
             _, label, *expr = imm
             expr = ' '.join(expr)
             return Position(label, expr)
-        elif imm[0].lower() == 'offset':
+        elif imm[0].lower() == '%offset':
             _, label = imm
             return Offset(label)
         elif imm[0].lower() == '%hi':
@@ -510,27 +510,81 @@ def resolve_labels(program):
 
     return output, labels
 
+def resolve_registers(program, context):
+    # helper functions for resolving register names (could be a constant)
+    def resolve_register(register, context):
+        if register in context:
+            return context[register]
+        return register
+
+    output = []
+    for item in program:
+        if type(item) == RTypeInstruction:
+            name, rd, rs1, rs2 = item
+            rd = resolve_register(rd, context)
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = RTypeInstruction(name, rd, rs1, rs2)
+            output.append(inst)
+        elif type(item) == ITypeInstruction:
+            name, rd, rs1, imm = item
+            rd = resolve_register(rd, context)
+            rs1 = resolve_register(rs1, context)
+            inst = ITypeInstruction(name, rd, rs1, imm)
+            output.append(inst)
+        elif type(item) == STypeInstruction:
+            name, rs1, rs2, imm = item
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = STypeInstruction(name, rs1, rs2, imm)
+            output.append(inst)
+        elif type(item) == BTypeInstruction:
+            name, rs1, rs2, imm = item
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = BTypeInstruction(name, rs1, rs2, imm)
+            output.append(inst)
+        elif type(item) == UTypeInstruction:
+            name, rd, imm = item
+            rd = resolve_register(rd, context)
+            inst = UTypeInstruction(name, rd, imm)
+            output.append(inst)
+        elif type(item) == JTypeInstruction:
+            name, rd, imm = item
+            rd = resolve_register(rd, context)
+            inst = JTypeInstruction(name, rd, imm)
+            output.append(inst)
+        else:
+            output.append(item)
+
+    return output
+
 def resolve_immediates(program, context, labels):
     # helper function for resolving immediate items
     def resolve_immediate(imm, context, labels, position):
-        if type(imm) == Position:
-            dest = labels[imm.label]
-            base = eval(imm.expr, context)
-            return base + dest
-        elif type(imm) == Offset:
-            dest = labels[imm.label]
-            return dest - position
-        elif type(imm) == Hi:
-            value = eval(imm.expr, context)
-            value = relocate_hi(value)
-            return value
-        elif type(imm) == Lo:
-            value = eval(imm.expr, context)
-            value = relocate_lo(value)
-            return value
-        else:
-            value = eval(imm, context)
-            return value
+        try:
+            if type(imm) == Position:
+                dest = labels[imm.label]
+                base = eval(imm.expr, context)
+                return base + dest
+            elif type(imm) == Offset:
+                dest = labels[imm.label]
+                return dest - position
+            elif type(imm) == Hi:
+                value = eval(imm.expr, context)
+                value = relocate_hi(value)
+                return value
+            elif type(imm) == Lo:
+                value = eval(imm.expr, context)
+                value = relocate_lo(value)
+                return value
+            elif imm in labels:
+                return labels[imm]
+            else:
+                value = eval(imm, context)
+                return value
+        except:
+            raise SystemExit('invalid immediate: {}'.format(imm))
 
     position = 0
 
@@ -634,8 +688,9 @@ def assemble(program):
 # 1. Resolve constants  (NAME = expr)
 # 2. Resolve aligns  (convert aligns to blobs based on position)
 # 3. Resolve labels  (store label locations into dict)
-# 4. Resolve immediates  (Position, Offset, Hi, Lo)
-# 5. Assemble!  (convert everything to bytes)
+# 4. Resolve registers  (could be constants for readability)
+# 5. Resolve immediates  (Position, Offset, Hi, Lo)
+# 6. Assemble!  (convert everything to bytes)
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
@@ -663,6 +718,9 @@ if __name__ == '__main__':
     prog, labels = resolve_labels(prog)
     pprint(prog)
     pprint(labels)
+
+    prog = resolve_registers(prog, context)
+    pprint(prog)
 
     prog = resolve_immediates(prog, context, labels)
     pprint(prog)
