@@ -43,7 +43,7 @@ gpio_init:
     and t1 t1 t2
 
     # set new config settings
-    addi t2 zero (GPIO_CTL_OUT_PUSH_POLL << 2 | GPIO_MODE_OUT_50MHZ)
+    addi t2 zero (GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
     slli t2 t2 20
     or t1 t1 t2
 
@@ -51,6 +51,10 @@ gpio_init:
     sw t0 t1 0
 
 blob foobar
-blob \x00\x00\x00\x00
 pack <I 123
 pack <B 42
+align 4
+pack <I position rcu_init RCU_BASE_ADDR
+pack <i offset gpio_init
+pack <I %hi RCU_BASE_ADDR
+pack <I %lo RCU_BASE_ADDR * 10
