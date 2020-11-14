@@ -1,3 +1,4 @@
+from collections import namedtuple
 from ctypes import c_uint32
 from functools import partial
 import re
@@ -291,36 +292,43 @@ INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 
-# definitions for the "items" that can be found in an assembly program
+# Arg types:
 #   name: str
 #   rd, rs1, rs2: int, str
-#   imm: int, Position, Offset, Hi, Lo
+#   imm: expr, Position, Offset, Hi, Lo
 #   alignment: int
 #   data: str, bytes
 #   format: str
 #   value: int
 #   label: str
+#   expr: python expression
+
+# items
 RTypeInstruction = namedtuple('RTypeInstruction', 'name rd rs1 rs2')
 ITypeInstruction = namedtuple('ITypeInstruction', 'name rd rs1 imm')
 STypeInstruction = namedtuple('STypeInstruction', 'name rs1 rs2 imm')
 BTypeInstruction = namedtuple('BTypeInstruction', 'name rs1 rs2 imm')
 UTypeInstruction = namedtuple('UTypeInstruction', 'name rd imm')
 JTypeInstruction = namedtuple('JTypeInstruction', 'name rd imm')
+Constant = namedtuple('Constant', 'name expr')
 Label = namedtuple('Label', 'name')
 Align = namedtuple('Align', 'alignment')
-Blob = namedtuple('Blob', 'data')
 Pack = namedtuple('Pack', 'fmt imm')
-Position = namedtuple('Position', 'label value')
+Blob = namedtuple('Blob', 'data')
+
+# immediates
+Position = namedtuple('Position', 'label expr')
 Offset = namedtuple('Offset', 'label')
-Hi = namedtuple('Hi', 'value')
-Lo = namedtuple('Lo', 'value')
+Hi = namedtuple('Hi', 'expr')
+Lo = namedtuple('Lo', 'expr')
 
 # Passes (labels, position):
-# 1. Resolve aligns  (convert aligns to blobs based on position)
-# 2. Resolve labels  (store label locations into dict)
-# 3. Resolve immediates  (resolve refs to labels, error if not found, leaves integers)
-# 4. Resolve relocations  (resolve Hi / Lo relocations)
-# 5. Assemble!  (convert everything to bytes)
+# 1. Resolve constants  (NAME = expr)
+# 2. Resolve aligns  (convert aligns to blobs based on position)
+# 3. Resolve packs  (convert packs to blobs)
+# 4. Resolve labels  (store label locations into dict)
+# 5. Resolve immediates  (Position, Offset, Hi, Lo, expr)
+# 6. Assemble!  (convert everything to bytes)
 
 def sign_extend(value, bits):
     sign_bit = 1 << (bits - 1)
@@ -358,23 +366,6 @@ def lex_assembly(assembly):
     return items
 
 def parse_assembly(items):
-    def parse_immediate(imm, context):
-        if imm[0] == 'position':
-            label = imm[1]
-            expr = imm[2:]
-            return Position(label, eval(expr, context))
-        elif imm[0] == 'offset':
-            label = imm[1]
-            return Offset(label)
-        elif imm[0] == '%hi':
-            expr = ' '.join(imm[1:])
-            return Hi(eval(expr, context))
-        elif imm[0] == '%lo':
-            expr = ' '.join(imm[1:])
-            return Lo(eval(expr, context))
-        else:
-            return int(imm[0])
-
     context = {}
 
     program = []
@@ -383,25 +374,54 @@ def parse_assembly(items):
         if len(item) == 1 and item[0].endswith(':'):
             label = item[0]
             label = label.rstrip(':')
-            program.append(Label(label))
-        # variable assignment
+            item = Label(label)
+            program.append(item)
+        # constants
         elif len(item) >= 3 and item[1] == '=':
             name, _, *expr = item
-            expr = ' '.join(expr)
-            context[name] = eval(expr)
+            item = Constant(name, expr)
+            program.append(item)
         # blobs
         elif item[0].lower() == 'blob':
-            data = item[1]
+            _, data = item
             data = data.encode()
-            program.append(Blob(data))
+            item = Blob(data)
+            program.append(item)
         # packs
         elif item[0].lower() == 'pack':
-            fmt = item[1]
-            imm = parse_immediate(item[2:])
-            program.append(Pack(fmt, imm))
+            _, fmt, *imm = item
+            item = Pack(fmt, imm)
+            program.append(item)
         # r-type instructions
         elif item[0].lower() in R_TYPE_INSTRUCTIONS:
-            pass
+            name, rd, rs1, rs2 = item
+            item = RTypeInstruction(name, rd, rs1, rs2)
+            program.append(item)
+        # i-type instructions
+        elif item[0].lower() in I_TYPE_INSTRUCTIONS:
+            name, rd, rs1, *imm = item
+            item = ITypeInstruction(name, rd, rs1, imm)
+            program.append(item)
+        # s-type instructions
+        elif item[0].lower() in S_TYPE_INSTRUCTIONS:
+            name, rs1, rs2, *imm = item
+            item = STypeInstruction(name, rs1, rs2, imm)
+            program.append(item)
+        # b-type instructions
+        elif item[0].lower() in B_TYPE_INSTRUCTIONS:
+            name, rs1, rs2, *imm = item
+            item = BTypeInstruction(name, rs1, rs2, imm)
+            program.append(item)
+        # u-type instructions
+        elif item[0].lower() in U_TYPE_INSTRUCTIONS:
+            name, rd, *imm = item
+            item = UTypeInstruction(name, rd, imm)
+            program.append(item)
+        # j-type instructions
+        elif item[0].lower() in J_TYPE_INSTRUCTIONS:
+            name, rd, *imm = item
+            item = JTypeInstruction(name, rd, imm)
+            program.append(item)
         else:
             raise SystemExit('invalid item:', ' '.join(item))
 
