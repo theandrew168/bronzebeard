@@ -403,9 +403,9 @@ with p.LABEL('getc'):
     p.ADDI('t1', 't0', USART_STAT_OFFSET)
     p.ADDI('t2', 't0', USART_DATA_OFFSET)
 with p.LABEL('getc_wait'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 5)  # isolate RBNE bit
-    p.BEQ('t4', 'zero', 'getc_wait')  # keep looping until a char comes in
+    p.LW('t3', 't1', 0)  # load stat into t3
+    p.ANDI('t3', 't3', 1 << 5)  # isolate RBNE bit
+    p.BEQ('t3', 'zero', 'getc_wait')  # keep looping until a char comes in
     p.LW('a5', 't2', 0)  # load char into a5
     p.JALR('zero', 'ra', 0)  # return
 
@@ -420,9 +420,9 @@ with p.LABEL('putc'):
     p.ADDI('t2', 't0', USART_DATA_OFFSET)
     p.SW('t2', 'a5', 0)  # write char from a5
 with p.LABEL('putc_wait'):
-    p.LW('t4', 't1', 0)  # load stat into t4
-    p.ANDI('t4', 't4', 1 << 7)  # isolate TBE bit
-    p.BEQ('t4', 'zero', 'putc_wait')  # keep looping until char gets sent
+    p.LW('t3', 't1', 0)  # load stat into t3
+    p.ANDI('t3', 't3', 1 << 7)  # isolate TBE bit
+    p.BEQ('t3', 'zero', 'putc_wait')  # keep looping until char gets sent
     p.JALR('zero', 'ra', 0)  # return
 
 # Main program starts here!

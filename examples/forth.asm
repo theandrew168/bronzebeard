@@ -1,5 +1,9 @@
 ROM_BASE_ADDR = 0x08000000
 RAM_BASE_ADDR = 0x20000000
+USART_BASE_ADDR_0 = 0x40013800
+USART_STAT_OFFSET = 0x00
+USART_DATA_OFFSET = 0x04
+USART_BAUD_OFFSET = 0x08
 
 #       Register Assignment
 # |------------------------------|
@@ -167,39 +171,92 @@ token_not_found:
 # Arg: a1 = length of word name
 # Ret: a2 = addr of found word (0 if not found)
 lookup:
+    addi t0 LATEST 0  # copy addr of latest word into t0
 lookup_body:
+    lw t1 t0 0  # load link of current word into t1
+    lbu t2 t0 4  # load flags | len of current word into t2
+    andi t2 t2 F_LENGTH  # isolate word length
+    beq a1 t2 lookup_strncmp  # start strncmp if len matches
 lookup_next:
+    beq t1 zero lookup_not_found  # if link is zero then the word isn't found (end of dict)
+    addi t0 t1 0  # point t0 at the next word (move link addr into t0)
+    jal zero lookup_body
 lookup_not_found:
-lookup_strcmp:
-lookup_strcmp_body:
-lookup_strcmp_next:
+    addi a2 zero 0  # a2 = 0
+    jalr zero ra 0  # return
+lookup_strncmp:
+    addi t3 a0 0  # t3 points at name in TIB string
+    addi t4 t0 5  # t4 points at name in word dict
+lookup_strncmp_body:
+    lbu t5 t3 0  # load TIB char into t5
+    lbu t6 t4 0  # load dict char into t6
+    bne t5 t6 lookup_next  # try next word if current chars don't match
+lookup_strncmp_next:
+    addi t2 t2 -1  # dec word name len
+    beq t2 zero lookup_found  # if all chars have been checked, its a match!
+    addi t3 t3 1  # inc TIB name ptr
+    addi t4 t4 1  # inc dict name ptr
+    jal zero lookup_strncmp_body
 lookup_found:
+    addi a2 t0 0  # a2 = addr of found word in dict
+    jalr zero ra 0  # return
 
 # Procedure: align
 # Usage: p.JAL('ra', 'align')
 # Arg: a3 = value to be aligned
 # Ret: a3 = value after alignment
 align:
+    andi t0 a3 0b11  # t0 = bottom 2 bits of a3
+    beq t0 zero align_done  # if they are zero, then a3 is a multiple of 4
+    addi a3 a3 1  # else inc a3 by 1
+    jal zero align  # and loop again
 align_done:
+    jalr zero ra 0  # return
 
 # Procedure: pad
 # Usage: p.JAL('ra', 'pad')
 # Arg: a4 = addr to be padded
 # Ret: a4 = addr after padding
 pad:
+    andi t0 a4 0b11  # t0 = bottom 2 bits of a4
+    beq t0 zero pad_done  # if they are zero, then a4 is a multiple of 4
+    sb a4 zero 0  # write a 0 to addr at a4
+    addi a4 a4 1  # inc a4 by 1
+    jal zero pad  # loop again
 pad_done:
+    jalr zero ra 0  # return
 
 # Procedure: getc
 # Usage: p.JAL('ra', 'getc')
 # Ret: a5 = character received from serial
 getc:
+    # t1 = stat, t2 = data
+    lui t0 %hi(USART_BASE_ADDR_0)
+    addi t0 t0 %lo(USART_BASE_ADDR_0)
+    addi t1 t0 USART_STAT_OFFSET
+    addi t2 t0 USART_DATA_OFFSET
 getc_wait:
+    lw t3 t1 0  # load stat into t3
+    andi t3 t3 (1 << 5)  # isolate RBNE bit
+    beq t3 zero getc_wait  # keep looping until a char is read
+    lw a5 t2 0  # load char into a5
+    jalr zero ra 0  # return
 
 # Procedure: putc
 # Usage: p.JAL('ra', 'putc')
 # Arg: a5 = character to send over serial
 putc:
+    # t1 = stat, t2 = data
+    lui t0 %hi(USART_BASE_ADDR_0)
+    addi t0 t0 %lo(USART_BASE_ADDR_0)
+    addi t1 t0 USART_STAT_OFFSET
+    addi t2 t0 USART_DATA_OFFSET
+    sw t2 a5 0  # write char from a5
 putc_wait:
+    lw t3 t1 0  # load stat into t3
+    andi t3 t3 (1 << 7)  # isolate TBE bit
+    beq t3 zero putc_wait  # keep looping until the char gets sent
+    jalr zero ra 0  # return
 
 # !!! main program starts here !!!
 
