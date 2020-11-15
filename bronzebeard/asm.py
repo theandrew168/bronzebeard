@@ -406,7 +406,8 @@ def parse_assembly(items):
             program.append(item)
         # blobs
         elif item[0].lower() == 'blob':
-            _, data = item
+            _, *data = item
+            data = ' '.join(data)
             data = data.encode()
             item = Blob(data)
             program.append(item)

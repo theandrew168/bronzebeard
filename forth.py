@@ -723,22 +723,20 @@ with p.LABEL('strncpy_done'):
     p.ADDI('a4', HERE, 0)  # setup arg for pad (a4 = HERE)
     p.JAL('ra', 'pad')  # call pad procedure
     p.ADDI(HERE, 'a4', 0)  # handle ret from pad (HERE = a4)
-    #   OffsetFrom(RAM_BASE_ADDR, 'enter')
-    #   AddressFrom(RAM_BASE_ADDR, 'enter')
-    addr = RAM_BASE_ADDR + p.labels['enter']
-    p.LUI('t0', p.HI(addr))  # load addr of ENTER into t0
-    p.ADDI('t0', 't0', p.LO(addr))  # ...
+    # load addr of ENTER into t0
+    p.LUI('t0', p.HI(RAM_BASE_ADDR))  
+    p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
+    p.ADDI('t0', 't0', 'enter')
     p.SW(HERE, 't0', 0)  # write addr of ENTER to word definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 1)  # STATE = 1 (compile)
     p.JAL('zero', 'next')  # next
 
 with defword(p, ';', flags=F_IMMEDIATE):
-    #   OffsetFrom(RAM_BASE_ADDR, 'word_exit')
-    #   AddressFrom(RAM_BASE_ADDR, 'word_exit')
-    addr = RAM_BASE_ADDR + p.labels['word_exit']
-    p.LUI('t0', p.HI(addr))  # load addr of EXIT into t0
-    p.ADDI('t0', 't0', p.LO(addr))  # ...
+    # load addr of word_exit into t0
+    p.LUI('t0', p.HI(RAM_BASE_ADDR))
+    p.ADDI('t0', 't0', p.LO(RAM_BASE_ADDR))
+    p.ADDI('t0', 't0', 'word_exit')
     p.SW(HERE, 't0', 0)  # write addr of EXIT to word definition
     p.ADDI(HERE, HERE, 4)  # HERE += 4
     p.ADDI(STATE, 'zero', 0)  # STATE = 0 (execute)
@@ -1044,5 +1042,5 @@ p.BLOB(b'; ')
 p.LABEL('disk_end')
 
 
-with open('forth.bin', 'wb') as f:
+with open('forth_v2.bin', 'wb') as f:
     f.write(p.machine_code)

@@ -1,9 +1,22 @@
+CLOCK_FREQ = 8000000
+USART_BAUD = 115200
 ROM_BASE_ADDR = 0x08000000
 RAM_BASE_ADDR = 0x20000000
+RCU_BASE_ADDR = 0x40021000
+RCU_APB2EN_OFFSET = 0x18
+GPIO_BASE_ADDR_A = 0x40010800
+GPIO_BASE_ADDR_C = 0x40011000
+GPIO_CTL1_OFFSET = 0x04
+GPIO_MODE_IN = 0b00
+GPIO_MODE_OUT_50MHZ = 0b11
+GPIO_CTL_IN_FLOATING = 0b01
+GPIO_CTL_OUT_PUSH_PULL = 0b00
+GPIO_CTL_OUT_ALT_PUSH_PULL = 0b10
 USART_BASE_ADDR_0 = 0x40013800
 USART_STAT_OFFSET = 0x00
 USART_DATA_OFFSET = 0x04
 USART_BAUD_OFFSET = 0x08
+USART_CTL0_OFFSET = 0x0c
 
 #       Register Assignment
 # |------------------------------|
@@ -258,7 +271,9 @@ putc_wait:
     beq t3 zero putc_wait  # keep looping until the char gets sent
     jalr zero ra 0  # return
 
-# !!! main program starts here !!!
+###
+### main program starts here
+###
 
 # Init serial comm via USART0:
 # 1. RCU APB2 enable GPIOA (1 << 2)
@@ -272,5 +287,333 @@ putc_wait:
 # 7. USART0 enable TX (1 << 3)
 # 7. USART0 enable USART (1 << 13)
 start:
+    # setup addr and load current APB2EN config into t1
+    lui t0 %hi(RCU_BASE_ADDR)
+    addi t0 t0 %lo(RCU_BASE_ADDR)
+    addi t0 t0 RCU_APB2EN_OFFSET
+    lw t1 t0 0
 
+    # setup enable bit for GPIO A
+    addi t2 zero 1
+    slli t2 t2 2
+    or t1 t1 t2
+
+    # setup enable bit for GPIO C
+    addi t2 zero 1
+    slli t2 t2 4
+    or t1 t1 t2
+
+    # setup enable bit for USART 0
+    addi t2 zero 1
+    slli t2 t2 14
+    or t1 t1 t2
+
+    # store APB2EN config
+    sw t0 t1 0
+
+    # setup addr and load current GPIO A config into t1
+    lui t0 %hi(GPIO_BASE_ADDR_A)
+    addi t0 t0 %lo(GPIO_BASE_ADDR_A)
+    addi t0 t0 GPIO_CTL1_OFFSET
+    lw t1 t0 0
+
+    # clear existing config (pin 9)
+    addi t2 zero 0b1111
+    slli t2 t2 4
+    xori t2 t2 -1
+    and t1 t1 t2
+
+    # setup config bits (pin 9)
+    addi t2 zero (GPIO_CTL_OUT_ALT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
+    slli t2 t2 4
+    or t1 t1 t2
+
+    # clear existing config (pin 10)
+    addi t2 zero 0b1111
+    slli t2 t2 8
+    xori t2 t2 -1
+    and t1 t1 t2
+
+    # setup config bits (pin 10)
+    addi t2 zero (GPIO_CTL_IN_FLOATING << 2 | GPIO_MODE_IN)
+    slli t2 t2 8
+    or t1 t1 t2
+
+    # store GPIO A config
+    sw t0 t1 0
+
+    # setup addr for USART 0
+    lui t0 %hi(USART_BASE_ADDR_0)
+    addi t0 t0 %lo(USART_BASE_ADDR_0)
+
+    # set baud rate clkdiv
+    addi t1 t0 USART_BAUD_OFFSET
+    addi t2 zero CLOCK_FREQ // USART_BAUD
+    sw t1 t2 0
+
+    # load current USART 0 config into t1
+    addi t0 t0 USART_CTL0_OFFSET
+    lw t1 t0 0
+
+    # setup enable bit for RX
+    addi t2 zero 1
+    slli t2 t2 2
+    or t1 t1 t2
+
+    # setup enable bit for TX
+    addi t2 zero 1
+    slli t2 t2 3
+    or t1 t1 t2
+
+    # setup enable bit for USART
+    addi t2 zero 1
+    slli t2 t2 13
+    or t1 t1 t2
+
+    # store USART 0 config
+    sw t0 t1 0
+
+    # set HERE var to "here" location
+    lui HERE %hi(RAM_BASE_ADDR)
+    addi HERE HERE %lo(RAM_BASE_ADDR)
+    addi HERE HERE here
+
+    # set LATEST var to "latest" location
+    lui LATEST %hi(RAM_BASE_ADDR)
+    addi LATEST LATEST %lo(RAM_BASE_ADDR)
+    addi LATEST LATEST latest
+
+    jal zero init
+
+# print error indicator and fall through into reset
+error:
+    addi a5 zero 32  # space
+    jal ra putc
+    addi a5 zero 63  # ?
+    jal ra putc
+    addi a5 zero 10  # newline
+    jal ra putc
+
+init:
+    # set working register to zero
+    addi W zero 0
+
+    # setup data stack pointer
+    lui DSP %hi(RAM_BASE_ADDR + DATA_STACK_BASE)
+    addi DSP DSP %lo(RAM_BASE_ADDR + DATA_STACK_BASE)
+
+    # setup return stack pointer
+    lui RSP %hi(RAM_BASE_ADDR + RETURN_STACK_BASE)
+    addi RSP RSP %lo(RAM_BASE_ADDR + RETURN_STACK_BASE)
+
+    # set STATE var to zero
+    addi STATE zero 0
+
+    # set TIB var to TIB_BASE
+    lui TIB %hi(RAM_BASE_ADDR + TIB_BASE)
+    addi TIB TIB %lo(RAM_BASE_ADDR + TIB_BASE)
+
+jal zero interpreter
+
+# print "ok" and fall through into interpreter
+interpreter_ok:
+    addi a5 zero 32  # space
+    jal ra putc
+    addi a5 zero 111  # o
+    jal ra putc
+    addi a5 zero 107  # k
+    jal ra putc
+    addi a5 zero 10  # newline
+    jal ra putc
+
+# main interpreter loop
+interpreter:
+
+# fill TIB with zeroes
+tib_clear:
+    addi t0 TIB 0  # t0 = addr of TIB
+    addi t1 zero TIB_SIZE  # t1 = size of TIB (1024)
+tib_clear_body:
+    sb t0 zero 0  # [t0] <- 0
+tib_clear_next:
+    addi t0 t0 1  # t0 += 1
+    addi t1 t1 -1  # t1 -= 1
+    bne t1 zero tib_clear_body  # keep looping til t1 == 0
+tib_clear_done:
+    addi TBUF TIB 0  # set TBUF to TIB
+    addi TLEN zero 0  # set TLEN to zero
+    addi TPOS zero 0  # set TPOS to zero
+
+interpreter_repl:
+interpreter_repl_char:
+
+interpreter_interpret:
+interpreter_compile:
+interpreter_execute:
+
+interpreter_addr:
+interpreter_addr_addr:
+
+# not technically required by should be here since the prev item wasn't an inst
+align 4
+
+# standard forth routine: next
+next:
+    lw W IP 0
+    addi IP IP 4
+    lw t0 W 0
+    jalr zero t0 0
+
+# standard forth routine: enter
+enter:
+    sw RSP IP 0
+    addi RSP RSP 4
+    addi IP W 4  # skip code field
+    jal zero next
+
+###
+### dictionary starts here
+###
+
+word_exit:
+    pack <I 0
+    pack <B 4
+    blob exit
+    align 4
+code_exit:
+    pack <I body_exit
+body_exit:
+    addi RSP RSP -4
+    lw IP RSP 0
+    jal zero next
+
+# TODO: error if word name is loo long (> 63) (len & F_LENGTH != 0)
+word_colon:
+    pack <I word_exit
+    pack <B 1
+    blob :
+    align 4
+code_colon:
+    pack <I body_colon
+body_colon:
+    jal ra token  # a0 = addr, a1 = len
+    sw HERE LATEST 0  # write link to prev word (write LATEST to HERE)
+    sb HERE a1 4  # write word len
+    addi LATEST HERE 0  # set LATEST = HERE (before HERE gets modified)
+    addi HERE LATEST 5  # move HERE past link and len (to start of name)
+strncpy:
+    addi t0 a0 0  # t0 = strncpy src
+    addi t1 HERE 0  # t1 = strncpy dest
+    addi t2 a1 0  # t2 = strncpy len
+strncpy_body:
+    lbu t3 t0 0  # t3 <- [src]
+    sb t1 t3 0  # [dest] <- t3
+strncpy_next:
+    addi t2 t2 -1  # len--
+    beq t2 zero strncpy_done  # done if len == 0
+    addi t0 t0 1  # src++
+    addi t1 t1 1  # dest++
+    jal zero strncpy_body  # copy next char
+strncpy_done:
+    addi HERE t1 1  # HERE = end of word, need +1 cuz still on last char of name
+    addi a4 HERE 0  # setup arg for pad (a4 = HERE)
+    jal ra pad  # call pad procedure
+    addi HERE a4 0  # handle ret from pad (HERE = a4)
+    # load addr of "enter" into t0
+    lui t0 %hi(RAM_BASE_ADDR)
+    addi t0 t0 %lo(RAM_BASE_ADDR)
+    addi t0 t0 enter
+    sw HERE t0 0  # write addr of "enter" to word definition
+    addi HERE HERE 4  # HERE += 4
+    addi STATE zero 1  # STATE = 1 (compile)
+    jal zero next  # next
+
+word_semi:
+    pack <I word_colon
+    pack <B (F_IMMEDIATE | 1)
+    blob ;
+    align 4
+code_semi:
+    pack <I body_semi
+body_semi:
+    # load addr of "code_exit" into t0
+    lui t0 %hi(RAM_BASE_ADDR)
+    addi t0 t0 %lo(RAM_BASE_ADDR)
+    addi t0 t0 code_exit
+    sw HERE t0 0  # write addr of "code_exit" to word definition
+    addi HERE HERE 4  # HERE += 4
+    addi STATE zero 0  # STATE = 0 (execute)
+    jal zero next  # next
+
+word_load:
+    pack <I word_semi
+    pack <B 4
+    blob load
+    align 4
+code_load:
+    pack <I body_load
+body_load:
+    # TBUF = disk_start
+    # TBUF = ROM_BASE_ADDR + 16k
+    # TODO: %hi/%ho(position(disk_start, ROM_BASE_ADDR))
+    lui TBUF %hi(ROM_BASE_ADDR)
+    addi TBUF TBUF %lo(ROM_BASE_ADDR)
+    addi t0 zero 1
+    slli t0 t0 14
+    add TBUF TBUF t0
+
+    # TLEN = disk_end - disk_start
+    # TLEN = 4096
+    # TODO: fix this hard-coded value
+    # TODO: offset(disk_end, disk_start)
+    addi t0 zero 1
+    slli TLEN t0 12
+
+    # TPOS = 0
+    addi TPOS zero 0
+
+    # next
+    jal zero next
+
+word_key:
+code_key:
+body_key:
+
+word_emit:
+code_emit:
+body_emit:
+
+word_at:
+code_at:
+body_at:
+
+word_ex:
+code_ex:
+body_ex:
+
+word_spat:
+code_spat:
+body_spat:
+
+word_rpat:
+code_rpat:
+body_rpat:
+
+word_zeroeq:
+code_zeroeq:
+body_zeroeq:
+notzero:
+
+word_plus:
+code_plus:
+body_plus:
+
+# mark the latest builtin word (nand)
+latest:
+
+word_nand:
+code_nand:
+body_nand:
+
+# mark the location of the next new word
 here:
