@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import struct
 
-from bronzebeard import asm
+from bronzebeard import asm_old
 
 # Types of Immediate values (one of Literal / Position / Location / Address):
 # An Immediate can be resolved to a Number given a map[string]int of labels (can be nil, too)
@@ -270,7 +270,7 @@ def defword(p, name, flags=0):
     yield
 
 
-p = asm.Program()
+p = asm_old.Program()
 
 # t0 = src, t1 = dest, t2 = count
 with p.LABEL('copy'):

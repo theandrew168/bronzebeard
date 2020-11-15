@@ -1,7 +1,11 @@
 from collections import namedtuple
 from ctypes import c_uint32
-from functools import partial, partialmethod
+from functools import partial
+import re
 import struct
+import sys
+
+from pprint import pprint
 
 
 REGISTERS = {
@@ -40,7 +44,7 @@ REGISTERS = {
 }
 
 
-def resolve_register(reg):
+def lookup_register(reg):
     # check if register corresponds to a valid name
     if reg in REGISTERS:
         reg = REGISTERS[reg]
@@ -58,25 +62,10 @@ def resolve_register(reg):
     return reg
 
 
-def sign_extend(value, bits):
-    sign_bit = 1 << (bits - 1)
-    return (value & (sign_bit - 1)) - (value & sign_bit)
-
-
-def relocate_hi(imm):
-    if imm & 0x800:
-        imm += 2**12
-    return sign_extend((imm >> 12) & 0x000fffff, 20)
-
-
-def relocate_lo(imm):
-    return sign_extend(imm & 0x00000fff, 12)
-
-
 def r_type(rd, rs1, rs2, opcode, funct3, funct7):
-    rd = resolve_register(rd)
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     code = 0
     code |= opcode
@@ -90,8 +79,8 @@ def r_type(rd, rs1, rs2, opcode, funct3, funct7):
 
 
 def i_type(rd, rs1, imm, opcode, funct3):
-    rd = resolve_register(rd)
-    rs1 = resolve_register(rs1)
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
 
     if imm < -0x800 or imm > 0x7ff:
         raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
@@ -109,8 +98,8 @@ def i_type(rd, rs1, imm, opcode, funct3):
 
 
 def s_type(rs1, rs2, imm, opcode, funct3):
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     if imm < -0x800 or imm > 0x7ff:
         raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
@@ -132,8 +121,8 @@ def s_type(rs1, rs2, imm, opcode, funct3):
 
 
 def b_type(rs1, rs2, imm, opcode, funct3):
-    rs1 = resolve_register(rs1)
-    rs2 = resolve_register(rs2)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
 
     if imm < -0x1000 or imm > 0x0fff:
         raise ValueError('12-bit multiple of 2 immediate must be between -0x1000 (-4096) and 0x0fff (4095): {}'.format(imm))
@@ -162,7 +151,7 @@ def b_type(rs1, rs2, imm, opcode, funct3):
 
 
 def u_type(rd, imm, opcode):
-    rd = resolve_register(rd)
+    rd = lookup_register(rd)
 
     if imm < -0x80000 or imm > 0x7ffff:
         raise ValueError('20-bit immediate must be between -0x80000 (-524288) and 0x7ffff (524287): {}'.format(imm))
@@ -178,7 +167,7 @@ def u_type(rd, imm, opcode):
 
 
 def j_type(rd, imm, opcode):
-    rd = resolve_register(rd)
+    rd = lookup_register(rd)
 
     if imm < -0x100000 or imm > 0x0fffff:
         raise ValueError('20-bit multiple of 2 immediate must be between -0x100000 (-1048576) and 0x0fffff (1048575): {}'.format(imm))
@@ -242,173 +231,502 @@ SRA = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
 
+R_TYPE_INSTRUCTIONS = {
+    'slli': SLLI,
+    'srli': SRLI,
+    'srai': SRAI,
+    'add': ADD,
+    'sub': SUB,
+    'sll': SLL,
+    'slt': SLT,
+    'sltu': SLTU,
+    'xor': XOR,
+    'srl': SRL,
+    'sra': SRA,
+    'or': OR,
+    'and': AND,
+}
 
-class Program:
-    RTypeInstruction = namedtuple('RTypeInstruction', 'inst location rd rs1 rs2')
-    ITypeInstruction = namedtuple('ITypeInstruction', 'inst location rd rs1 imm')
-    STypeInstruction = namedtuple('STypeInstruction', 'inst location rs1 rs2 imm')
-    BTypeInstruction = namedtuple('BTypeInstruction', 'inst location rs1 rs2 imm')
-    UTypeInstruction = namedtuple('UTypeInstruction', 'inst location rd imm')
-    JTypeInstruction = namedtuple('JTypeInstruction', 'inst location rd imm')
-    Blob = namedtuple('Blob', 'data')
-    Align = namedtuple('Align', 'boundary')
+I_TYPE_INSTRUCTIONS = {
+    'jalr': JALR,
+    'lb': LB,
+    'lh': LH,
+    'lw': LW,
+    'lbu': LBU,
+    'lhu': LHU,
+    'addi': ADDI,
+    'slti': SLTI,
+    'sltiu': SLTIU,
+    'xori': XORI,
+    'ori': ORI,
+    'andi': ANDI,
+}
 
-    def __init__(self):
-        self.instructions = []
-        self.labels = {}
-        self.location = 0
+S_TYPE_INSTRUCTIONS = {
+    'sb': SB,
+    'sh': SH,
+    'sw': SW,
+}
 
-    @property
-    def machine_code(self):
-        code = bytearray()
+B_TYPE_INSTRUCTIONS = {
+    'beq': BEQ,
+    'bne': BNE,
+    'blt': BLT,
+    'bge': BGE,
+    'bltu': BLTU,
+    'bgeu': BGEU,
+}
 
-        for instruction in self.instructions:
-            if isinstance(instruction, Program.RTypeInstruction):
-                inst, location, rd, rs1, rs2 = instruction
-                code.extend(inst(rd, rs1, rs2))
-            elif isinstance(instruction, Program.ITypeInstruction):
-                inst, location, rd, rs1, imm = instruction
-                imm = self._resolve_immediate(imm, location, inst)
-                code.extend(inst(rd, rs1, imm))
-            elif isinstance(instruction, Program.STypeInstruction):
-                inst, location, rs1, rs2, imm = instruction
-                imm = self._resolve_immediate(imm, location, inst)
-                code.extend(inst(rs1, rs2, imm))
-            elif isinstance(instruction, Program.BTypeInstruction):
-                inst, location, rs1, rs2, imm = instruction
-                imm = self._resolve_immediate(imm, location, inst)
-                code.extend(inst(rs1, rs2, imm))
-            elif isinstance(instruction, Program.UTypeInstruction):
-                inst, location, rd, imm = instruction
-                imm = self._resolve_immediate(imm, location, inst)
-                code.extend(inst(rd, imm))
-            elif isinstance(instruction, Program.JTypeInstruction):
-                inst, location, rd, imm = instruction
-                imm = self._resolve_immediate(imm, location, inst)
-                code.extend(inst(rd, imm))
-            elif isinstance(instruction, Program.Blob):
-                code.extend(instruction.data)
-            elif isinstance(instruction, Program.Align):
-                while len(code) % instruction.boundary != 0:
-                    code.append(0)
-            else:
-                raise ValueError('Invalid instruction type')
+U_TYPE_INSTRUCTIONS = {
+    'lui': LUI,
+    'auipc': AUIPC,
+}
 
-        return bytes(code)
+J_TYPE_INSTRUCTIONS = {
+    'jal': JAL,
+}
 
-    def __enter__(self):
-        pass
+INSTRUCTIONS = {}
+INSTRUCTIONS.update(R_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(I_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(S_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 
-    def __exit__(self, *args):
-        pass
+# Arg types:
+#   rd, rs1, rs2: int, str
+#   name: str
+#   imm: Position, Offset, Hi, Lo, expr
+#   alignment: int
+#   data: bytes
+#   fmt: str
+#   label: str
+#   expr: simple python expression
 
-    def _resolve_immediate(self, imm, location, instruction):
-        # check if immediate value references a label
-        if imm in self.labels:
-            # return relative offsets for jump / branch instructions
-            if instruction in [JAL, JALR, BEQ, BNE, BLT, BGE, BLTU, BGEU]:
-                dest = self.labels[imm]
-                return dest - location + 4  # add 4 to account for the jump / branch inst itself
-            # otherwise return the raw label location
-            else:
-                return self.labels[imm]
+# items
+RTypeInstruction = namedtuple('RTypeInstruction', 'name rd rs1 rs2')  # 4 bytes
+ITypeInstruction = namedtuple('ITypeInstruction', 'name rd rs1 imm')  # 4 bytes
+STypeInstruction = namedtuple('STypeInstruction', 'name rs1 rs2 imm')  # 4 bytes
+BTypeInstruction = namedtuple('BTypeInstruction', 'name rs1 rs2 imm')  # 4 bytes
+UTypeInstruction = namedtuple('UTypeInstruction', 'name rd imm')  # 4 bytes
+JTypeInstruction = namedtuple('JTypeInstruction', 'name rd imm')  # 4 bytes
+Constant = namedtuple('Constant', 'name expr')  # 0 bytes
+Label = namedtuple('Label', 'name')  # 0 bytes
+Align = namedtuple('Align', 'alignment')  # 0-3 bytes
+Pack = namedtuple('Pack', 'fmt imm')  # struct.calcsize(fmt) bytes
+Blob = namedtuple('Blob', 'data')  # len(data) bytes
 
-        # check if immediate value is a number
+# immediates
+Position = namedtuple('Position', 'label expr')
+Offset = namedtuple('Offset', 'label')
+Hi = namedtuple('Hi', 'expr')
+Lo = namedtuple('Lo', 'expr')
+
+def sign_extend(value, bits):
+    sign_bit = 1 << (bits - 1)
+    return (value & (sign_bit - 1)) - (value & sign_bit)
+
+def relocate_hi(imm):
+    if imm & 0x800:
+        imm += 2**12
+    return sign_extend((imm >> 12) & 0x000fffff, 20)
+
+def relocate_lo(imm):
+    return sign_extend(imm & 0x00000fff, 12)
+
+def lex_assembly(assembly):
+    # strip comments
+    assembly = re.sub(r'#.*?$', r'', assembly, flags=re.MULTILINE)
+
+    # split into lines
+    lines = assembly.splitlines()
+
+    # strip whitespace
+    lines = [line.strip() for line in lines]
+
+    # skip empty lines
+    lines = [line for line in lines if len(line) > 0]
+
+    # split lines into tokens
+    items = [re.split(r'[\s,()]+', line) for line in lines]
+
+    # remove empty tokens
+    for item in items:
+        while '' in item:
+            item.remove('')
+
+    return items
+
+def parse_assembly(items):
+    def parse_immediate(imm):
+        if imm[0].lower() == '%position':
+            _, label, *expr = imm
+            expr = ' '.join(expr)
+            return Position(label, expr)
+        elif imm[0].lower() == '%offset':
+            _, label = imm
+            return Offset(label)
+        elif imm[0].lower() == '%hi':
+            _, *expr = imm
+            expr = ' '.join(expr)
+            return Hi(expr)
+        elif imm[0].lower() == '%lo':
+            _, *expr = imm
+            expr = ' '.join(expr)
+            return Lo(expr)
+        else:
+            return ' '.join(imm)
+
+    program = []
+    for item in items:
+        # labels
+        if len(item) == 1 and item[0].endswith(':'):
+            label = item[0]
+            label = label.rstrip(':')
+            item = Label(label)
+            program.append(item)
+        # constants
+        elif len(item) >= 3 and item[1] == '=':
+            name, _, *expr = item
+            expr = ' '.join(expr)
+            item = Constant(name, expr)
+            program.append(item)
+        # aligns
+        elif item[0].lower() == 'align':
+            _, alignment = item
+            alignment = int(alignment)
+            item = Align(alignment)
+            program.append(item)
+        # packs
+        elif item[0].lower() == 'pack':
+            _, fmt, *imm = item
+            imm = parse_immediate(imm)
+            item = Pack(fmt, imm)
+            program.append(item)
+        # blobs
+        elif item[0].lower() == 'blob':
+            _, data = item
+            data = data.encode()
+            item = Blob(data)
+            program.append(item)
+        # r-type instructions
+        elif item[0].lower() in R_TYPE_INSTRUCTIONS:
+            name, rd, rs1, rs2 = item
+            item = RTypeInstruction(name, rd, rs1, rs2)
+            program.append(item)
+        # i-type instructions
+        elif item[0].lower() in I_TYPE_INSTRUCTIONS:
+            name, rd, rs1, *imm = item
+            imm = parse_immediate(imm)
+            item = ITypeInstruction(name, rd, rs1, imm)
+            program.append(item)
+        # s-type instructions
+        elif item[0].lower() in S_TYPE_INSTRUCTIONS:
+            name, rs1, rs2, *imm = item
+            imm = parse_immediate(imm)
+            item = STypeInstruction(name, rs1, rs2, imm)
+            program.append(item)
+        # b-type instructions
+        elif item[0].lower() in B_TYPE_INSTRUCTIONS:
+            name, rs1, rs2, *imm = item
+            imm = parse_immediate(imm)
+            item = BTypeInstruction(name, rs1, rs2, imm)
+            program.append(item)
+        # u-type instructions
+        elif item[0].lower() in U_TYPE_INSTRUCTIONS:
+            name, rd, *imm = item
+            imm = parse_immediate(imm)
+            item = UTypeInstruction(name, rd, imm)
+            program.append(item)
+        # j-type instructions
+        elif item[0].lower() in J_TYPE_INSTRUCTIONS:
+            name, rd, *imm = item
+            imm = parse_immediate(imm)
+            item = JTypeInstruction(name, rd, imm)
+            program.append(item)
+        else:
+            raise SystemExit('invalid item: {}'.format(' '.join(item)))
+
+    return program
+
+def resolve_constants(program):
+    # exclude Python builtins from eval env (safer?)
+    context = {
+        '__builtins__': None,
+    }
+
+    output = []
+    for item in program:
+        if type(item) == Constant:
+            context[item.name] = eval(item.expr, context)
+        else:
+            output.append(item)
+
+    return output, context
+
+def resolve_aligns(program):
+    position = 0
+
+    output = []
+    for item in program:
+        if type(item) == Align:
+            padding = item.alignment - (position % item.alignment)
+            if padding == item.alignment:
+                continue
+            position += padding
+            output.append(Blob(b'\x00' * padding))
+        elif type(item) == Pack:
+            position += struct.calcsize(item.fmt)
+            output.append(item)
+        elif type(item) == Blob:
+            position += len(item.data)
+            output.append(item)
+        elif type(item) == Label:
+            output.append(item)
+        else:
+            position += 4
+            output.append(item)
+
+    return output
+
+def resolve_labels(program):
+    position = 0
+    labels = {}
+
+    output = []
+    for item in program:
+        if type(item) == Label:
+            labels[item.name] = position
+        elif type(item) == Pack:
+            position += struct.calcsize(item.fmt)
+            output.append(item)
+        elif type(item) == Blob:
+            position += len(item.data)
+            output.append(item)
+        else:
+            position += 4
+            output.append(item)
+
+    return output, labels
+
+def resolve_registers(program, context):
+    # helper functions for resolving register names (could be a constant)
+    def resolve_register(register, context):
+        if register in context:
+            return context[register]
+        return register
+
+    output = []
+    for item in program:
+        if type(item) == RTypeInstruction:
+            name, rd, rs1, rs2 = item
+            rd = resolve_register(rd, context)
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = RTypeInstruction(name, rd, rs1, rs2)
+            output.append(inst)
+        elif type(item) == ITypeInstruction:
+            name, rd, rs1, imm = item
+            rd = resolve_register(rd, context)
+            rs1 = resolve_register(rs1, context)
+            inst = ITypeInstruction(name, rd, rs1, imm)
+            output.append(inst)
+        elif type(item) == STypeInstruction:
+            name, rs1, rs2, imm = item
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = STypeInstruction(name, rs1, rs2, imm)
+            output.append(inst)
+        elif type(item) == BTypeInstruction:
+            name, rs1, rs2, imm = item
+            rs1 = resolve_register(rs1, context)
+            rs2 = resolve_register(rs2, context)
+            inst = BTypeInstruction(name, rs1, rs2, imm)
+            output.append(inst)
+        elif type(item) == UTypeInstruction:
+            name, rd, imm = item
+            rd = resolve_register(rd, context)
+            inst = UTypeInstruction(name, rd, imm)
+            output.append(inst)
+        elif type(item) == JTypeInstruction:
+            name, rd, imm = item
+            rd = resolve_register(rd, context)
+            inst = JTypeInstruction(name, rd, imm)
+            output.append(inst)
+        else:
+            output.append(item)
+
+    return output
+
+def resolve_immediates(program, context, labels):
+    # helper function for resolving immediate items
+    def resolve_immediate(imm, context, labels, position):
         try:
-            return int(imm)
-        except ValueError:
-            pass
+            if type(imm) == Position:
+                dest = labels[imm.label]
+                base = eval(imm.expr, context)
+                return base + dest
+            elif type(imm) == Offset:
+                dest = labels[imm.label]
+                return dest - position
+            elif type(imm) == Hi:
+                value = eval(imm.expr, context)
+                value = relocate_hi(value)
+                return value
+            elif type(imm) == Lo:
+                value = eval(imm.expr, context)
+                value = relocate_lo(value)
+                return value
+            elif imm in labels:
+                return labels[imm]
+            else:
+                value = eval(imm, context)
+                return value
+        except:
+            raise SystemExit('invalid immediate: {}'.format(imm))
 
-        # otherwise the immediate value is invalid
-        raise ValueError('Invalid or unknown immediate value: {}'.format(imm))
+    position = 0
 
-    def _r_type(self, rd, rs1, rs2, instruction):
-        self.location += 4
-        inst = Program.RTypeInstruction(instruction, self.location, rd, rs1, rs2)
-        self.instructions.append(inst)
+    # check for items that have an immediate field and resolve it
+    output = []
+    for item in program:
+        if type(item) == ITypeInstruction:
+            name, rd, rs1, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            inst = ITypeInstruction(name, rd, rs1, imm)
+            position += 4
+            output.append(inst)
+        elif type(item) == STypeInstruction:
+            name, rs1, rs2, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            inst = STypeInstruction(name, rs1, rs2, imm)
+            position += 4
+            output.append(inst)
+        elif type(item) == BTypeInstruction:
+            name, rs1, rs2, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            inst = BTypeInstruction(name, rs1, rs2, imm)
+            position += 4
+            output.append(inst)
+        elif type(item) == UTypeInstruction:
+            name, rd, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            inst = UTypeInstruction(name, rd, imm)
+            position += 4
+            output.append(inst)
+        elif type(item) == JTypeInstruction:
+            name, rd, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            inst = JTypeInstruction(name, rd, imm)
+            position += 4
+            output.append(inst)
+        elif type(item) == Pack:
+            fmt, imm = item
+            imm = resolve_immediate(imm, context, labels, position)
+            pack = Pack(fmt, imm)
+            position += struct.calcsize(fmt)
+            output.append(pack)
+        elif type(item) == Blob:
+            position += len(item.data)
+            output.append(item)
+        else:
+            position += 4
+            output.append(item)
 
-    def _i_type(self, rd, rs1, imm, instruction):
-        self.location += 4
-        inst = Program.ITypeInstruction(instruction, self.location, rd, rs1, imm)
-        self.instructions.append(inst)
+    return output
 
-    def _s_type(self, rs1, rs2, imm, instruction):
-        self.location += 4
-        inst = Program.STypeInstruction(instruction, self.location, rs1, rs2, imm)
-        self.instructions.append(inst)
 
-    def _b_type(self, rs1, rs2, imm, instruction):
-        self.location += 4
-        inst = Program.BTypeInstruction(instruction, self.location, rs1, rs2, imm)
-        self.instructions.append(inst)
+def assemble(program):
+    output = bytearray()
+    for item in program:
+        if type(item) == RTypeInstruction:
+            name, rd, rs1, rs2 = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rd, rs1, rs2)
+            output.extend(code)
+        elif type(item) == ITypeInstruction:
+            name, rd, rs1, imm = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rd, rs1, imm)
+            output.extend(code)
+        elif type(item) == STypeInstruction:
+            name, rs1, rs2, imm = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rs1, rs2, imm)
+            output.extend(code)
+        elif type(item) == BTypeInstruction:
+            name, rs1, rs2, imm = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rs1, rs2, imm)
+            output.extend(code)
+        elif type(item) == UTypeInstruction:
+            name, rd, imm = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rd, imm)
+            output.extend(code)
+        elif type(item) == JTypeInstruction:
+            name, rd, imm = item
+            encode_func = INSTRUCTIONS[name]
+            code = encode_func(rd, imm)
+            output.extend(code)
+        elif type(item) == Pack:
+            fmt, imm = item
+            data = struct.pack(fmt, imm)
+            output.extend(data)
+        elif type(item) == Blob:
+            data = item.data
+            output.extend(data)
+        else:
+            raise SystemExit('invalid item at assemble pass: {}'.format(item))
 
-    def _u_type(self, rd, imm, instruction):
-        self.location += 4
-        inst = Program.UTypeInstruction(instruction, self.location, rd, imm)
-        self.instructions.append(inst)
+    return bytes(output)
 
-    def _j_type(self, rd, imm, instruction):
-        self.location += 4
-        inst = Program.JTypeInstruction(instruction, self.location, rd, imm)
-        self.instructions.append(inst)
 
-    def HI(self, value):
-        return relocate_hi(value)
+# Passes (labels, position):
+# 0. Lex + Parse assembly source
+# 1. Resolve constants  (NAME = expr)
+# 2. Resolve aligns  (convert aligns to blobs based on position)
+# 3. Resolve labels  (store label locations into dict)
+# 4. Resolve registers  (could be constants for readability)
+# 5. Resolve immediates  (Position, Offset, Hi, Lo)
+# 6. Assemble!  (convert everything to bytes)
 
-    def LO(self, value):
-        return relocate_lo(value)
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        usage = 'usage: python -m bronzebeard.asm <input_asm> <output_bin>'
+        raise SystemExit(usage)
 
-    def LABEL(self, name):
-        if name in self.labels:
-            raise ValueError('Duplicate label: {}'.format(name))
-        self.labels[name] = self.location
-        return self
+    input_asm = sys.argv[1]
+    output_bin = sys.argv[2]
 
-    def BLOB(self, data):
-        self.location += len(data)
-        blob = Program.Blob(data)
-        self.instructions.append(blob)
+    with open(input_asm) as f:
+        assembly = f.read()
 
-    def ALIGN(self, boundary=4):
-        while self.location % boundary != 0:
-            self.location += 1
-        align = Program.Align(boundary)
-        self.instructions.append(align)
+    items = lex_assembly(assembly)
+    prog = parse_assembly(items)
 
-    LUI = partialmethod(_u_type, instruction=LUI)
-    AUIPC = partialmethod(_u_type, instruction=AUIPC)
-    JAL = partialmethod(_j_type, instruction=JAL)
-    JALR = partialmethod(_i_type, instruction=JALR)
-    BEQ = partialmethod(_b_type, instruction=BEQ)
-    BNE = partialmethod(_b_type, instruction=BNE)
-    BLT = partialmethod(_b_type, instruction=BLT)
-    BGE = partialmethod(_b_type, instruction=BGE)
-    BLTU = partialmethod(_b_type, instruction=BLTU)
-    BGEU = partialmethod(_b_type, instruction=BGEU)
-    LB = partialmethod(_i_type, instruction=LB)
-    LH = partialmethod(_i_type, instruction=LH)
-    LW = partialmethod(_i_type, instruction=LW)
-    LBU = partialmethod(_i_type, instruction=LBU)
-    LHU = partialmethod(_i_type, instruction=LHU)
-    SB = partialmethod(_s_type, instruction=SB)
-    SH = partialmethod(_s_type, instruction=SH)
-    SW = partialmethod(_s_type, instruction=SW)
-    ADDI = partialmethod(_i_type, instruction=ADDI)
-    SLTI = partialmethod(_i_type, instruction=SLTI)
-    SLTIU = partialmethod(_i_type, instruction=SLTIU)
-    XORI = partialmethod(_i_type, instruction=XORI)
-    ORI = partialmethod(_i_type, instruction=ORI)
-    ANDI = partialmethod(_i_type, instruction=ANDI)
-    SLLI = partialmethod(_r_type, instruction=SLLI)
-    SRLI = partialmethod(_r_type, instruction=SRLI)
-    SRAI = partialmethod(_r_type, instruction=SRAI)
-    ADD = partialmethod(_r_type, instruction=ADD)
-    SUB = partialmethod(_r_type, instruction=SUB)
-    SLL = partialmethod(_r_type, instruction=SLL)
-    SLT = partialmethod(_r_type, instruction=SLT)
-    SLTU = partialmethod(_r_type, instruction=SLTU)
-    XOR = partialmethod(_r_type, instruction=XOR)
-    SRL = partialmethod(_r_type, instruction=SRL)
-    SRA = partialmethod(_r_type, instruction=SRA)
-    OR = partialmethod(_r_type, instruction=OR)
-    AND = partialmethod(_r_type, instruction=AND)
+    pprint(prog)
+
+    prog, context = resolve_constants(prog)
+    pprint(prog)
+    pprint(context)
+
+    prog = resolve_aligns(prog)
+    pprint(prog)
+
+    prog, labels = resolve_labels(prog)
+    pprint(prog)
+    pprint(labels)
+
+    prog = resolve_registers(prog, context)
+    pprint(prog)
+
+    prog = resolve_immediates(prog, context, labels)
+    pprint(prog)
+
+    prog = assemble(prog)
+    pprint(prog)
+
+    with open(output_bin, 'wb') as f:
+        f.write(prog)
