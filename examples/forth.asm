@@ -119,7 +119,7 @@ copy_loop:
     jal zero copy_loop
 copy_done:
     # t0 = addr of start
-    # TODO: allow %position / %offset in %lo / %hi
+    # TODO: allow %position / %offset in %hi / %lo
     # lui t0 %hi(%position(start, RAM_BASE_ADDR))
     # addi t0 t0 %lo(%position(start, RAM_BASE_ADDR))
     lui t0 %hi(RAM_BASE_ADDR)
@@ -128,14 +128,92 @@ copy_done:
     # jump to start
     jalr zero t0 0
 
+# Procedure: token
+# Usage: p.JAL('ra', 'token')
+# Ret: a0 = addr of word name (0 if not found)
+# Ret: a1 = length of word name (0 if not found)
 token:
-    addi t0 zero 33
+    addi t0 zero 33  # put whitespace threshold value into t0
 token_skip_whitespace:
-    add t1 TBUF TPOS
+    add t1 TBUF TPOS  # point t1 at current char
+    lbu t2 t1 0  # load current char into t2
+    bge t2 t0 token_scan  # check if non-whitespace char is found
+    addi TPOS TPOS 1  # inc TPOS
+    bge TPOS TLEN token_not_found  # no token if TPOS >= TLEN
+    jal zero token_skip_whitespace  # else check again
 token_scan:
+    addi t1 TPOS 0  # put current TPOS value into t1
 token_scan_loop:
+    add t2 TBUF t1  # point t2 at next char
+    lbu t3 t2 0  # load next char into t3
+    blt t3 t0 token_found  # check for whitespace
+    addi t1 t1 1  # increment offset
+    bge t1 TLEN token_not_found  # no token if t1 >= TLEN
+    jal zero token_scan_loop  # scan the next char
 token_found:
+    add a0 TBUF TPOS  # a0 = addr of word
+    sub a1 t1 TPOS  # a1 = len of word
+    addi TPOS t1 0  # update TPOS
+    jalr zero ra 0  # return
 token_not_found:
+    addi a0 zero 0  # a0 = 0
+    addi a1 zero 0  # a1 = 0
+    addi TPOS t1 0  # update TPOS
+    jalr zero ra 0  # return
 
+# Procedure: lookup
+# Usage: p.JAL('ra', 'lookup')
+# Arg: a0 = addr of word name
+# Arg: a1 = length of word name
+# Ret: a2 = addr of found word (0 if not found)
+lookup:
+lookup_body:
+lookup_next:
+lookup_not_found:
+lookup_strcmp:
+lookup_strcmp_body:
+lookup_strcmp_next:
+lookup_found:
+
+# Procedure: align
+# Usage: p.JAL('ra', 'align')
+# Arg: a3 = value to be aligned
+# Ret: a3 = value after alignment
+align:
+align_done:
+
+# Procedure: pad
+# Usage: p.JAL('ra', 'pad')
+# Arg: a4 = addr to be padded
+# Ret: a4 = addr after padding
+pad:
+pad_done:
+
+# Procedure: getc
+# Usage: p.JAL('ra', 'getc')
+# Ret: a5 = character received from serial
+getc:
+getc_wait:
+
+# Procedure: putc
+# Usage: p.JAL('ra', 'putc')
+# Arg: a5 = character to send over serial
+putc:
+putc_wait:
+
+# !!! main program starts here !!!
+
+# Init serial comm via USART0:
+# 1. RCU APB2 enable GPIOA (1 << 2)
+# 2. RCU APB2 enable USART0 (1 << 14)
+# 3. GPIOA config pin 9 (ctl = OUT_ALT_PUSH_PULL, mode = OUT_50MHZ)
+#   Pin 9 offset = ((PIN - 8) * 4) = 4
+# 4. GPIOA config pin 10 (ctl = IN_FLOATING, mode = IN)
+#   Pin 10 offset = ((PIN - 8) * 4) = 8
+# 5. USART0 config baud (CLOCK // BAUD = 69)
+# 6. USART0 enable RX (1 << 2)
+# 7. USART0 enable TX (1 << 3)
+# 7. USART0 enable USART (1 << 13)
 start:
+
 here:
