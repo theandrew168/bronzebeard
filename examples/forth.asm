@@ -445,14 +445,61 @@ tib_clear_done:
     addi TPOS zero 0  # set TPOS to zero
 
 interpreter_repl:
+    jal ra getc  # read char into a5
+    jal ra putc  # echo back
+    addi t0 zero 8  # load backspace char into t0
+    bne a5 t0 interpreter_repl_char  # proceed normally if not a BS
+    beq TLEN zero interpreter_repl  # ignore BS if TLEN is zero
+    addi TLEN TLEN -1  # dec TLEN, effectively erasing a character
+    jal zero interpreter_repl  # loop back to top of REPL
 interpreter_repl_char:
+    add t0 TBUF TLEN  # t0 = dest addr for this char in TBUF
+    sw t0 a5 0  # write char into TBUF
+    addi TLEN TLEN 1  # TLEN += 1
+    addi t0 zero 10  # t0 = newline char
+    beq a5 t0 interpreter_interpret  # interpreter the input upon newline
+    jal zero interpreter_repl  # else wait for more input
 
 interpreter_interpret:
+    jal ra token  # call token procedure (a0 = addr, a1 = len)
+    beq a0 zero interpreter_ok  # loop back to REPL if input is used up
+
+    jal ra lookup  # call lookup procedure (a2 = addr of word to lookup)
+    beq a2 zero error  # error and reset if word isn't found
+
+    # decide whether to compile or execute the word
+    lb t0 a2 4  # load word flags | len into t0
+    andi t0 t0 F_IMMEDIATE  # isolate immediate flag
+    bne t0 zero interpreter_execute  # execute if word is immediate
+    beq STATE zero interpreter_execute  # execute if STATE is zero
 interpreter_compile:
+    # otherwise compile
+    addi t0 a2 5  # t0 = start of word name
+    add t0 t0 a1  # skip to end of word name
+    addi a3 t0 0  # setup arg for align
+    jal ra align  # align to start of code word (a3 = addr of code word)
+    sw HERE a3 0  # write addr of code word to definition
+    addi HERE HERE 4  # HERE += 4
+    jal zero interpreter_interpret
 interpreter_execute:
+    # set IP to double-indirect addr back to interpreter loop
+    lui IP %hi RAM_BASE_ADDR
+    addi IP IP %lo RAM_BASE_ADDR
+    addi IP IP interpreter_addr_addr
+    # word is found and located at a2
+    addi W a2 5  # skip to end of word name (skip link and len)
+    add W W a1  # point W to end of word name (might need padding)
+    addi a3 W 0  # setup arg for align (a3 = W)
+    jal ra align  # call align procedure
+    addi W a3 0  # handle ret from align (W = a3)
+    # at this point, W holds the addr of the target word's code field
+    lw t0 W 0  # load code addr into t0 (t0 now holds the addr of the word's body)
+    jalr zero t0 0  # execute the word
 
 interpreter_addr:
+    pack <I %position interpreter_interpret RAM_BASE_ADDR
 interpreter_addr_addr:
+    pack <I %position interpreter_addr RAM_BASE_ADDR
 
 # not technically required by should be here since the prev item wasn't an inst
 align 4

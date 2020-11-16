@@ -653,9 +653,9 @@ with p.LABEL('interpreter_execute'):
     # word is found and located at a2
     p.ADDI(W, 'a2', 5)  # skip to start of word name (skip link and len)
     p.ADD(W, W, 'a1')  # point W to end of word name (might need padding)
-    p.ADDI('a4', W, 0)  # setup arg for pad (a4 = W)
-    p.JAL('ra', 'pad')  # call pad procedure
-    p.ADDI(W, 'a4', 0)  # handle ret from pad (W = a4)
+    p.ADDI('a3', W, 0)  # setup arg for align (a3 = W)
+    p.JAL('ra', 'align')  # call align procedure
+    p.ADDI(W, 'a3', 0)  # handle ret from align (W = 34)
     # At this point, W holds the addr of the target word's code field
     p.LW('t0', W, 0)  # load code addr into t0 (t0 now holds addr of the word's code)
     p.JALR('zero', 't0', 0)  # execute the word!
