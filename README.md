@@ -21,7 +21,7 @@ At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudi
 However, there are plans in the near future to broaden support to also include the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html) and [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
 
 ## Installation
-If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest you a take a brief moment to learn about them and set one up.
+If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest taking a brief moment to learn about them and set one up.
 The Python docs provide a great [tutorial](https://docs.python.org/3/tutorial/venv.html) for getting started with virtual environments and packages.
 
 Bronzebeard can be installed via pip:
