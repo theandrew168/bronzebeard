@@ -481,7 +481,7 @@ word_exit:
     string "exit"
     align 4
 code_exit:
-    pack <I body_exit
+    pack <I %position body_exit RAM_BASE_ADDR
 body_exit:
     addi RSP RSP -4
     lw IP RSP 0
@@ -489,12 +489,12 @@ body_exit:
 
 # TODO: error if word name is loo long (> 63) (len & F_LENGTH != 0)
 word_colon:
-    pack <I word_exit
+    pack <I %position word_exit RAM_BASE_ADDR
     pack <B 1
     string ":"
     align 4
 code_colon:
-    pack <I body_colon
+    pack <I %position body_colon RAM_BASE_ADDR
 body_colon:
     jal ra token  # a0 = addr, a1 = len
     sw HERE LATEST 0  # write link to prev word (write LATEST to HERE)
@@ -529,12 +529,12 @@ strncpy_done:
     jal zero next  # next
 
 word_semi:
-    pack(<I, word_colon)
+    pack(<I, %position(word_colon, RAM_BASE_ADDR))
     pack(<B, F_IMMEDIATE | 1)
     string ";"
     align 4
 code_semi:
-    pack <I body_semi
+    pack <I %position(body_semi, RAM_BASE_ADDR)
 body_semi:
     # load addr of "code_exit" into t0
     lui t0 %hi(RAM_BASE_ADDR)
@@ -545,13 +545,14 @@ body_semi:
     addi STATE zero 0  # STATE = 0 (execute)
     jal zero next  # next
 
+# TODO: remove this in favor of a more proper load / edit system (based on Starting Forth)
 word_load:
-    pack <I word_semi
+    pack <I %position word_semi RAM_BASE_ADDR
     pack <B 4
     string 'load'
     align 4
 code_load:
-    pack <I body_load
+    pack <I %position body_load RAM_BASE_ADDR
 body_load:
     # TBUF = disk_start
     # TBUF = ROM_BASE_ADDR + 16k
@@ -576,20 +577,90 @@ body_load:
     jal zero next
 
 word_key:
+    pack <I %position word_load RAM_BASE_ADDR
+    pack <B 3
+    string "key"
+    align 4
 code_key:
+    pack <I %position body_key RAM_BASE_ADDR
 body_key:
+    # call getc (a5 = char)
+    jal ra getc
+
+    # isolate bottom 8 bits (ascii)
+    andi a5 a5 0xff
+
+    # push char onto stack
+    sw DSP a5 0
+    addi DSP DSP 4
+
+    # next
+    jal zero next
 
 word_emit:
+    pack <I %position word_key RAM_BASE_ADDR
+    pack <B 4
+    string "emit"
+    align 4
 code_emit:
+    pack <I %position body_emit RAM_BASE_ADDR
 body_emit:
+    # pop char into a5
+    addi DSP DSP -4
+    lw a5 DSP 0
+
+    # isolate bottom 8 bits (ascii)
+    andi a5 a5 0xff
+
+    # call putc (char = a5)
+    jal ra putc
+
+    # next
+    jal zero next
 
 word_at:
+    pack <I %position word_emit RAM_BASE_ADDR
+    pack <B 1
+    string "@"
+    align 4
 code_at:
+    pack <I %position body_at RAM_BASE_ADDR
 body_at:
+    # pop addr into t0
+    addi DSP DSP -4
+    lw t0 DSP 0
+
+    # load value from addr
+    lw t0 t0 0
+
+    # push value onto stack
+    sw DSP t0 0
+    addi DSP DSP 4
+
+    # next
+    jal zero next
 
 word_ex:
+    pack <I %position word_at RAM_BASE_ADDR
+    pack <B 1
+    string "!"
+    align 4
 code_ex:
+    pack <I %position body_ex RAM_BASE_ADDR
 body_ex:
+    # pop addr into t0
+    addi DSP DSP -4
+    lw t0 DSP 0
+
+    # pop value into t1
+    addi DSP DSP -4
+    lw t1 DSP 0
+
+    # store value to addr
+    sw t0 t1 0
+
+    # next
+    jal zero next
 
 word_spat:
 code_spat:

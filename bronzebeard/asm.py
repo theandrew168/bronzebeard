@@ -704,6 +704,17 @@ def assemble_program(program):
 # 5. Resolve immediates  (Position, Offset, Hi, Lo)
 # 6. Assemble!  (convert everything to bytes)
 
+def assemble(source):
+    items = lex_assembly(source)
+    prog = parse_assembly(items)
+    prog, context = resolve_constants(prog)
+    prog = resolve_aligns(prog)
+    prog, labels = resolve_labels(prog)
+    prog = resolve_registers(prog, context)
+    prog = resolve_immediates(prog, context, labels)
+    return assemble_program(prog)
+
+
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         usage = 'usage: python -m bronzebeard.asm <input_asm> <output_bin>'
