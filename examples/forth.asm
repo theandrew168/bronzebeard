@@ -663,27 +663,112 @@ body_ex:
     jal zero next
 
 word_spat:
+    pack <I %position word_ex RAM_BASE_ADDR
+    pack <B 3
+    string "sp@"
+    align 4
 code_spat:
+    pack <I %position body_spat RAM_BASE_ADDR
 body_spat:
+    # copy DSP into t0 and decrement to current top value
+    addi t0 DSP 0
+    addi t0 t0 -4
+
+    # push t0 onto stack
+    sw DSP t0 0
+    addi DSP DSP 4
+
+    # next
+    jal zero next
 
 word_rpat:
+    pack <I %position word_spat RAM_BASE_ADDR
+    pack <B 3
+    string "rp@"
+    align 4
 code_rpat:
+    pack <I %position body_rpat RAM_BASE_ADDR
 body_rpat:
+    # copy RSP into t0 and decrement to current top value
+    addi t0 RSP 0
+    addi t0 t0 -4
+
+    # push t0 onto stack
+    sw DSP t0 0
+    addi DSP DSP 4
+
+    # next
+    jal zero next
 
 word_zeroeq:
+    pack <I %position word_rpat RAM_BASE_ADDR
+    pack <B 2
+    string "0="
+    align 4
 code_zeroeq:
+    pack <I %position body_zeroeq RAM_BASE_ADDR
 body_zeroeq:
+    # pop value into t0
+    addi DSP DSP -4
+    lw t0 DSP 0
+    # check equality between t0 and 0
+    addi t1 zero 0  # setup result (0 if nonzero)
+    bne t0 zero notzero
+    addi t1 zero -1  # -1 if zero
 notzero:
+    # push result of comparison onto stack
+    sw DSP t1 0
+    addi DSP DSP 4
+    # next
+    jal zero next
 
 word_plus:
+    pack <I %position word_zeroeq RAM_BASE_ADDR
+    pack <B 1
+    string "+"
+    align 4
 code_plus:
+    pack <I %position body_plus RAM_BASE_ADDR
 body_plus:
+    # pop first value into t0
+    addi DSP DSP -4
+    lw t0 DSP 0
+    # pop second value into t1
+    addi DSP DSP -4
+    lw t1 DSP 0
+    # add the two together into t0
+    add t0 t0 t1
+    # push resulting sum onto stack
+    sw DSP t0 0
+    addi DSP DSP 4
+    # next
+    jal zero next
 
 # mark the latest builtin word (nand)
 latest:
 word_nand:
+    pack <I %position word_plus RAM_BASE_ADDR
+    pack <B 4
+    string "nand"
+    align 4
 code_nand:
+    pack <I %position body_nand RAM_BASE_ADDR
 body_nand:
+    # pop first value into t0
+    addi DSP DSP -4
+    lw t0 DSP 0
+    # pop second value into t1
+    addi DSP DSP -4
+    lw t1 DSP 0
+    # AND the two together into t0
+    and t0 t0 t1
+    # NOT the value into t0 (via a XOR with -1)
+    xori t0 t0 -1
+    # push resulting value onto stack
+    sw DSP t0 0
+    addi DSP DSP 4
+    # next
+    jal zero next
 
 # mark the location of the next new word
 here:

@@ -648,52 +648,71 @@ def resolve_immediates(program, context, labels):
 
     return output
 
-
-def assemble_program(program):
-    output = bytearray()
+def resolve_instructions(program):
+    output = []
     for item in program:
         if type(item) == RTypeInstruction:
             name, rd, rs1, rs2 = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rd, rs1, rs2)
-            output.extend(code)
+            blob = Blob(code)
+            output.append(blob)
         elif type(item) == ITypeInstruction:
             name, rd, rs1, imm = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rd, rs1, imm)
-            output.extend(code)
+            blob = Blob(code)
+            output.append(blob)
         elif type(item) == STypeInstruction:
             name, rs1, rs2, imm = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rs1, rs2, imm)
-            output.extend(code)
+            blob = Blob(code)
+            output.append(blob)
         elif type(item) == BTypeInstruction:
             name, rs1, rs2, imm = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rs1, rs2, imm)
-            output.extend(code)
+            blob = Blob(code)
+            output.append(blob)
         elif type(item) == UTypeInstruction:
             name, rd, imm = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rd, imm)
-            output.extend(code)
+            blob = Blob(code)
+            output.append(blob)
         elif type(item) == JTypeInstruction:
             name, rd, imm = item
             encode_func = INSTRUCTIONS[name]
             code = encode_func(rd, imm)
-            output.extend(code)
-        elif type(item) == Pack:
+            blob = Blob(code)
+            output.append(blob)
+        else:
+            output.append(item)
+
+    return output
+
+def resolve_packs(program):
+    output = []
+    for item in program:
+        if type(item) == Pack:
             fmt, imm = item
             data = struct.pack(fmt, imm)
-            output.extend(data)
-        elif type(item) == Blob:
-            data = item.data
-            output.extend(data)
+            blob = Blob(data)
+            output.append(blob)
         else:
-            raise SystemExit('invalid item at assemble pass: {}'.format(item))
+            output.append(item)
 
-    return bytes(output)
+    return output
 
+def resolve_blobs(program):
+    output = bytearray()
+    for item in program:
+        if type(item) != Blob:
+            raise SystemExit('expected only blobs but got: {}'.format(item))
+        output.extend(item.data)
+
+    return output
 
 # Passes (labels, position):
 # 0. Lex + Parse assembly source
@@ -702,7 +721,9 @@ def assemble_program(program):
 # 3. Resolve labels  (store label locations into dict)
 # 4. Resolve registers  (could be constants for readability)
 # 5. Resolve immediates  (Position, Offset, Hi, Lo)
-# 6. Assemble!  (convert everything to bytes)
+# 6. Resolve instructions  (convert xTypeInstruction to Blob)
+# 7. Resolve packs  (convert Pack to Blob)
+# 8. Resolve blobs  (merge all Blobs into a single binary)
 
 def assemble(source):
     items = lex_assembly(source)
@@ -712,7 +733,10 @@ def assemble(source):
     prog, labels = resolve_labels(prog)
     prog = resolve_registers(prog, context)
     prog = resolve_immediates(prog, context, labels)
-    return assemble_program(prog)
+    prog = resolve_instructions(prog)
+    prog = resolve_packs(prog)
+    prog = resolve_blobs(prog)
+    return prog
 
 
 if __name__ == '__main__':
@@ -748,7 +772,13 @@ if __name__ == '__main__':
     prog = resolve_immediates(prog, context, labels)
     pprint(prog)
 
-    prog = assemble_program(prog)
+    prog = resolve_instructions(prog)
+    pprint(prog)
+
+    prog = resolve_packs(prog)
+    pprint(prog)
+
+    prog = resolve_blobs(prog)
     pprint(prog)
 
     with open(output_bin, 'wb') as f:
