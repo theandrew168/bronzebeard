@@ -117,6 +117,7 @@ F_IMMEDIATE = 0b10000000
 F_HIDDEN    = 0b01000000
 F_LENGTH    = 0b00111111
 
+# t0 = src, t1 = dest, t2 = count
 copy:
     # setup copy src
     lui t0 %hi(ROM_BASE_ADDR)
@@ -125,15 +126,15 @@ copy:
     lui t1 %hi(RAM_BASE_ADDR)
     addi t1 t1 %lo(RAM_BASE_ADDR)
     # setup copy count
-    addi t0 zero %position(here, 0)
+    addi t2 zero %position(here, 0)
 copy_loop:
-    beq t2 zero copy_done
+    beq t2 zero %offset copy_done
     lw t3 t0 0  # [src] -> t3
     sw t1 t3 0  # [dest] <- t3
     addi t0 t0 4  # src += 4
     addi t1 t1 4  # dest += 4
     addi t2 t2 -4  # count -= 4
-    jal zero copy_loop
+    jal zero %offset copy_loop
 copy_done:
     # t0 = addr of start
     # TODO: allow %position / %offset in %hi / %lo
@@ -547,7 +548,7 @@ body_colon:
     sw HERE LATEST 0  # write link to prev word (write LATEST to HERE)
     sb HERE a1 4  # write word len
     addi LATEST HERE 0  # set LATEST = HERE (before HERE gets modified)
-    addi HERE LATEST 5  # move HERE past link and len (to start of name)
+    addi HERE HERE 5  # move HERE past link and len (to start of name)
 strncpy:
     addi t0 a0 0  # t0 = strncpy src
     addi t1 HERE 0  # t1 = strncpy dest
@@ -815,7 +816,7 @@ body_nand:
     sw DSP t0 0
     addi DSP DSP 4
     # next
-    jal zero next
+    jal zero %offset next
 
 # mark the location of the next new word
 here:

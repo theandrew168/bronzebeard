@@ -441,6 +441,8 @@ def parse_assembly(items):
         # b-type instructions
         elif item[0].lower() in B_TYPE_INSTRUCTIONS:
             name, rs1, rs2, *imm = item
+            if imm[0] != '%offset':
+                imm.insert(0, '%offset')
             imm = parse_immediate(imm)
             item = BTypeInstruction(name, rs1, rs2, imm)
             program.append(item)
@@ -453,6 +455,8 @@ def parse_assembly(items):
         # j-type instructions
         elif item[0].lower() in J_TYPE_INSTRUCTIONS:
             name, rd, *imm = item
+            if imm[0] != '%offset':
+                imm.insert(0, '%offset')
             imm = parse_immediate(imm)
             item = JTypeInstruction(name, rd, imm)
             program.append(item)
