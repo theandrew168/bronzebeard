@@ -349,7 +349,7 @@ def lex_assembly(assembly):
     lines = [line for line in lines if len(line) > 0]
 
     # split lines into tokens
-    items = [re.split(r'[\s,()]+', line) for line in lines]
+    items = [re.split(r'[\s,()\'"]+', line) for line in lines]
 
     # remove empty tokens
     for item in items:
@@ -404,8 +404,18 @@ def parse_assembly(items):
             imm = parse_immediate(imm)
             item = Pack(fmt, imm)
             program.append(item)
-        # blobs
-        elif item[0].lower() == 'blob':
+        # bytes
+        elif item[0].lower() == 'bytes':
+            _, *data = item
+            data = [int(byte, base=0) for byte in data]
+            for byte in data:
+                if byte < 0 or byte > 255:
+                    raise SystemExit('bytes literal not in range [0, 255]: {}'.format(data))
+            data = bytes(data)
+            item = Blob(data)
+            program.append(item)
+        # string
+        elif item[0].lower() == 'string':
             _, *data = item
             data = ' '.join(data)
             data = data.encode()
@@ -452,7 +462,8 @@ def parse_assembly(items):
     return program
 
 def resolve_constants(program):
-    # exclude Python builtins from eval env (safer?)
+    # exclude Python builtins from eval env
+    # https://docs.python.org/3/library/functions.html#eval
     context = {
         '__builtins__': None,
     }
@@ -460,7 +471,7 @@ def resolve_constants(program):
     output = []
     for item in program:
         if type(item) == Constant:
-            context[item.name] = eval(item.expr, context)
+            context[item.name] = eval(item.expr, context, REGISTERS)
         else:
             output.append(item)
 
@@ -638,7 +649,7 @@ def resolve_immediates(program, context, labels):
     return output
 
 
-def assemble(program):
+def assemble_program(program):
     output = bytearray()
     for item in program:
         if type(item) == RTypeInstruction:
@@ -726,7 +737,7 @@ if __name__ == '__main__':
     prog = resolve_immediates(prog, context, labels)
     pprint(prog)
 
-    prog = assemble(prog)
+    prog = assemble_program(prog)
     pprint(prog)
 
     with open(output_bin, 'wb') as f:

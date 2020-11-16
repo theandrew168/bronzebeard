@@ -478,7 +478,7 @@ enter:
 word_exit:
     pack <I 0
     pack <B 4
-    blob exit
+    string "exit"
     align 4
 code_exit:
     pack <I body_exit
@@ -491,7 +491,7 @@ body_exit:
 word_colon:
     pack <I word_exit
     pack <B 1
-    blob :
+    string ":"
     align 4
 code_colon:
     pack <I body_colon
@@ -529,9 +529,9 @@ strncpy_done:
     jal zero next  # next
 
 word_semi:
-    pack <I word_colon
-    pack <B (F_IMMEDIATE | 1)
-    blob ;
+    pack(<I, word_colon)
+    pack(<B, F_IMMEDIATE | 1)
+    string ";"
     align 4
 code_semi:
     pack <I body_semi
@@ -548,7 +548,7 @@ body_semi:
 word_load:
     pack <I word_semi
     pack <B 4
-    blob load
+    string 'load'
     align 4
 code_load:
     pack <I body_load
@@ -610,7 +610,6 @@ body_plus:
 
 # mark the latest builtin word (nand)
 latest:
-
 word_nand:
 code_nand:
 body_nand:
