@@ -85,13 +85,13 @@ This section details how to run programs on the [Longan Nano](https://www.seeeds
 ### Assemble
 With Bronzebeard installed:
 ```
-python -m bronzebeard.asm examples/led.asm led.bin
+python3 -m bronzebeard.asm examples/led.asm led.bin
 ```
 
 ### Program
 Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, release BOOT.
 ```
-python -m bronzebeard.dfu 28e9:0189 led.bin
+python3 -m bronzebeard.dfu 28e9:0189 led.bin
 ```
 
 After programming, press and release RESET in order to put the device back into normal mode.
@@ -101,21 +101,21 @@ If you have flashed a program that includes serial interaction, We can use [pySe
 
 To get a list of available serial ports, run the following command:
 ```
-python -m serial.tools.list_ports
+python3 -m serial.tools.list_ports
 ```
 
 One of them should be the device we want to communicate with.
 You can specify the device port in the following command in order to initiate the connection.
 ```
-python -m serial.tools.miniterm <device_port> 115200
+python3 -m serial.tools.miniterm <device_port> 115200
 ```
 
 Here are a few potential examples:
 ```
 # Windows
-python -m serial.tools.miniterm COM3 115200
+python3 -m serial.tools.miniterm COM3 115200
 # macOS
-python -m serial.tools.miniterm /dev/TODO_what_goes_here 115200
+python3 -m serial.tools.miniterm /dev/TODO_what_goes_here 115200
 # Linux
-python -m serial.tools.miniterm /dev/ttyUSB0 115200
+python3 -m serial.tools.miniterm /dev/ttyUSB0 115200
 ```
