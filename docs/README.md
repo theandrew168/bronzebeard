@@ -22,7 +22,29 @@ loop:
     jal zero, loop
 ```
 
-## Modifiers
+### Labels
+what is a label? what do they mean?  
+how do you reference in them?  
+why would you use a position vs an offset?  
+explain the default offset behavior for jumps / branches  
+
+### Instructions
+what is an instruction?  
+how do you write one?  
+how do you write registers and immediates?  
+
+### Constants
+talk about hardware values and the LED example  
+talk about basic exprs and the order of ops gotcha
+
+### String Literals
+talk about the whitespace gotcha  
+
+### Bytes Literals
+### Packed Literals
+### Alignment
+
+## Expressions
 ### %position / %offset
 ### %hi / %lo
 
