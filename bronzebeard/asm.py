@@ -731,6 +731,12 @@ def resolve_blobs(program):
 # 8. Resolve blobs  (merge all Blobs into a single binary)
 
 def assemble(source):
+    """
+    Assemble a RISC-V assembly program into a raw binary.
+
+    :param source: A string of the assembly source program.
+    :returns: The assembled binary as bytes.
+    """
     items = lex_assembly(source)
     prog = parse_assembly(items)
 

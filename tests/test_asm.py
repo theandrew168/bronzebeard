@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from bronzebeard.asm import *
+from bronzebeard import asm
 
 
 @pytest.mark.parametrize(
@@ -21,7 +21,7 @@ from bronzebeard.asm import *
     (0x00000fff, 12,   -1),
 ])
 def test_sign_extend(value, bits, expected):
-    assert sign_extend(value, bits) == expected
+    assert asm.sign_extend(value, bits) == expected
 
 
 @pytest.mark.parametrize(
@@ -39,7 +39,7 @@ def test_sign_extend(value, bits, expected):
     (0x80000800, -0x7ffff),
 ])
 def test_relocate_hi(value, expected):
-    assert relocate_hi(value) == expected
+    assert asm.relocate_hi(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -57,7 +57,7 @@ def test_relocate_hi(value, expected):
     (0xfffff800, -2048),
 ])
 def test_relocate_lo(value, expected):
-    assert relocate_lo(value) == expected
+    assert asm.relocate_lo(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -79,9 +79,9 @@ def test_relocate_lo(value, expected):
     (0xcafec0fe),
 ])
 def test_relocate_hi_lo_sum(value):
-    hi = relocate_hi(value)
-    lo = relocate_lo(value)
-    expected = sign_extend(value, 32)
+    hi = asm.relocate_hi(value)
+    lo = asm.relocate_lo(value)
+    expected = asm.sign_extend(value, 32)
 
     sum_raw = (hi << 12) + lo
     sum_wrapped = c_int32(sum_raw).value
@@ -98,7 +98,7 @@ def test_relocate_hi_lo_sum(value):
     (0,  -0x80000, 0b10000000000000000000000000110111),
 ])
 def test_lui(rd, imm, code):
-    assert LUI(rd, imm) == struct.pack('<I', code)
+    assert asm.LUI(rd, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -111,7 +111,7 @@ def test_lui(rd, imm, code):
     (0,  -0x80000, 0b10000000000000000000000000010111),
 ])
 def test_auipc(rd, imm, code):
-    assert AUIPC(rd, imm) == struct.pack('<I', code)
+    assert asm.AUIPC(rd, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -130,7 +130,7 @@ def test_auipc(rd, imm, code):
     (0,  -0x100000, 0b10000000000000000000000001101111),
 ])
 def test_jal(rd, imm, code):
-    assert JAL(rd, imm) == struct.pack('<I', code)
+    assert asm.JAL(rd, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,7 @@ def test_jal(rd, imm, code):
     (0,  0,   -0x800, 0b10000000000000000000000001100111),
 ])
 def test_jalr(rd, rs1, imm, code):
-    assert JALR(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.JALR(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -160,7 +160,7 @@ def test_jalr(rd, rs1, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000000000001100011),
 ])
 def test_beq(rs1, rs2, imm, code):
-    assert BEQ(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BEQ(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -175,7 +175,7 @@ def test_beq(rs1, rs2, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000001000001100011),
 ])
 def test_bne(rs1, rs2, imm, code):
-    assert BNE(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BNE(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -190,7 +190,7 @@ def test_bne(rs1, rs2, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000100000001100011),
 ])
 def test_blt(rs1, rs2, imm, code):
-    assert BLT(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BLT(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -205,7 +205,7 @@ def test_blt(rs1, rs2, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000101000001100011),
 ])
 def test_bge(rs1, rs2, imm, code):
-    assert BGE(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BGE(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -220,7 +220,7 @@ def test_bge(rs1, rs2, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000110000001100011),
 ])
 def test_bltu(rs1, rs2, imm, code):
-    assert BLTU(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BLTU(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -235,7 +235,7 @@ def test_bltu(rs1, rs2, imm, code):
     (0,   0,   -0x1000, 0b10000000000000000111000001100011),
 ])
 def test_bgeu(rs1, rs2, imm, code):
-    assert BGEU(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.BGEU(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -250,7 +250,7 @@ def test_bgeu(rs1, rs2, imm, code):
     (0,  0,   -0x800, 0b10000000000000000000000000000011),
 ])
 def test_lb(rd, rs1, imm, code):
-    assert LB(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.LB(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +265,7 @@ def test_lb(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000001000000000011),
 ])
 def test_lh(rd, rs1, imm, code):
-    assert LH(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.LH(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -280,7 +280,7 @@ def test_lh(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000010000000000011),
 ])
 def test_lw(rd, rs1, imm, code):
-    assert LW(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.LW(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -295,7 +295,7 @@ def test_lw(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000100000000000011),
 ])
 def test_lbu(rd, rs1, imm, code):
-    assert LBU(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.LBU(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -310,7 +310,7 @@ def test_lbu(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000101000000000011),
 ])
 def test_lhu(rd, rs1, imm, code):
-    assert LHU(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.LHU(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -325,7 +325,7 @@ def test_lhu(rd, rs1, imm, code):
     (0,   0,   -2048, 0b10000000000000000000000000100011),
 ])
 def test_sb(rs1, rs2, imm, code):
-    assert SB(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.SB(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -340,7 +340,7 @@ def test_sb(rs1, rs2, imm, code):
     (0,   0,   -2048, 0b10000000000000000001000000100011),
 ])
 def test_sh(rs1, rs2, imm, code):
-    assert SH(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.SH(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -355,7 +355,7 @@ def test_sh(rs1, rs2, imm, code):
     (0,   0,   -2048, 0b10000000000000000010000000100011),
 ])
 def test_sw(rs1, rs2, imm, code):
-    assert SW(rs1, rs2, imm) == struct.pack('<I', code)
+    assert asm.SW(rs1, rs2, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -370,7 +370,7 @@ def test_sw(rs1, rs2, imm, code):
     (0,  0,   -0x800, 0b10000000000000000000000000010011),
 ])
 def test_addi(rd, rs1, imm, code):
-    assert ADDI(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.ADDI(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -385,7 +385,7 @@ def test_addi(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000010000000010011),
 ])
 def test_slti(rd, rs1, imm, code):
-    assert SLTI(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.SLTI(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -400,7 +400,7 @@ def test_slti(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000011000000010011),
 ])
 def test_sltiu(rd, rs1, imm, code):
-    assert SLTIU(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.SLTIU(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -415,7 +415,7 @@ def test_sltiu(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000100000000010011),
 ])
 def test_xori(rd, rs1, imm, code):
-    assert XORI(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.XORI(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -430,7 +430,7 @@ def test_xori(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000110000000010011),
 ])
 def test_ori(rd, rs1, imm, code):
-    assert ORI(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.ORI(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -445,7 +445,7 @@ def test_ori(rd, rs1, imm, code):
     (0,  0,   -0x800, 0b10000000000000000111000000010011),
 ])
 def test_andi(rd, rs1, imm, code):
-    assert ANDI(rd, rs1, imm) == struct.pack('<I', code)
+    assert asm.ANDI(rd, rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -460,7 +460,7 @@ def test_andi(rd, rs1, imm, code):
     (31, 31,  31,  0b00000001111111111001111110010011),
 ])
 def test_slli(rd, rs1, rs2, code):
-    assert SLLI(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SLLI(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -475,7 +475,7 @@ def test_slli(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111101111110010011),
 ])
 def test_srli(rd, rs1, rs2, code):
-    assert SRLI(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SRLI(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -490,7 +490,7 @@ def test_srli(rd, rs1, rs2, code):
     (31, 31,  31,  0b01000001111111111101111110010011),
 ])
 def test_srai(rd, rs1, rs2, code):
-    assert SRAI(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SRAI(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -505,7 +505,7 @@ def test_srai(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111000111110110011),
 ])
 def test_add(rd, rs1, rs2, code):
-    assert ADD(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.ADD(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -520,7 +520,7 @@ def test_add(rd, rs1, rs2, code):
     (31, 31,  31,  0b01000001111111111000111110110011),
 ])
 def test_sub(rd, rs1, rs2, code):
-    assert SUB(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SUB(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -535,7 +535,7 @@ def test_sub(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111001111110110011),
 ])
 def test_sll(rd, rs1, rs2, code):
-    assert SLL(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SLL(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -550,7 +550,7 @@ def test_sll(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111010111110110011),
 ])
 def test_slt(rd, rs1, rs2, code):
-    assert SLT(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SLT(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -565,7 +565,7 @@ def test_slt(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111011111110110011),
 ])
 def test_sltu(rd, rs1, rs2, code):
-    assert SLTU(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SLTU(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -580,7 +580,7 @@ def test_sltu(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111100111110110011),
 ])
 def test_xor(rd, rs1, rs2, code):
-    assert XOR(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.XOR(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -595,7 +595,7 @@ def test_xor(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111101111110110011),
 ])
 def test_srl(rd, rs1, rs2, code):
-    assert SRL(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SRL(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -610,7 +610,7 @@ def test_srl(rd, rs1, rs2, code):
     (31, 31,  31,  0b01000001111111111101111110110011),
 ])
 def test_sra(rd, rs1, rs2, code):
-    assert SRA(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.SRA(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -625,7 +625,7 @@ def test_sra(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111110111110110011),
 ])
 def test_or(rd, rs1, rs2, code):
-    assert OR(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.OR(rd, rs1, rs2) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -640,4 +640,150 @@ def test_or(rd, rs1, rs2, code):
     (31, 31,  31,  0b00000001111111111111111110110011),
 ])
 def test_and(rd, rs1, rs2, code):
-    assert AND(rd, rs1, rs2) == struct.pack('<I', code)
+    assert asm.AND(rd, rs1, rs2) == struct.pack('<I', code)
+
+
+def test_assembler_basic():
+    source = """
+    addi t0 zero 1
+    addi t1, zero, 2
+    addi(t2, zero, 3)
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        # can use nums OR names for registers
+        asm.ADDI(5, 0, 1),
+        asm.ADDI('t1', 'zero', 2),
+        asm.ADDI('t2', 'zero', 3),
+    ])
+    assert binary == target
+
+
+def test_assembler_constants():
+    source = """
+    FOO = 42
+    BAR = FOO * 2
+    BAZ = BAR >> 1 & 0b11111
+    W = 's0'
+    IP = gp
+    addi zero zero BAR
+    addi W IP BAZ
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        asm.ADDI(0, 0, 84),
+        asm.ADDI('s0', 'gp', 10),
+    ])
+    assert binary == target
+
+
+def test_assembler_labels_and_jumps():
+    source = """
+    start:
+        addi t0 zero 42
+        jal zero end
+    middle:
+        beq t0 zero main
+        addi t0 t0 -1
+    end:
+        jal zero %offset middle
+    main:
+        addi zero zero 0
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        asm.ADDI('t0', 'zero', 42),
+        asm.JAL('zero', 12),
+        asm.BEQ('t0', 'zero', 12),
+        asm.ADDI('t0', 't0', -1),
+        asm.JAL('zero', -8),
+        asm.ADDI(0, 0, 0),
+    ])
+    assert binary == target
+
+
+def test_assembler_string():
+    source = """
+    string hello
+    string world
+    string hello world
+    string hello   world
+    """
+    binary = asm.assemble(source)
+    target = b'helloworldhello worldhello world'
+    assert binary == target
+
+
+def test_assembler_bytes():
+    source = """
+    bytes 1 2 0x03 0b100 5 0x06 0b111 8
+    """
+    binary = asm.assemble(source)
+    target = b'\x01\x02\x03\x04\x05\x06\x07\x08'
+    assert binary == target
+
+
+def test_assembler_pack():
+    source = """
+    ADDR = 0x20000000
+    pack <B 0
+    pack <B 255
+    pack <I ADDR
+    pack <f 3.14159
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        struct.pack('<B', 0),
+        struct.pack('<B', 255),
+        struct.pack('<I', 0x20000000),
+        struct.pack('<f', 3.14159),
+    ])
+    assert binary == target
+
+
+def test_assembler_align():
+    source = """
+    addi zero zero 0
+    pack <B 42
+    align 4
+    addi zero zero 0
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        asm.ADDI(0, 0, 0),
+        b'\x2a\x00\x00\x00',
+        asm.ADDI(0, 0, 0),
+    ])
+    assert binary == target
+
+
+def test_assembler_modifiers():
+    source = """
+    ADDR = 0x20000000
+
+    addi zero zero 0
+    addi zero zero 0
+    addi zero zero 0
+
+    main:
+        # without nestable exprs under hi / lo
+        lui t0 %hi ADDR
+        addi t0 t0 %lo(ADDR)
+        addi t0 t0 main
+    
+        # with nestable exprs under hi / lo
+        lui t0 %hi %position main ADDR
+        addi t0 t0 %lo(%position(main, ADDR))
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        asm.ADDI(0, 0, 0),
+        asm.ADDI(0, 0, 0),
+        asm.ADDI(0, 0, 0),
+        asm.LUI('t0', asm.relocate_hi(0x20000000)),
+        asm.ADDI('t0', 't0', asm.relocate_lo(0x20000000)),
+        asm.ADDI('t0', 't0', 12),
+        asm.LUI('t0', asm.relocate_hi(0x20000000 + 12)),
+        asm.ADDI('t0', 't0', asm.relocate_lo(0x20000000 + 12)),
+    ])
+    assert binary == target
