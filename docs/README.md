@@ -55,10 +55,45 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 This table provides summaries for the baseline RISC-V instructions.
 Full specifications be found on the RISC-V [website](https://riscv.org/technical/specifications/).
 
-| Name  | Parameters    | Description | Example |
-| ----- | ------------- | ----------- | ------- |
-| lui   | rd, imm       | TODO        | lui x1, %hi(0x20000000) |
-| auipc | rd, imm       | TODO        | auipc x1, %hi(0x20000000) |
+| Name  | Parameters    | Description |
+| ----- | ------------- | ----------- |
+| lui   | rd, imm       | TODO        |
+| auipc | rd, imm       | TODO        |
+| jal   | rd, imm       | TODO        |
+| jalr  | rd, rs1, imm  | TODO        |
+| beq   | rs1, rs2, imm | TODO        |
+| bne   | rs1, rs2, imm | TODO        |
+| blt   | rs1, rs2, imm | TODO        |
+| bge   | rs1, rs2, imm | TODO        |
+| bltu  | rs1, rs2, imm | TODO        |
+| bgeu  | rs1, rs2, imm | TODO        |
+| lb    | rd, rs1, imm  | TODO        |
+| lh    | rd, rs1, imm  | TODO        |
+| lw    | rd, rs1, imm  | TODO        |
+| lbu   | rd, rs1, imm  | TODO        |
+| lhu   | rd, rs1, imm  | TODO        |
+| sb    | rs1, rs2, imm | TODO        |
+| sh    | rs1, rs2, imm | TODO        |
+| sw    | rs1, rs2, imm | TODO        |
+| addi  | rd, rs1, imm  | TODO        |
+| slti  | rd, rs1, imm  | TODO        |
+| sltiu | rd, rs1, imm  | TODO        |
+| xori  | rd, rs1, imm  | TODO        |
+| ori   | rd, rs1, imm  | TODO        |
+| andi  | rd, rs1, imm  | TODO        |
+| slli  | rd, rs1, bits | TODO        |
+| srli  | rd, rs1, bits | TODO        |
+| srai  | rd, rs1, bits | TODO        |
+| add   | rd, rs1, rs2  | TODO        |
+| sub   | rd, rs1, rs2  | TODO        |
+| sll   | rd, rs1, rs2  | TODO        |
+| slt   | rd, rs1, rs2  | TODO        |
+| sltu  | rd, rs1, rs2  | TODO        |
+| xor   | rd, rs1, rs2  | TODO        |
+| srl   | rd, rs1, rs2  | TODO        |
+| sra   | rd, rs1, rs2  | TODO        |
+| or    | rd, rs1, rs2  | TODO        |
+| and   | rd, rs1, rs2  | TODO        |
 
 ## Common Patterns
 Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
