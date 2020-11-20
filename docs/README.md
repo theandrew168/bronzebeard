@@ -35,65 +35,65 @@ A given register can be referenced in multiple ways: by number, by name, or by i
 The alias and suggested usage of each register can be ignored when writing simple assembly programs.
 They are given more meaning when dealing with more complex [ABIs](https://en.wikipedia.org/wiki/Application_binary_interface) and [calling conventions](https://en.wikipedia.org/wiki/Calling_convention).
 
-| Number | Name   | Alias | Suggested Usage |
-| ------ | ------ | ----- | --------------- |
-| 0      | x0     | zero  | Hard-wired zero |
-| 1      | x1     | ra    | Return address  |
-| 2      | x2     | sp    | Stack pointer   |
-| 3      | x3     | gp    | Global pointer  |
-| 4      | x4     | tp    | Thread pointer  |
-| 5      | x5     | t0    | Temporary register |
-| 6-7    | x6-7   | t1-2  | Temporary registers |
-| 8      | x8     | s0/fp | Saved register / frame pointer |
-| 9      | x9     | s1    | Saved register  |
-| 10-11  | x10-11 | a0-1  | Function arguments / return values |
-| 12-17  | x12-17 | a2-7  | Funciton arguments |
-| 18-27  | x18-27 | s2-11 | Saved registers |
-| 28-31  | x28-31 | t3-6  | Temporary registers |
+| Number  | Name     | Alias   | Suggested Usage |
+| ------- | -------- | ------- | --------------- |
+| `0`     | `x0`     | `zero`  | Hard-wired zero |
+| `1`     | `x1`     | `ra`    | Return address  |
+| `2`     | `x2`     | `sp`    | Stack pointer   |
+| `3`     | `x3`     | `gp`    | Global pointer  |
+| `4`     | `x4`     | `tp`    | Thread pointer  |
+| `5`     | `x5`     | `t0`    | Temporary register |
+| `6-7`   | `x6-7`   | `t1-2`  | Temporary registers |
+| `8`     | `x8`     | `s0/fp` | Saved register / frame pointer |
+| `9`     | `x9`     | `s1`    | Saved register  |
+| `10-11` | `x10-11` | `a0-1`  | Function arguments / return values |
+| `12-17` | `x12-17` | `a2-7`  | Funciton arguments |
+| `18-27` | `x18-27` | `s2-11` | Saved registers |
+| `28-31` | `x28-31` | `t3-6`  | Temporary registers |
 
 ## Instructions
 This table provides summaries for the baseline RISC-V instructions.
 Full specifications be found on the RISC-V [website](https://riscv.org/technical/specifications/).
 
-| Name  | Parameters    | Description |
-| ----- | ------------- | ----------- |
-| lui   | rd, imm       | TODO        |
-| auipc | rd, imm       | TODO        |
-| jal   | rd, imm       | TODO        |
-| jalr  | rd, rs1, imm  | TODO        |
-| beq   | rs1, rs2, imm | TODO        |
-| bne   | rs1, rs2, imm | TODO        |
-| blt   | rs1, rs2, imm | TODO        |
-| bge   | rs1, rs2, imm | TODO        |
-| bltu  | rs1, rs2, imm | TODO        |
-| bgeu  | rs1, rs2, imm | TODO        |
-| lb    | rd, rs1, imm  | TODO        |
-| lh    | rd, rs1, imm  | TODO        |
-| lw    | rd, rs1, imm  | TODO        |
-| lbu   | rd, rs1, imm  | TODO        |
-| lhu   | rd, rs1, imm  | TODO        |
-| sb    | rs1, rs2, imm | TODO        |
-| sh    | rs1, rs2, imm | TODO        |
-| sw    | rs1, rs2, imm | TODO        |
-| addi  | rd, rs1, imm  | TODO        |
-| slti  | rd, rs1, imm  | TODO        |
-| sltiu | rd, rs1, imm  | TODO        |
-| xori  | rd, rs1, imm  | TODO        |
-| ori   | rd, rs1, imm  | TODO        |
-| andi  | rd, rs1, imm  | TODO        |
-| slli  | rd, rs1, bits | TODO        |
-| srli  | rd, rs1, bits | TODO        |
-| srai  | rd, rs1, bits | TODO        |
-| add   | rd, rs1, rs2  | TODO        |
-| sub   | rd, rs1, rs2  | TODO        |
-| sll   | rd, rs1, rs2  | TODO        |
-| slt   | rd, rs1, rs2  | TODO        |
-| sltu  | rd, rs1, rs2  | TODO        |
-| xor   | rd, rs1, rs2  | TODO        |
-| srl   | rd, rs1, rs2  | TODO        |
-| sra   | rd, rs1, rs2  | TODO        |
-| or    | rd, rs1, rs2  | TODO        |
-| and   | rd, rs1, rs2  | TODO        |
+| Name    | Parameters    | Description |
+| ------- | ------------- | ----------- |
+| `lui`   | rd, imm       | TODO        |
+| `auipc` | rd, imm       | TODO        |
+| `jal`   | rd, imm       | TODO        |
+| `jalr`  | rd, rs1, imm  | TODO        |
+| `beq`   | rs1, rs2, imm | TODO        |
+| `bne`   | rs1, rs2, imm | TODO        |
+| `blt`   | rs1, rs2, imm | TODO        |
+| `bge`   | rs1, rs2, imm | TODO        |
+| `bltu`  | rs1, rs2, imm | TODO        |
+| `bgeu`  | rs1, rs2, imm | TODO        |
+| `lb`    | rd, rs1, imm  | TODO        |
+| `lh`    | rd, rs1, imm  | TODO        |
+| `lw`    | rd, rs1, imm  | TODO        |
+| `lbu`   | rd, rs1, imm  | TODO        |
+| `lhu`   | rd, rs1, imm  | TODO        |
+| `sb`    | rs1, rs2, imm | TODO        |
+| `sh`    | rs1, rs2, imm | TODO        |
+| `sw`    | rs1, rs2, imm | TODO        |
+| `addi`  | rd, rs1, imm  | TODO        |
+| `slti`  | rd, rs1, imm  | TODO        |
+| `sltiu` | rd, rs1, imm  | TODO        |
+| `xori`  | rd, rs1, imm  | TODO        |
+| `ori`   | rd, rs1, imm  | TODO        |
+| `andi`  | rd, rs1, imm  | TODO        |
+| `slli`  | rd, rs1, bits | TODO        |
+| `srli`  | rd, rs1, bits | TODO        |
+| `srai`  | rd, rs1, bits | TODO        |
+| `add`   | rd, rs1, rs2  | TODO        |
+| `sub`   | rd, rs1, rs2  | TODO        |
+| `sll`   | rd, rs1, rs2  | TODO        |
+| `slt`   | rd, rs1, rs2  | TODO        |
+| `sltu`  | rd, rs1, rs2  | TODO        |
+| `xor`   | rd, rs1, rs2  | TODO        |
+| `srl`   | rd, rs1, rs2  | TODO        |
+| `sra`   | rd, rs1, rs2  | TODO        |
+| `or`    | rd, rs1, rs2  | TODO        |
+| `and`   | rd, rs1, rs2  | TODO        |
 
 ## Common Patterns
 Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
