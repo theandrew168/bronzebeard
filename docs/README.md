@@ -136,7 +136,7 @@ This pattern copies a value from register `x1` to `x2`.
 addi x2, x1, 0
 ```
 
-### One's Complement Negation
+### Bitwise Negation
 This pattern flips all 1s to 0s and 0s to 1s for register `x1`.
 ```
 xori x1, x1, -1
