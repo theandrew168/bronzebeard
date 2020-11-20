@@ -1,11 +1,10 @@
+import argparse
 from collections import namedtuple
 from ctypes import c_uint32
 from functools import partial
 import re
 import struct
 import sys
-
-from pprint import pprint
 
 
 REGISTERS = {
@@ -294,6 +293,7 @@ INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 
+
 # Arg types:
 #   name: str
 #   label: str
@@ -322,17 +322,21 @@ Offset = namedtuple('Offset', 'label')
 Hi = namedtuple('Hi', 'expr')
 Lo = namedtuple('Lo', 'expr')
 
+
 def sign_extend(value, bits):
     sign_bit = 1 << (bits - 1)
     return (value & (sign_bit - 1)) - (value & sign_bit)
+
 
 def relocate_hi(imm):
     if imm & 0x800:
         imm += 2**12
     return sign_extend((imm >> 12) & 0x000fffff, 20)
 
+
 def relocate_lo(imm):
     return sign_extend(imm & 0x00000fff, 12)
+
 
 def lex_assembly(assembly):
     assembly = re.sub(r'#.*?$', r'', assembly, flags=re.MULTILINE)  # strip comments
@@ -347,6 +351,7 @@ def lex_assembly(assembly):
             item.remove('')
 
     return items
+
 
 def parse_assembly(items):
     def parse_expression(expr):
@@ -457,6 +462,7 @@ def parse_assembly(items):
 
     return program
 
+
 # helper func, not a pass
 def resolve_expression(expr, env, position):
     # TODO: better error messages
@@ -488,6 +494,7 @@ def resolve_expression(expr, env, position):
     except:
         raise SystemExit('invalid expression: {}'.format(expr))
 
+
 def resolve_aligns(program):
     position = 0
 
@@ -515,6 +522,7 @@ def resolve_aligns(program):
 
     return output
 
+
 def resolve_labels(program, env):
     env = dict(env)
     position = 0
@@ -537,6 +545,7 @@ def resolve_labels(program, env):
 
     return output, env
 
+
 def resolve_constants(program, env):
     env = dict(env)
     position = 0
@@ -558,6 +567,7 @@ def resolve_constants(program, env):
             output.append(item)
 
     return output, env
+
 
 def resolve_registers(program, env):
     output = []
@@ -601,6 +611,7 @@ def resolve_registers(program, env):
             output.append(item)
 
     return output
+
 
 def resolve_immediates(program, env):
     position = 0
@@ -653,6 +664,7 @@ def resolve_immediates(program, env):
 
     return output
 
+
 def resolve_instructions(program):
     output = []
     for item in program:
@@ -697,6 +709,7 @@ def resolve_instructions(program):
 
     return output
 
+
 def resolve_packs(program):
     output = []
     for item in program:
@@ -710,6 +723,7 @@ def resolve_packs(program):
 
     return output
 
+
 def resolve_blobs(program):
     output = bytearray()
     for item in program:
@@ -719,11 +733,12 @@ def resolve_blobs(program):
 
     return output
 
-# Passes (labels, position):
-# 0. Lex + Parse assembly source
+
+# Passes:
+# 0. Lex + Parse source
 # 1. Resolve aligns  (convert aligns to blobs based on position)
-# 2. Resolve labels  (store label locations into dict)
-# 3. Resolve constants  (NAME = expr)
+# 2. Resolve labels  (store label locations into env)
+# 3. Resolve constants  (eval expr and update env)
 # 4. Resolve registers  (could be constants for readability)
 # 5. Resolve immediates  (Position, Offset, Hi, Lo)
 # 6. Resolve instructions  (convert xTypeInstruction to Blob)
@@ -759,53 +774,18 @@ def assemble(source):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        usage = 'usage: python -m bronzebeard.asm <input_asm> <output_bin>'
-        raise SystemExit(usage)
+    parser = argparse.ArgumentParser(
+        description='Assemble RISC-V source code',
+        prog='python -m bronzebeard.asm',
+    )
+    parser.add_argument('input_asm', help='input source file')
+    parser.add_argument('output_bin', help='output binary file')
+    args = parser.parse_args()
 
-    input_asm = sys.argv[1]
-    output_bin = sys.argv[2]
+    with open(args.input_asm) as f:
+        source = f.read()
 
-    with open(input_asm) as f:
-        assembly = f.read()
+    binary = assemble(source)
 
-    items = lex_assembly(assembly)
-    prog = parse_assembly(items)
-
-    pprint(prog)
-
-    # exclude Python builtins from eval env
-    # https://docs.python.org/3/library/functions.html#eval
-    env = {
-        '__builtins__': None,
-    }
-    env.update(REGISTERS)
-
-    prog = resolve_aligns(prog)
-    pprint(prog)
-
-    prog, env = resolve_labels(prog, env)
-    pprint(prog)
-    pprint(env)
-
-    prog, env = resolve_constants(prog, env)
-    pprint(prog)
-    pprint(env)
-
-    prog = resolve_registers(prog, env)
-    pprint(prog)
-
-    prog = resolve_immediates(prog, env)
-    pprint(prog)
-
-    prog = resolve_instructions(prog)
-    pprint(prog)
-
-    prog = resolve_packs(prog)
-    pprint(prog)
-
-    prog = resolve_blobs(prog)
-    pprint(prog)
-
-    with open(output_bin, 'wb') as f:
-        f.write(prog)
+    with open(args.output_bin, 'wb') as f:
+        f.write(binary)
