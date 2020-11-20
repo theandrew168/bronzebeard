@@ -593,39 +593,8 @@ body_semi:
     addi STATE zero 0  # STATE = 0 (execute)
     jal zero next  # next
 
-# TODO: remove this in favor of a more proper load / edit system (based on Starting Forth)
-word_load:
-    pack <I %position word_semi RAM_BASE_ADDR
-    pack <B 4
-    string 'load'
-    align 4
-code_load:
-    pack <I %position body_load RAM_BASE_ADDR
-body_load:
-    # TBUF = disk_start
-    # TBUF = ROM_BASE_ADDR + 16k
-    # TODO: %hi/%ho(position(disk_start, ROM_BASE_ADDR))
-    lui TBUF %hi(ROM_BASE_ADDR)
-    addi TBUF TBUF %lo(ROM_BASE_ADDR)
-    addi t0 zero 1
-    slli t0 t0 14
-    add TBUF TBUF t0
-
-    # TLEN = disk_end - disk_start
-    # TLEN = 4096
-    # TODO: fix this hard-coded value
-    # TODO: offset(disk_end, disk_start)
-    addi t0 zero 1
-    slli TLEN t0 12
-
-    # TPOS = 0
-    addi TPOS zero 0
-
-    # next
-    jal zero next
-
 word_key:
-    pack <I %position word_load RAM_BASE_ADDR
+    pack <I %position word_semi RAM_BASE_ADDR
     pack <B 3
     string "key"
     align 4
