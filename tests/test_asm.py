@@ -659,6 +659,22 @@ def test_assembler_basic():
     assert binary == target
 
 
+def test_assembler_basic_uppercase():
+    source = """
+    ADDI t0 zero 1
+    ADDI t1, zero, 2
+    ADDI(t2, zero, 3)
+    """
+    binary = asm.assemble(source)
+    target = b''.join([
+        # can use nums OR names for registers
+        asm.ADDI(5, 0, 1),
+        asm.ADDI('t1', 'zero', 2),
+        asm.ADDI('t2', 'zero', 3),
+    ])
+    assert binary == target
+
+
 def test_assembler_constants():
     source = """
     FOO = 42

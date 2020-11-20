@@ -419,23 +419,27 @@ def parse_assembly(items):
         # r-type instructions
         elif item[0].lower() in R_TYPE_INSTRUCTIONS:
             name, rd, rs1, rs2 = item
+            name = name.lower()
             item = RTypeInstruction(name, rd, rs1, rs2)
             program.append(item)
         # i-type instructions
         elif item[0].lower() in I_TYPE_INSTRUCTIONS:
             name, rd, rs1, *expr = item
+            name = name.lower()
             expr = parse_expression(expr)
             item = ITypeInstruction(name, rd, rs1, expr)
             program.append(item)
         # s-type instructions
         elif item[0].lower() in S_TYPE_INSTRUCTIONS:
             name, rs1, rs2, *expr = item
+            name = name.lower()
             expr = parse_expression(expr)
             item = STypeInstruction(name, rs1, rs2, expr)
             program.append(item)
         # b-type instructions
         elif item[0].lower() in B_TYPE_INSTRUCTIONS:
             name, rs1, rs2, *expr = item
+            name = name.lower()
             # ensure behavior is "offset" for branch instructions
             if expr[0] != '%offset':
                 expr.insert(0, '%offset')
@@ -445,12 +449,14 @@ def parse_assembly(items):
         # u-type instructions
         elif item[0].lower() in U_TYPE_INSTRUCTIONS:
             name, rd, *expr = item
+            name = name.lower()
             expr = parse_expression(expr)
             item = UTypeInstruction(name, rd, expr)
             program.append(item)
         # j-type instructions
         elif item[0].lower() in J_TYPE_INSTRUCTIONS:
             name, rd, *expr = item
+            name = name.lower()
             # ensure behavior is "offset" for jump instructions
             if expr[0] != '%offset':
                 expr.insert(0, '%offset')
