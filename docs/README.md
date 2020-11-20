@@ -5,7 +5,6 @@ This document describes the assembly language dialect that Bronzebeard understan
 RISC-V assembly programs are written as a plain text files.
 The file extension is mostly arbitrary, but I recommend using `.txt` or `.asm`.
 Using `.txt` will make for better default behavior on Windows systems.
-
 An assembly program is a linear sequence of "items".
 Items can be many things: labels, instructions, literal bytes and strings, etc.
 Single-line comments can be intermixed with the source code by using the `#` character.
@@ -13,14 +12,14 @@ Single-line comments can be intermixed with the source code by using the `#` cha
 Here is a basic example containing a single comment and a single instruction:
 ```
 # load the value 12 into register x1
-addi x1 zero 12
+addi x1, zero, 12
 ```
 
 Here is another example that utilizes a label in order to create an infinite loop:
 ```
 # loop forever!
 loop:
-    jal zero loop
+    jal zero, loop
 ```
 
 ## Modifiers
@@ -46,7 +45,7 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 | 5      | x5     | t0    | Temporary register |
 | 6-7    | x6-7   | t1-2  | Temporary registers |
 | 8      | x8     | s0/fp | Saved register / frame pointer |
-| 9      | x9     | s1    | Saved register |
+| 9      | x9     | s1    | Saved register  |
 | 10-11  | x10-11 | a0-1  | Function arguments / return values |
 | 12-17  | x12-17 | a2-7  | Funciton arguments |
 | 18-27  | x18-27 | s2-11 | Saved registers |
@@ -58,8 +57,8 @@ Full specifications be found on the RISC-V [website](https://riscv.org/technical
 
 | Name  | Parameters    | Description | Example |
 | ----- | ------------- | ----------- | ------- |
-| lui   | rd, imm       | TODO        | lui x1 %hi(0x20000000) |
-| auipc | rs1, rs2, imm | TODO        | auipc x1 %hi(0x20000000) |
+| lui   | rd, imm       | TODO        | lui x1, %hi(0x20000000) |
+| auipc | rd, imm       | TODO        | auipc x1, %hi(0x20000000) |
 
 ## Common Patterns
 Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
@@ -70,24 +69,24 @@ The first instruction loads the upper 20 bits of the value and the second loads 
 
 This pattern loads the hex value `0x20000000` into register `x1`.
 ```
-lui x1 %hi(0x20000000)
-addi x1 x1 %lo(0x20000000)
+lui x1, %hi(0x20000000)
+addi x1, x1, %lo(0x20000000)
 ```
 
 ### Copy Register
 This pattern copies a value from register `x1` to `x2`.
 ```
-addi x2 x1 0
+addi x2, x1, 0
 ```
 
 ### One's Complement Negation
 This pattern flips all 1s to 0s and 0s to 1s for register `x1`.
 ```
-xori x1 x1 -1
+xori x1, x1, -1
 ```
 
 ### No Operation
 This pattern intentionally does nothing.
 ```
-addi x0 x0 0
+addi x0, x0, 0
 ```
