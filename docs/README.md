@@ -16,7 +16,7 @@ addi x1, zero, 12
 ```
 
 ### Labels
-Labels are single-token items that end with a colon such as `foo:` or `bar:` (you exclude the colon when referencing them, however).
+Labels are single-token items that end with a colon such as `foo:` or `bar:`.
 They effectively mark a location in the assembly program with a human-readable name.
 Labels have two primary use cases: being targets for jump / branch offsets and marking the position of data.
 
@@ -26,6 +26,8 @@ Here is an example that utilizes a label in order to create an infinite loop:
 loop:
     jal zero, loop
 ```
+Notice how the label ends with a colon when it is defined but when it is referenced.
+This is necessary to distinguish label definitions from other keywords.
 
 ### Instructions
 what is an instruction?  
@@ -44,11 +46,17 @@ talk about the whitespace gotcha
 ### Alignment
 
 ## Expressions
+```
+FOO = 42
+BAR = FOO * 2
+BAZ = BAR >> 1 & 0b11111
+```
+
 ### Modifiers
-* *%position* - TODO
-* *%offset* - TODO
-* *%hi* - TODO
-* *%lo* - TODO
+* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
+* **%offset(label)** - Calculate the relative offset of a label from the current instruction's address
+* **%hi(value)** - Calculate the sign-adjusted top 20 bits of a value
+* **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
 
 ### Example
 Consider the following example:
@@ -84,9 +92,8 @@ Since the program data is marked with a label, it can referenced by name in subs
 You might be wondering: why are `%position` and `ROM_ADDR` needed here?
 If the data is marked with a label, can't we just load that directly and reference it?
 This would be the case IF your device's flash ROM happened to start at address zero (which will likely never happen).
-However, ROM is more likely to be mapped to a higher location in memory (such as `0x02000000` on GD32 devices).
-This means that in order to obtain the actual, absolute position of `data` in memory, we need to add its position to the ROM base address.
-That is precisely why the `%position` modifier exists: to obtain the position of a label from a given base address.
+Flash ROM is more likely to be mapped to a higher location in memory (such as `0x08000000` on GD32 devices).
+This means that in order to obtain the actual, absolute position of `data` in memory, we need to add its position to the ROM address.
 
 ## Registers
 The RISC-V ISA specifies 32 general purpose registers.
