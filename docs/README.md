@@ -201,25 +201,25 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 
 ## Instructions
 This table provides summaries for the baseline RISC-V instructions.
-Full specifications be found on the RISC-V [website](https://riscv.org/technical/specifications/).
+Full [specifications](https://riscv.org/technical/specifications/) be found on the RISC-V website.
 
 | Name    | Parameters    | Description |
 | ------- | ------------- | ----------- |
 | `lui`   | rd, imm       | load upper 20 bits of `rd` with 20-bit `imm`, fill lower 12 bits with zeroes |
 | `auipc` | rd, imm       | load upper 20 bits of `pc` with 20-bit `imm`, fill lower 12 bits with zeroes, add this offset to address of this instruction and store into `rd` |
-| `jal`   | rd, imm       | jump offset 20-bit `imm`, store return address into `rd` |
-| `jalr`  | rd, rs1, imm  | jump offset 12-bit `imm` plus `rs1`, store return addres into `rd` |
+| `jal`   | rd, imm       | jump offset 20-bit `imm` and store return address into `rd` |
+| `jalr`  | rd, rs1, imm  | jump offset 12-bit `imm` plus `rs1` and store return addres into `rd` |
 | `beq`   | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is equal to `rs2` |
 | `bne`   | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is not equal to `rs2` |
-| `blt`   | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is less than to `rs2` |
+| `blt`   | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is less than `rs2` |
 | `bge`   | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is greater than or equal to `rs2` |
 | `bltu`  | rs1, rs2, imm | same as `blt` but treat values as unsigned numbers |
 | `bgeu`  | rs1, rs2, imm | same as `bge` but treat values as unsigned numbers |
-| `lb`    | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd`, sign extend |
-| `lh`    | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd`, sign extend |
+| `lb`    | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
+| `lh`    | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
 | `lw`    | rd, rs1, imm  | load 32-bit value from addr in `rs1` plus 12-bit `imm` into `rd` |
-| `lbu`   | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd`, zero extend |
-| `lhu`   | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd`, zero extend |
+| `lbu`   | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
+| `lhu`   | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
 | `sb`    | rs1, rs2, imm | store 8-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
 | `sh`    | rs1, rs2, imm | store 16-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
 | `sw`    | rs1, rs2, imm | store 32-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
@@ -230,16 +230,16 @@ Full specifications be found on the RISC-V [website](https://riscv.org/technical
 | `ori`   | rd, rs1, imm  | bitwise OR 12-bit `imm` with `rs1` and store into `rd` |
 | `andi`  | rd, rs1, imm  | bitwise AND 12-bit `imm` with `rs1` and store into `rd` |
 | `slli`  | rd, rs1, amt  | shift `rs1` left by `amt` bits and store into `rd` |
-| `srli`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd`, shift in zeroes |
-| `srai`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd`, shift in sign bit |
+| `srli`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd` (shift in zeroes) |
+| `srai`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd` (shift in sign bit) |
 | `add`   | rd, rs1, rs2  | add `rs2` to `rs1` and store into `rd` |
 | `sub`   | rd, rs1, rs2  | subtract `rs2` from `rs1` and store into `rd` |
 | `sll`   | rd, rs1, rs2  | shift `rs1` left by `rs2` bits and store into `rd` |
 | `slt`   | rd, rs1, rs2  | store 1 into `rd` if `rs1` is less than `rs2` else store 0 |
 | `sltu`  | rd, rs1, rs2  | same as `slt` but treat values as unsigned numbers |
 | `xor`   | rd, rs1, rs2  | bitwise XOR `rs2` with `rs1` and store into `rd` |
-| `srl`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd`, shift in zeroes |
-| `sra`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd`, shift in sign bit |
+| `srl`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in zeroes) |
+| `sra`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
 | `or`    | rd, rs1, rs2  | bitwise OR `rs2` with `rs1` and store into `rd` |
 | `and`   | rd, rs1, rs2  | bitwise AND `rs2` with `rs1` and store into `rd` |
 
