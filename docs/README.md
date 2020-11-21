@@ -172,6 +172,37 @@ This would be the case IF your device's flash ROM happened to start at address z
 Flash ROM is more likely to be mapped to a higher location in memory (such as `0x08000000` on GD32 devices).
 This means that in order to obtain the actual, absolute position of `data` in memory, we need to add its position to the ROM address.
 
+## Common Patterns
+Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
+
+### Load Immediate
+Loading an integer that is outside of the range [-2048, 2047] requires two instructions.
+The first instruction loads the upper 20 bits of the value and the second loads the bottom 12.
+
+This pattern loads the hex value `0x20000000` into register `x1`.
+```
+lui x1, %hi(0x20000000)
+addi x1, x1, %lo(0x20000000)
+```
+
+### Copy Register
+This pattern copies a value from register `x1` to `x2`.
+```
+addi x2, x1, 0
+```
+
+### Bitwise Negation
+This pattern flips all 1s to 0s and 0s to 1s for register `x1`.
+```
+xori x1, x1, -1
+```
+
+### No Operation
+This pattern intentionally does nothing.
+```
+addi zero, zero, 0
+```
+
 ## Registers
 The RISC-V ISA specifies 32 general purpose registers.
 Each register is cable of a holding a single 32-bit value (or 64 bits on a 64-bit system).
@@ -242,34 +273,3 @@ Full [specifications](https://riscv.org/technical/specifications/) be found on t
 | `sra`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
 | `or`    | rd, rs1, rs2  | bitwise OR `rs2` with `rs1` and store into `rd` |
 | `and`   | rd, rs1, rs2  | bitwise AND `rs2` with `rs1` and store into `rd` |
-
-## Common Patterns
-Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
-
-### Load Immediate
-Loading an integer that is outside of the range [-2048, 2047] requires two instructions.
-The first instruction loads the upper 20 bits of the value and the second loads the bottom 12.
-
-This pattern loads the hex value `0x20000000` into register `x1`.
-```
-lui x1, %hi(0x20000000)
-addi x1, x1, %lo(0x20000000)
-```
-
-### Copy Register
-This pattern copies a value from register `x1` to `x2`.
-```
-addi x2, x1, 0
-```
-
-### Bitwise Negation
-This pattern flips all 1s to 0s and 0s to 1s for register `x1`.
-```
-xori x1, x1, -1
-```
-
-### No Operation
-This pattern intentionally does nothing.
-```
-addi zero, zero, 0
-```
