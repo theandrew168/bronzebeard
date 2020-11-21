@@ -80,7 +80,7 @@ They start with the `string` keyword and are followed by one or words.
 string hello
 string world
 string hello world
-string hello   world  # same as above, whitespace gets compressed by the lexer
+string hello   world  # same as above
 ```
 **NOTE:** Since the lexer compresses whitespace, any gap between words will be reduced to a single space.
 The lexer also strips any leading or trailing whitespace from the sequence of words.
@@ -100,7 +100,7 @@ Packed literals allow you embed packed integer / float values into your binary.
 They start with the `pack` keyword and are followed by a format specifier and a value.
 The format specifier is based on Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
 The value can be a literal or another expression (such as a constant or result of a modifier).
-As will all other items, commas are optional.
+As with all other items, commas are optional.
 ```
 pack <B, 0
 pack <B, 255
@@ -176,6 +176,8 @@ This means that in order to obtain the actual, absolute position of `data` in me
 The RISC-V ISA specifies 32 general purpose registers.
 Each register is cable of a holding a single 32-bit value (or 64 bits on a 64-bit system).
 Register 0 is the only special case: it always holds the value zero no matter what gets written to it.
+There also exists the "program counter" which is a register that holds the location of the current program's execution.
+This `pc` register can't be accessed directly but is utilized by certain instructions.
 
 A given register can be referenced in multiple ways: by number, by name, or by its alias.
 The alias and suggested usage of each register can be ignored when writing simple assembly programs.
@@ -203,16 +205,16 @@ Full specifications be found on the RISC-V [website](https://riscv.org/technical
 
 | Name    | Parameters    | Description |
 | ------- | ------------- | ----------- |
-| `lui`   | rd, imm       | TODO        |
-| `auipc` | rd, imm       | TODO        |
+| `lui`   | rd, imm       | load upper 20 bits of `rd` with 20-bit `imm`, fill lower 12 bits with zeroes |
+| `auipc` | rd, imm       | load upper 20 bits of `pc` with 20-bit `imm`, fill lower 12 bits with zeroes, add to addr of this inst and store into `rd` |
 | `jal`   | rd, imm       | TODO        |
 | `jalr`  | rd, rs1, imm  | TODO        |
 | `beq`   | rs1, rs2, imm | TODO        |
 | `bne`   | rs1, rs2, imm | TODO        |
 | `blt`   | rs1, rs2, imm | TODO        |
 | `bge`   | rs1, rs2, imm | TODO        |
-| `bltu`  | rs1, rs2, imm | TODO        |
-| `bgeu`  | rs1, rs2, imm | TODO        |
+| `bltu`  | rs1, rs2, imm | same as `blt` but treat values as unsigned numbers |
+| `bgeu`  | rs1, rs2, imm | same as `bge` but treat values as unsigned numbers |
 | `lb`    | rd, rs1, imm  | TODO        |
 | `lh`    | rd, rs1, imm  | TODO        |
 | `lw`    | rd, rs1, imm  | TODO        |
@@ -221,23 +223,23 @@ Full specifications be found on the RISC-V [website](https://riscv.org/technical
 | `sb`    | rs1, rs2, imm | TODO        |
 | `sh`    | rs1, rs2, imm | TODO        |
 | `sw`    | rs1, rs2, imm | TODO        |
-| `addi`  | rd, rs1, imm  | TODO        |
-| `slti`  | rd, rs1, imm  | TODO        |
-| `sltiu` | rd, rs1, imm  | TODO        |
-| `xori`  | rd, rs1, imm  | TODO        |
-| `ori`   | rd, rs1, imm  | TODO        |
-| `andi`  | rd, rs1, imm  | TODO        |
-| `slli`  | rd, rs1, bits | TODO        |
-| `srli`  | rd, rs1, bits | TODO        |
-| `srai`  | rd, rs1, bits | TODO        |
-| `add`   | rd, rs1, rs2  | TODO        |
-| `sub`   | rd, rs1, rs2  | TODO        |
-| `sll`   | rd, rs1, rs2  | TODO        |
-| `slt`   | rd, rs1, rs2  | TODO        |
-| `sltu`  | rd, rs1, rs2  | TODO        |
+| `addi`  | rd, rs1, imm  | add 12-bit `imm` to `rs1` and store into `rd` |
+| `slti`  | rd, rs1, imm  | store 1 into `rd` if `rs1` is less than 12-bit `imm` else store 0|
+| `sltiu` | rd, rs1, imm  | same as `slti` but treat values as unsigned numbers |
+| `xori`  | rd, rs1, imm  | bitwise XOR 12-bit `imm` and `rs1` and store into `rd` |
+| `ori`   | rd, rs1, imm  | bitwise OR 12-bit `imm` and `rs1` and store into `rd` |
+| `andi`  | rd, rs1, imm  | bitwise AND 12-bit `imm` and `rs1` and store into `rd` |
+| `slli`  | rd, rs1, amt  | shift `rs1` left by `amt` bits and store into `rd` |
+| `srli`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd`, shift in zeroes |
+| `srai`  | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd`, shift in sign bit |
+| `add`   | rd, rs1, rs2  | add `rs2` to `rs1` and store into `rd` |
+| `sub`   | rd, rs1, rs2  | subtract `rs2` from `rs1` and store into `rd` |
+| `sll`   | rd, rs1, rs2  | shift `rs1` left by `rs2` bits and store into `rd` |
+| `slt`   | rd, rs1, rs2  | store 1 into `rd` if `rs1` is less than `rs2` else store 0 |
+| `sltu`  | rd, rs1, rs2  | same as `slt` but treat values as unsigned numbers |
 | `xor`   | rd, rs1, rs2  | TODO        |
-| `srl`   | rd, rs1, rs2  | TODO        |
-| `sra`   | rd, rs1, rs2  | TODO        |
+| `srl`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd`, shift in zeroes |
+| `sra`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd`, shift in sign bit |
 | `or`    | rd, rs1, rs2  | TODO        |
 | `and`   | rd, rs1, rs2  | TODO        |
 
