@@ -7,13 +7,11 @@ The file extension is mostly arbitrary, but I recommend using `.txt` or `.asm`.
 Using `.txt` will make for better default behavior on Windows systems.
 An assembly program is a linear sequence of "items".
 Items can be many things: labels, instructions, literal bytes and strings, etc.
-Single-line comments can be intermixed with the source code by using the `#` character.
 
-Here is a basic example containing a single comment and a single instruction:
-```
-# load the value 12 into register x1
-addi x1, zero, 12
-```
+The Bronzebeard assembly syntax also supports basic comments.
+Single-line comments can be intermixed with the source code by using the `#` character.
+Multi-line comments are not supported at this point in time.
+You can always use multiple single-line comments to construct larger blocks.
 
 ### Labels
 Labels are single-token items that end with a colon such as `foo:` or `bar:`.
@@ -30,13 +28,50 @@ Notice how the label ends with a colon when it is defined but when it is referen
 This is necessary to distinguish label definitions from other keywords.
 
 ### Instructions
-what is an instruction?  
-how do you write one?  
-how do you write registers and immediates?  
+An instruction is the basic building block of any CPU.
+At a bare minimum, RISC-V supports 37 instructions (you can find a reference further down in this doc).
+An instructions tells the CPU to do something with a given set of registers and/or immediate values.
+Registers are named 32-bit "slots" that the CPU can use to store information at runtime.
+Immediate values are typically integers of varying sizes (depending on the specific instruction at hand).
+
+An instruction is written as a name followed by its arguments.
+The arguments can be separated by a comma for readability but this isn't a requirement (commas are treated as whitespace).
+Here is an example of using the `addi` instruction to the value `12` into register `x1`:
+```
+# load the value 12 into register x1
+addi x1, zero, 12
+```
 
 ### Constants
-talk about hardware values and the LED example  
-talk about basic exprs and the order of ops gotcha
+A constant in Bronzebeard is the named result of a simple expression.
+Numbers can be represented as decimal, binary, or hex.
+Simple math operations such as addition, multiplication, shifting, and binary ops all work as expected.
+
+Here are a few examples constant definitions:
+```
+RCU_BASE_ADDR = 0x40021000
+RCU_APB2EN_OFFSET = 0x18
+
+GPIO_BASE_ADDR_C = 0x40011000
+GPIO_CTL1_OFFSET = 0x04
+GPIO_MODE_OUT_50MHZ = 0b11
+GPIO_CTL_OUT_PUSH_PULL = 0b00
+
+FOO = 42
+BAR = FOO * 2
+BAZ = BAR >> 1 & 0b11111
+```
+NOTE: Since parentheses are treated as whitespace by the lexer, any precedence grouping within an expression disappears.
+Be careful with this!
+If you have a calculation that requires a specific order of operations, break it up into smaller, separate definitions.
+
+### Modifiers
+In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
+You can think of these like simple, builtin functions:
+* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
+* **%offset(label)** - Calculate the relative offset of a label from the current instruction's address
+* **%hi(value)** - Calculate the sign-adjusted top 20 bits of a value
+* **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
 
 ### String Literals
 talk about the whitespace gotcha  
@@ -45,20 +80,7 @@ talk about the whitespace gotcha
 ### Packed Literals
 ### Alignment
 
-## Expressions
-```
-FOO = 42
-BAR = FOO * 2
-BAZ = BAR >> 1 & 0b11111
-```
-
-### Modifiers
-* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
-* **%offset(label)** - Calculate the relative offset of a label from the current instruction's address
-* **%hi(value)** - Calculate the sign-adjusted top 20 bits of a value
-* **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
-
-### Example
+## Example
 Consider the following example:
 ```
 ROM_ADDR = 0x02000000
