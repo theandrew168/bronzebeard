@@ -15,18 +15,17 @@ Here is a basic example containing a single comment and a single instruction:
 addi x1, zero, 12
 ```
 
-Here is another example that utilizes a label in order to create an infinite loop:
+### Labels
+Labels are single-token items that end with a colon such as `foo:` or `bar:` (you exclude the colon when referencing them, however).
+They effectively mark a location in the assembly program with a human-readable name.
+Labels have two primary use cases: being targets for jump / branch offsets and marking the position of data.
+
+Here is an example that utilizes a label in order to create an infinite loop:
 ```
-# loop forever!
+# loop forever
 loop:
     jal zero, loop
 ```
-
-### Labels
-what is a label? what do they mean?  
-how do you reference in them?  
-why would you use a position vs an offset?  
-explain the default offset behavior for jumps / branches  
 
 ### Instructions
 what is an instruction?  
@@ -45,8 +44,49 @@ talk about the whitespace gotcha
 ### Alignment
 
 ## Expressions
-### %position / %offset
-### %hi / %lo
+### Modifiers
+* *%position* - TODO
+* *%offset* - TODO
+* *%hi* - TODO
+* *%lo* - TODO
+
+### Example
+Consider the following example:
+```
+ROM_ADDR = 0x02000000
+
+# CPU starts executing here, skip data and jump to main
+start:
+    jal zero, main
+
+# misc data that the program needs
+data:
+    string foo bar data here
+    bytes 0x00 0x01 0x02 0x03
+
+# instructions must be aligned to a 32-bit boundary
+align 4
+
+# main program starts here
+main:
+    # load address of data into register t0
+    lui t0, %hi(%position(data, ROM_ADDR))
+    addi t0, t0, %hi(%position(data, ROM_ADDR))
+    # do stuff with data
+    # ...
+```
+
+This program contains three labels: `start`, `data`, and `main`.
+The CPU will execute this program starting at `start` simply because it is at the top and assembly programs always execute top-to-bottom by default.
+The program then skips over the `data` segment by jumping to `main`, where the main program logic / loop exists.
+Since the program data is marked with a label, it can referenced by name in subsequent code.
+
+You might be wondering: why are `%position` and `ROM_ADDR` needed here?
+If the data is marked with a label, can't we just load that directly and reference it?
+This would be the case IF your device's flash ROM happened to start at address zero (which will likely never happen).
+However, ROM is more likely to be mapped to a higher location in memory (such as `0x02000000` on GD32 devices).
+This means that in order to obtain the actual, absolute position of `data` in memory, we need to add its position to the ROM base address.
+That is precisely why the `%position` modifier exists: to obtain the position of a label from a given base address.
 
 ## Registers
 The RISC-V ISA specifies 32 general purpose registers.
@@ -145,5 +185,5 @@ xori x1, x1, -1
 ### No Operation
 This pattern intentionally does nothing.
 ```
-addi x0, x0, 0
+addi zero, zero, 0
 ```
