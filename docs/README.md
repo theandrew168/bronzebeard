@@ -2,7 +2,7 @@
 This document describes the assembly language dialect that Bronzebeard understands.
 
 ## General
-RISC-V assembly programs are written as a plain text files.
+RISC-V assembly programs are written as plain text files.
 The file extension is mostly arbitrary, but I recommend using `.txt` or `.asm`.
 Using `.txt` will make for better default behavior on Windows systems.
 An assembly program is a linear sequence of "items".
@@ -11,7 +11,7 @@ Items can be many things: labels, instructions, literal bytes and strings, etc.
 The Bronzebeard assembly syntax also supports basic comments.
 Single-line comments can be intermixed with the source code by using the `#` character.
 Multi-line comments are not supported at this point in time.
-You can always use multiple single-line comments to construct larger blocks.
+You can always emulate multi-line comments by using multiple single-line comments to construct larger blocks.
 
 ### Labels
 Labels are single-token items that end with a colon such as `foo:` or `bar:`.
@@ -38,16 +38,16 @@ An instruction is written as a name followed by its arguments.
 The arguments can be separated by a comma for readability but this isn't a requirement (commas are treated as whitespace).
 Here is an example of using the `addi` instruction to the value `12` into register `x1`:
 ```
-# load the value 12 into register x1
+# x1 = 0 + 12
 addi x1, zero, 12
 ```
 
 ### Constants
-A constant in Bronzebeard is the named result of a simple expression.
+A constant in Bronzebeard is the named result of an expression.
 Numbers can be represented as decimal, binary, or hex.
 Simple math operations such as addition, multiplication, shifting, and binary ops all work as expected.
 
-Here are a few examples constant definitions:
+Here are a few examples:
 ```
 RCU_BASE_ADDR = 0x40021000
 RCU_APB2EN_OFFSET = 0x18
@@ -61,7 +61,7 @@ FOO = 42
 BAR = FOO * 2
 BAZ = BAR >> 1 & 0b11111
 ```
-NOTE: Since parentheses are treated as whitespace by the lexer, any precedence grouping within an expression disappears.
+**NOTE:** Since parentheses are treated as whitespace by the lexer, any precedence grouping within an expression disappears.
 Be careful with this!
 If you have a calculation that requires a specific order of operations, break it up into smaller, separate definitions.
 
@@ -74,11 +74,66 @@ You can think of these like simple, builtin functions:
 * **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
 
 ### String Literals
-talk about the whitespace gotcha  
+String literals allow you to embed UTF-8 strings into your binary.
+They start with the `string` keyword and are followed by one or words.
+```
+string hello
+string world
+string hello world
+string hello   world  # same as above, whitespace gets compressed by the lexer
+```
+**NOTE:** Since the lexer compresses whitespace, any gap between words will be reduced to a single space.
+The lexer also strips any leading or trailing whitespace from the sequence of words.
+Be careful with this!
+If you have a need for leading / trailing / duplicate whitespace, consider using a `bytes` literal instead.
 
 ### Bytes Literals
+Bytes literals allow you to embed arbitrary byte sequences into your binary.
+They start with the `bytes` keyword and followed by one or more integers between 0 and 255.
+The integers can be expressed in decimal, binary, or hex.
+```
+bytes 1 2 0x03 0b100 5 0x06 0b111 8
+```
+
 ### Packed Literals
+Packed literals allow you embed packed integer / float values into your binary.
+They start with the `pack` keyword and are followed by a format specifier and a value.
+The format specifier is based on Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
+The value can be a literal or another expression (such as a constant or result of a modifier).
+As will all other items, commas are optional.
+```
+pack <B, 0
+pack <B, 255
+pack <I ADDR
+pack <f 3.14159
+pack <I %position(foo, ADDR)
+```
+
 ### Alignment
+The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.
+This alignment is achieved by padding the binary with `0x00` bytes until it aligns with the bounary.
+In pseudo-code, the assembler adds zeroes until: `len(binary) % alignment == 0`.
+```
+# align the current location in the binary to 4 bytes
+align 4
+```
+
+Alignment is important when mixing instructions and data into the same binary (which happens quite often).
+According to the RISC-V spec, instructions MUST be aligned to a 32-bit (4 byte) boundary.
+Otherwise, errors will arise.
+
+For example, the following code is invalid because the instruction is not on a 32-bit boundary (it is only on an 8-bit boundary):
+```
+bytes 0x42  # occupies 1 byte
+addi zero, zero, 0  # misaligned :(
+```
+
+To fix this, we need to tell the assembler to ensure that the binary is aligned to 32 bits (4 bytes) before proceeding:
+```
+bytes 0x42  # occupies 1 byte
+align 4  # will pad the binary with 3 0x00 bytes
+addi zero, zero, 0  # aligned :)
+```
 
 ## Example
 Consider the following example:
