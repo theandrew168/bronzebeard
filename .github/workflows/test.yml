@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [ $default-branch ]
+    branches: [ master ]
   pull_request:
-    branches: [ $default-branch ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -14,7 +14,11 @@ jobs:
       with:
         python-version: 3.8
     - uses: actions/checkout@v2
-    - run: |
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
         python3 setup.py .
-        pip install pytest
+    - name: Test with pytest
+      run: |
         pytest
