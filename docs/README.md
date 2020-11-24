@@ -24,13 +24,13 @@ Here is an example that utilizes a label in order to create an infinite loop:
 loop:
     jal zero, loop
 ```
-Notice how the label ends with a colon when it is defined but when it is referenced.
+Notice how the label ends with a colon when it is defined but not when it is referenced.
 This is necessary to distinguish label definitions from other keywords.
 
 ### Instructions
 An instruction is the basic building block of any CPU.
-At a bare minimum, RISC-V supports 37 instructions (you can find a reference further down in this doc).
-An instructions tells the CPU to do something with a given set of registers and/or immediate values.
+At a bare minimum, RISC-V supports [37 instructions](https://github.com/theandrew168/bronzebeard/tree/master/docs#instructions-1).
+An instruction tells the CPU to do something with a given set of registers and/or immediate values.
 Registers are named 32-bit "slots" that the CPU can use to store information at runtime.
 Immediate values are typically integers of varying sizes (depending on the specific instruction at hand).
 
@@ -164,7 +164,7 @@ main:
 This program contains three labels: `start`, `data`, and `main`.
 The CPU will execute this program starting at `start` simply because it is at the top and assembly programs always execute top-to-bottom by default.
 The program then skips over the `data` segment by jumping to `main`, where the main program logic / loop exists.
-Since the program data is marked with a label, it can referenced by name in subsequent code.
+Since the program data is marked with a label, it can be referenced by name in subsequent code.
 
 You might be wondering: why are `%position` and `ROM_ADDR` needed here?
 If the data is marked with a label, can't we just load that directly and reference it?
