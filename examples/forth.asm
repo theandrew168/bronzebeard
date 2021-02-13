@@ -294,6 +294,10 @@ start:
     addi t0 t0 RCU_APB2EN_OFFSET
     lw t1 t0 0
 
+    # setup enable bit for AFIO
+    addi t2 zero 1
+    or t1 t1 t2
+
     # setup enable bit for GPIO A
     addi t2 zero 1
     slli t2 t2 2
