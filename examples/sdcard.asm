@@ -1,6 +1,8 @@
 # Read blocks from the SDCard on the Longan Nano
 # Based on:
 # https://github.com/riscv-mcu/GD32VF103_Firmware_Library/blob/master/Examples/SPI/SPI_master_slave_fullduplex_polling/main.c
+# http://elm-chan.org/docs/mmc/mmc_e.html
+# https://github.com/arduino-libraries/SD/blob/master/src/utility/Sd2Card.cpp
 
 # SPI Locations
 # (based on schematic)
@@ -20,7 +22,7 @@ GPIOC_BASE_ADDR = 0x40011000  # GD32VF103 Manual: Section 7.5 (red LED)
 GPIO_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 7.5.1 (pins 0-7)
 GPIO_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 7.5.2 (pins 8-15)
 
-# GD32VF103 Manual: Section 7.3
+# GD32VF103 Manual: Section 7.3, Figure 7.1
 GPIO_CTL_IN_ANALOG = 0b00
 GPIO_CTL_IN_FLOATING = 0b01
 GPIO_CTL_IN_PULL_DOWN = 0b10
@@ -34,11 +36,11 @@ GPIO_MODE_OUT_10MHZ = 0b01
 GPIO_MODE_OUT_2MHZ = 0b10
 GPIO_MODE_OUT_50MHZ = 0b11
 
-SPI1_BASE_ADDR = 0x40003800
-SPI_CTL0_OFFSET = 0x00
-SPI_CTL1_OFFSET = 0x04
-SPI_STAT_OFFSET = 0x08
-SPI_DATA_OFFSET = 0x0c
+SPI1_BASE_ADDR = 0x40003800  # GD32VF103 Manual: Section 18.11
+SPI_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 18.11.1
+SPI_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 18.11.2
+SPI_STAT_OFFSET = 0x08  # GD32VF103 Manual: Section 18.11.3
+SPI_DATA_OFFSET = 0x0c  # GD32VF103 Manual: Section 18.11.4
 
 rcu_init:
     # load RCU APB2EN addr into t0
@@ -103,16 +105,16 @@ gpio_init:
     # store the GPIO config
     sw t0, t1, 0
 
-# enable SPI
-# spi_init_struct.trans_mode           = SPI_TRANSMODE_FULLDUPLEX; (default)
-# spi_init_struct.device_mode          = SPI_MASTER;
-# spi_init_struct.frame_size           = SPI_FRAMESIZE_8BIT; (default)
-# spi_init_struct.clock_polarity_phase = SPI_CK_PL_HIGH_PH_2EDGE; (CLK_HI | 2ND_CLK)
-# spi_init_struct.nss                  = SPI_NSS_SOFT;
-# spi_init_struct.prescale             = SPI_PSC_8; (PCLK/8 = 0b010)
-# spi_init_struct.endian               = SPI_ENDIAN_MSB; (default)
-
 spi_init:
+    # enable SPI
+    # spi_init_struct.trans_mode           = SPI_TRANSMODE_FULLDUPLEX; (default)
+    # spi_init_struct.device_mode          = SPI_MASTER;
+    # spi_init_struct.frame_size           = SPI_FRAMESIZE_8BIT; (default)
+    # spi_init_struct.clock_polarity_phase = SPI_CK_PL_HIGH_PH_2EDGE; (CLK_HI | 2ND_CLK)
+    # spi_init_struct.nss                  = SPI_NSS_SOFT;
+    # spi_init_struct.prescale             = SPI_PSC_8; (PCLK/8 = 0b010)
+    # spi_init_struct.endian               = SPI_ENDIAN_MSB; (default)
+
     # load SPI1 CTL0 addr into t0
     lui t0, %hi(SPI1_BASE_ADDR)
     addi t0, t0, %lo(SPI1_BASE_ADDR)
@@ -150,6 +152,14 @@ spi_init:
     sw t0, t1, 0
 
 main:
+    # recv:
+    # loop until RBNE (SPI_STAT bit 0)
+    # read from data reg
+
+    # send:
+    # loop until TBE (SPI_STAT bit 1)
+    # write to data reg
+
     jal zero success
 
 failure:
