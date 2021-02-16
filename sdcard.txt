@@ -1,0 +1,43 @@
+Control flow of esmil's code:
+https://github.com/esmil/gd32vf103inator/blob/master/examples/LonganNano/sdcard.c
+
+constants
+---------
+SPI on:  clear NSS, set enable
+SPI off: set NSS, clear enable
+
+delay
+-----
+wait 1ms for SD power to activate
+
+sd_init
+-------
+RCU: enable GPIOB and AFIO
+RCU: enable SPI1
+GPIO: set CS
+GPIO: clear CLK
+GPIO: set MOSI
+GPIO: set MISO
+GPIO: config CS - out af pp 50
+GPIO: config CLK - out af pp 50
+GPIO: config MISO - in float
+GPIO: config MOSI - out af od 50
+RCU: set SPI1 reset (not necessary)
+RCU: clear SPI1 reset (not necessary)
+SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off)
+SPI: enable NSS drive
+
+sd_wakeup:
+SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off)
+SPI: set clkdiv, enable SW NSS, enable master mode, clear NSS, set enable (on)
+send 0xff (8 clock pulses, not needed?)
+send 0x40 (CMD0)
+send 0x00 (ARG)
+send 0x00 (ARG)
+send 0x00 (ARG)
+send 0x00 (ARG)
+send 0x95 (CRC)
+flush
+recv 0x01 (try up to 32k times (1 << 15))
+    "send" 0xff just to clock in the 8 bits
+    should probs wait for TBE beforehand
