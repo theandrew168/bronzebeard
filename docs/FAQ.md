@@ -1,21 +1,21 @@
 # Frequently Asked Questions
 Questions I've received via email or other means and my best attempt at helpful answers.
 
-## Multiple questions regarding examples/led.asm:
+## Regarding examples/led.asm...
 ### 1. What is the exact memory address of the red LED's GPIO pin?
 ### 2. On what line is the red LED's GPIO pin set high?
 ### 3. What is the purpose of the instruction that "stores the GPIO config"?
-I think that a detailed explanation of the program will satisfy all three.
+I think that a detailed explanation of the program will satisfy all three questions about [examples/led.asm](https://github.com/theandrew168/bronzebeard/blob/master/examples/led.asm).
 I'm hoping to provide enough detail as to how I discovered all of these small bits of information necessary to turn on the LED.
-In general, though, I extracted the necessary steps from the GD32VF103_Firmware_Library and platform-gd32v's longan-nano-blink example.
+In general, though, I extracted the necessary steps from the [GD32VF103_Firmware_Library](https://github.com/riscv-mcu/GD32VF103_Firmware_Library/tree/master/Firmware/GD32VF103_standard_peripheral) and platform-gd32v's [longan-nano-blink example](https://github.com/sipeed/platform-gd32v/blob/master/examples/longan-nano-blink/src/main.c).
 
-Finding this answer to question 1 requires looking at both the Longan Nano schematic and the GD32VF103 manual.
+Finding this answer to question 1 requires looking at both the [Longan Nano schematic](https://dl.sipeed.com/LONGAN/Nano/HDK/Longan%20Nano%202663/Longan%20nano%202663%28Schematic%29.pdf) and the [GD32VF103 manual](https://gd32mcu.21ic.com/data/documents/shujushouce/GD32VF103_User_Manual_EN_V1.2.pdf).
 By looking at sector A5 of the schematic, we can see that the red LED is associated with GPIO port C, pin 13.
 Similarly, the green LED is on port A, pin 1 and the blue LED is on port A, pin 2.
 It's also important to note here how the 3V3 power is on the opposite side of the GPIO connections meaning that the LEDs are essentially active-low.
 When the GPIO is ON, the LED will be OFF and vice versa.
 I was stumped by this nuance for days.
-Thankfully, someone else also noticed this and added clarity to the longan-nano-blink example.
+Thankfully, someone else also noticed this and [added clarity](https://github.com/sipeed/platform-gd32v/commit/7b85c1eb83b4cf2ff10aa3dae61444741a97479a) to the longan-nano-blink example.
 To answer question 2, there is no line in the code that sets the GPIO pin high.
 This is because the LED is on when the GPIO pin is OFF (which is the pin's default state).
 To be extra clear, you could add a line that explicitly turns off the pin but it's technically redundant.
@@ -73,12 +73,12 @@ The 4 pins on the end of the Nano are GND, TX, RX, and 3V3.
 Therefore if you attach the 4 cables from the adapter directly to these pins, the chip will bug out, run way too fast, and potentially be damaged.
 To avoid this, you can either power the Nano via USB-C and leave the serial cable's 5V line unplugged or you can jump the 5V line over to the 5V input on the far corner of the device.
 
-As for the forth.asm example, it does work.
+As for the [examples/forth.asm](https://github.com/theandrew168/bronzebeard/blob/master/examples/forth.asm) example, it does work.
 It's just so minimal at this point that it's sort of hard to tell.
-By default, it only supports the bare minimum builtin words as documented here.
-In order to build up the dictionary into something useful, it is necessary to enter most of the commands from prelude.forth.
-If you then go on and manually type all the commands in from both rcu.forth and gpio.forth, you'll be equipped with the word "rled" which turns on the red LED.
-I made a quick demo video for this example.
+By default, it only supports the bare minimum builtin words as documented [here](https://github.com/theandrew168/bronzebeard/blob/master/docs/forth.md).
+In order to build up the dictionary into something useful, it is necessary to enter most of the commands from [prelude.forth](https://github.com/theandrew168/bronzebeard/blob/master/examples/prelude.forth).
+If you then go on and manually type all the commands in from both [rcu.forth](https://github.com/theandrew168/bronzebeard/blob/master/examples/rcu.forth) and [gpio.forth](https://github.com/theandrew168/bronzebeard/blob/master/examples/gpio.forth), you'll be equipped with the word "rled" which turns on the red LED.
+I made a quick [demo video](https://www.youtube.com/watch?v=7Q1TXs5Ff9M) for this example.
 
 Obviously, this is an obnoxious amount of manual and tedious typing.
 Surely there is a better way!
@@ -89,4 +89,8 @@ In the future I'll need to make the assembler smart enough to handle short / lon
 Since baking these word definitions into the binary didn't really scale, I needed to find a better option.
 Next on my TODO list for this project is to get the SD card working (at least for reads) over SPI.
 That way I could store all of these words there and load them easily at runtime.
-I really want to implement a simple LOAD / EDIT system as described in chapter 3 of "Starting Forth" by Leo Brodie.
+I really want to implement a simple LOAD / EDIT system as described in [chapter 3 of "Starting Forth"](https://www.forth.com/starting-forth/3-forth-editor-blocks-buffer/) by Leo Brodie.
+
+I'm pretty happy with where this Forth interpreter is but it definitely has a ways to go before I'd call it "useful".
+Most of the design is based on Cesar Blum's [sectorforth](https://github.com/cesarblum/sectorforth) project.
+His design is based on an [old Usenet thread](https://groups.google.com/g/comp.lang.forth/c/NS2icrCj1jQ) wherein some folks discussed the smallest number of initial builtin words that could be used to bootstrap a full Forth environment.
