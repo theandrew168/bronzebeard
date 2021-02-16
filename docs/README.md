@@ -226,7 +226,7 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 | `8`     | `x8`     | `s0/fp` | Saved register / frame pointer |
 | `9`     | `x9`     | `s1`    | Saved register  |
 | `10-11` | `x10-11` | `a0-1`  | Function arguments / return values |
-| `12-17` | `x12-17` | `a2-7`  | Funciton arguments |
+| `12-17` | `x12-17` | `a2-7`  | Function arguments |
 | `18-27` | `x18-27` | `s2-11` | Saved registers |
 | `28-31` | `x28-31` | `t3-6`  | Temporary registers |
 

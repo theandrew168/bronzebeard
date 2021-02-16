@@ -12,7 +12,7 @@ GPIO_BASE_ADDR_A = 0x40010800  # GD32VF103 Manual: Section 7.5 (blue LED)
 GPIO_BASE_ADDR_C = 0x40011000  # GD32VF103 Manual: Section 7.5
 GPIO_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 7.5.1 (pins 0-7)
 GPIO_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 7.5.2 (pins 8-15)
-GPIO_OCTL_OFFSET = 0x0c  # GD32VF103 Manual: Section 7.5.4
+GPIO_BOP_OFFSET = 0x10  # GD32VF103 Manual: Section 7.5.5
 GPIO_MODE_OUT_50MHZ = 0b11  # GD32VF103 Manual: Section 7.3
 GPIO_CTL_OUT_PUSH_PULL = 0b00  # GD32VF103 Manual: Section 7.3
 
@@ -61,8 +61,8 @@ gpio_init:
     lui t0, %hi(GPIO_BASE_ADDR_A)
     addi t0, t0, %lo(GPIO_BASE_ADDR_A)
 
-    # move t0 forward to output control register
-    addi t0, t0, GPIO_OCTL_OFFSET
+    # move t0 forward to bit operate register
+    addi t0, t0, GPIO_BOP_OFFSET
 
     # enable pin 8
     addi t1, zero, 1

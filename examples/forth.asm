@@ -147,7 +147,7 @@ copy_done:
     jalr zero t0 0
 
 # Procedure: token
-# Usage: p.JAL('ra', 'token')
+# Usage: jal ra token
 # Ret: a0 = addr of word name (0 if not found)
 # Ret: a1 = length of word name (0 if not found)
 token:
@@ -180,7 +180,7 @@ token_not_found:
     jalr zero ra 0  # return
 
 # Procedure: lookup
-# Usage: p.JAL('ra', 'lookup')
+# Usage: jal ra lookup
 # Arg: a0 = addr of word name
 # Arg: a1 = length of word name
 # Ret: a2 = addr of found word (0 if not found)
@@ -216,7 +216,7 @@ lookup_found:
     jalr zero ra 0  # return
 
 # Procedure: align
-# Usage: p.JAL('ra', 'align')
+# Usage: jal ra align
 # Arg: a3 = value to be aligned
 # Ret: a3 = value after alignment
 align:
@@ -228,7 +228,7 @@ align_done:
     jalr zero ra 0  # return
 
 # Procedure: pad
-# Usage: p.JAL('ra', 'pad')
+# Usage: jal ra pad
 # Arg: a4 = addr to be padded
 # Ret: a4 = addr after padding
 pad:
@@ -241,7 +241,7 @@ pad_done:
     jalr zero ra 0  # return
 
 # Procedure: getc
-# Usage: p.JAL('ra', 'getc')
+# Usage: jal ra getc
 # Ret: a5 = character received from serial
 getc:
     # t1 = stat, t2 = data
@@ -252,12 +252,12 @@ getc:
 getc_wait:
     lw t3 t1 0  # load stat into t3
     andi t3 t3 (1 << 5)  # isolate RBNE bit
-    beq t3 zero getc_wait  # keep looping until a char is read
+    beq t3 zero getc_wait  # keep looping until ready to recv
     lw a5 t2 0  # load char into a5
     jalr zero ra 0  # return
 
 # Procedure: putc
-# Usage: p.JAL('ra', 'putc')
+# Usage: jal ra putc
 # Arg: a5 = character to send over serial
 putc:
     # t1 = stat, t2 = data
@@ -265,11 +265,11 @@ putc:
     addi t0 t0 %lo(USART_BASE_ADDR_0)
     addi t1 t0 USART_STAT_OFFSET
     addi t2 t0 USART_DATA_OFFSET
-    sw t2 a5 0  # write char from a5
 putc_wait:
     lw t3 t1 0  # load stat into t3
     andi t3 t3 (1 << 7)  # isolate TBE bit
-    beq t3 zero putc_wait  # keep looping until the char gets sent
+    beq t3 zero putc_wait  # keep looping until ready to send
+    sw t2 a5 0  # write char from a5
     jalr zero ra 0  # return
 
 ###
