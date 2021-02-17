@@ -15,7 +15,6 @@ setup(
     install_requires=[
         'pyserial',
         'pyusb',
-        'windows-curses; platform_system=="Windows"',
     ],
     classifiers=[
         "License :: OSI Approved :: MIT License",

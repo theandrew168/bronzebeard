@@ -14,10 +14,10 @@ end:
     jal zero, %offset(middle)
 
 # string literals
-string hello
-string world
-string hello world
-string hello   world  # same as above, whitespace gets compressed by the lexer
+string "hello"
+string "world"
+string "hello world"
+string "hello   world"  # same as above, whitespace gets compressed by the lexer
 
 # bytes literals
 bytes 1 2 0x03 0b100 5 0x06 0b111 8

@@ -3,22 +3,23 @@ Minimal ecosystem for bare-metal RISC-V development
 
 ## What
 Bronzebeard is a collection of tools for writing [RISC-V](https://en.wikipedia.org/wiki/Riscv) assembly and working with hobbyist development devices.
-It is designed for programs that will run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on an [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or existing software of any kind.
+It is designed for programs that will run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or pre-existing software of any kind.
+The assembler currently supports RV32IM (C is coming soon).
 
 ## Why
 Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
 Can useful software be developed without relying on any of it?
 That's the question that this project seeks to answer.
 I believe that the rise of RISC-V provides a great opportunity to explore different methods of program development.
-Installing a full operating system isn't always a prerequisite to building something valuable.
+Installing a full operating system doesn't have to be a prerequisite to building something valuable.
 
 ## How
 Bronzebeard and its tools are implemented purely in Python.
 A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) is the centerpiece.
 It has been written in order to be free from large, complex toolchains.
 This keeps the project portable, minimal, and easy to understand.
-At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
-However, there are plans in the near future to broaden support to also include the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html) and [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
+At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
+However, there are plans to broaden support to also include [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
 
 ## Documentation
 Most of the surface-level documentation for Bronzebeard lives right here in this README.

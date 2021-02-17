@@ -192,97 +192,116 @@ def j_type(rd, imm, opcode):
     return struct.pack('<I', code)
 
 
-LUI = partial(u_type, opcode=0b0110111)
-AUIPC = partial(u_type, opcode=0b0010111)
-JAL = partial(j_type, opcode=0b1101111)
-JALR = partial(i_type, opcode=0b1100111, funct3=0b000)
-BEQ = partial(b_type, opcode=0b1100011, funct3=0b000)
-BNE = partial(b_type, opcode=0b1100011, funct3=0b001)
-BLT = partial(b_type, opcode=0b1100011, funct3=0b100)
-BGE = partial(b_type, opcode=0b1100011, funct3=0b101)
-BLTU = partial(b_type, opcode=0b1100011, funct3=0b110)
-BGEU = partial(b_type, opcode=0b1100011, funct3=0b111)
-LB = partial(i_type, opcode=0b0000011, funct3=0b000)
-LH = partial(i_type, opcode=0b0000011, funct3=0b001)
-LW = partial(i_type, opcode=0b0000011, funct3=0b010)
-LBU = partial(i_type, opcode=0b0000011, funct3=0b100)
-LHU = partial(i_type, opcode=0b0000011, funct3=0b101)
-SB = partial(s_type, opcode=0b0100011, funct3=0b000)
-SH = partial(s_type, opcode=0b0100011, funct3=0b001)
-SW = partial(s_type, opcode=0b0100011, funct3=0b010)
-ADDI = partial(i_type, opcode=0b0010011, funct3=0b000)
-SLTI = partial(i_type, opcode=0b0010011, funct3=0b010)
-SLTIU = partial(i_type, opcode=0b0010011, funct3=0b011)
-XORI = partial(i_type, opcode=0b0010011, funct3=0b100)
-ORI = partial(i_type, opcode=0b0010011, funct3=0b110)
-ANDI = partial(i_type, opcode=0b0010011, funct3=0b111)
-SLLI = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
-SRLI = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
-SRAI = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
-ADD = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
-SUB = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
-SLL = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
-SLT = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
-SLTU = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
-XOR = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
-SRL = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
-SRA = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
-OR = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
-AND = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+# RV32I Base Instruction Set
+LUI    = partial(u_type, opcode=0b0110111)
+AUIPC  = partial(u_type, opcode=0b0010111)
+JAL    = partial(j_type, opcode=0b1101111)
+JALR   = partial(i_type, opcode=0b1100111, funct3=0b000)
+BEQ    = partial(b_type, opcode=0b1100011, funct3=0b000)
+BNE    = partial(b_type, opcode=0b1100011, funct3=0b001)
+BLT    = partial(b_type, opcode=0b1100011, funct3=0b100)
+BGE    = partial(b_type, opcode=0b1100011, funct3=0b101)
+BLTU   = partial(b_type, opcode=0b1100011, funct3=0b110)
+BGEU   = partial(b_type, opcode=0b1100011, funct3=0b111)
+LB     = partial(i_type, opcode=0b0000011, funct3=0b000)
+LH     = partial(i_type, opcode=0b0000011, funct3=0b001)
+LW     = partial(i_type, opcode=0b0000011, funct3=0b010)
+LBU    = partial(i_type, opcode=0b0000011, funct3=0b100)
+LHU    = partial(i_type, opcode=0b0000011, funct3=0b101)
+SB     = partial(s_type, opcode=0b0100011, funct3=0b000)
+SH     = partial(s_type, opcode=0b0100011, funct3=0b001)
+SW     = partial(s_type, opcode=0b0100011, funct3=0b010)
+ADDI   = partial(i_type, opcode=0b0010011, funct3=0b000)
+SLTI   = partial(i_type, opcode=0b0010011, funct3=0b010)
+SLTIU  = partial(i_type, opcode=0b0010011, funct3=0b011)
+XORI   = partial(i_type, opcode=0b0010011, funct3=0b100)
+ORI    = partial(i_type, opcode=0b0010011, funct3=0b110)
+ANDI   = partial(i_type, opcode=0b0010011, funct3=0b111)
+SLLI   = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+SRLI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
+SRAI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
+ADD    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
+SUB    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
+SLL    = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
+SLT    = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
+SLTU   = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
+XOR    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
+SRL    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
+SRA    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
+OR     = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
+AND    = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+
+# RV32M Standard Extension
+MUL    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
+MULH   = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
+MULHSU = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
+MULHU  = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
+DIV    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
+DIVU   = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
+REM    = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
+REMU   = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
 
 R_TYPE_INSTRUCTIONS = {
-    'slli': SLLI,
-    'srli': SRLI,
-    'srai': SRAI,
-    'add': ADD,
-    'sub': SUB,
-    'sll': SLL,
-    'slt': SLT,
-    'sltu': SLTU,
-    'xor': XOR,
-    'srl': SRL,
-    'sra': SRA,
-    'or': OR,
-    'and': AND,
+    'slli':   SLLI,
+    'srli':   SRLI,
+    'srai':   SRAI,
+    'add':    ADD,
+    'sub':    SUB,
+    'sll':    SLL,
+    'slt':    SLT,
+    'sltu':   SLTU,
+    'xor':    XOR,
+    'srl':    SRL,
+    'sra':    SRA,
+    'or':     OR,
+    'and':    AND,
+    'mul':    MUL,
+    'mulh':   MULH,
+    'mulhsu': MULHSU,
+    'mulhu':  MULHU,
+    'div':    DIV,
+    'divu':   DIVU,
+    'rem':    REM,
+    'remu':   REMU,
 }
 
 I_TYPE_INSTRUCTIONS = {
-    'jalr': JALR,
-    'lb': LB,
-    'lh': LH,
-    'lw': LW,
-    'lbu': LBU,
-    'lhu': LHU,
-    'addi': ADDI,
-    'slti': SLTI,
-    'sltiu': SLTIU,
-    'xori': XORI,
-    'ori': ORI,
-    'andi': ANDI,
+    'jalr':   JALR,
+    'lb':     LB,
+    'lh':     LH,
+    'lw':     LW,
+    'lbu':    LBU,
+    'lhu':    LHU,
+    'addi':   ADDI,
+    'slti':   SLTI,
+    'sltiu':  SLTIU,
+    'xori':   XORI,
+    'ori':    ORI,
+    'andi':   ANDI,
 }
 
 S_TYPE_INSTRUCTIONS = {
-    'sb': SB,
-    'sh': SH,
-    'sw': SW,
+    'sb':     SB,
+    'sh':     SH,
+    'sw':     SW,
 }
 
 B_TYPE_INSTRUCTIONS = {
-    'beq': BEQ,
-    'bne': BNE,
-    'blt': BLT,
-    'bge': BGE,
-    'bltu': BLTU,
-    'bgeu': BGEU,
+    'beq':    BEQ,
+    'bne':    BNE,
+    'blt':    BLT,
+    'bge':    BGE,
+    'bltu':   BLTU,
+    'bgeu':   BGEU,
 }
 
 U_TYPE_INSTRUCTIONS = {
-    'lui': LUI,
-    'auipc': AUIPC,
+    'lui':    LUI,
+    'auipc':  AUIPC,
 }
 
 J_TYPE_INSTRUCTIONS = {
-    'jal': JAL,
+    'jal':    JAL,
 }
 
 INSTRUCTIONS = {}

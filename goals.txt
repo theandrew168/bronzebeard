@@ -1,0 +1,25 @@
+0.0.7
+-----
+M extension for integer mul / div
+
+0.0.8
+-----
+Type hints
+Better error messages (file:number line)
+Tests for each pass
+
+0.0.9
+-----
+Include statement / feature
+
+0.0.10
+-----
+C extension for potential optimizations
+
+0.0.11
+------
+Basic TUI using prompt_toolkit (or pyvim)
+
+0.0.12
+------
+Basic GUI using tkinter

@@ -156,7 +156,7 @@ align 4
 main:
     # load address of data into register t0
     lui t0, %hi(%position(data, ROM_ADDR))
-    addi t0, t0, %hi(%position(data, ROM_ADDR))
+    addi t0, t0, %lo(%position(data, ROM_ADDR))
     # do stuff with data
     # ...
 ```
