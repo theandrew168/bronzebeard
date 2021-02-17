@@ -5,9 +5,10 @@ from functools import partial
 import re
 import struct
 import sys
+from typing import cast, Dict, Optional, Union
 
 
-REGISTERS = {
+REGISTERS: Dict[str, int] = {
     'x0': 0, 'zero': 0,
     'x1': 1, 'ra': 1,
     'x2': 2, 'sp': 2,
@@ -43,10 +44,10 @@ REGISTERS = {
 }
 
 
-def lookup_register(reg):
+def lookup_register(reg: Union[str, int]) -> int:
     # check if register corresponds to a valid name
-    if reg in REGISTERS:
-        reg = REGISTERS[reg]
+    if isinstance(reg, str) and reg in REGISTERS:
+        reg = REGISTERS[cast(str, reg)]
 
     # ensure register is a number
     try:
@@ -342,18 +343,18 @@ Hi = namedtuple('Hi', 'expr')
 Lo = namedtuple('Lo', 'expr')
 
 
-def sign_extend(value, bits):
+def sign_extend(value: int, bits: int) -> int:
     sign_bit = 1 << (bits - 1)
     return (value & (sign_bit - 1)) - (value & sign_bit)
 
 
-def relocate_hi(imm):
+def relocate_hi(imm: int) -> int:
     if imm & 0x800:
         imm += 2**12
     return sign_extend((imm >> 12) & 0x000fffff, 20)
 
 
-def relocate_lo(imm):
+def relocate_lo(imm: int) -> int:
     return sign_extend(imm & 0x00000fff, 12)
 
 
@@ -770,7 +771,7 @@ def resolve_blobs(program):
 # 7. Resolve packs  (convert Pack to Blob)
 # 8. Resolve blobs  (merge all Blobs into a single binary)
 
-def assemble(source):
+def assemble(source: str) -> bytes:
     """
     Assemble a RISC-V assembly program into a raw binary.
 
@@ -782,7 +783,7 @@ def assemble(source):
 
     # exclude Python builtins from eval env
     # https://docs.python.org/3/library/functions.html#eval
-    env = {
+    env: Dict[str, Optional[int]] = {
         '__builtins__': None,
     }
     env.update(REGISTERS)
@@ -803,14 +804,14 @@ if __name__ == '__main__':
         description='Assemble RISC-V source code',
         prog='python -m bronzebeard.asm',
     )
-    parser.add_argument('input_asm', help='input source file')
-    parser.add_argument('output_bin', help='output binary file')
+    parser.add_argument('input_asm', type=str, help='input source file')
+    parser.add_argument('output_bin', type=str, help='output binary file')
     args = parser.parse_args()
 
-    with open(args.input_asm) as f:
-        source = f.read()
+    with open(args.input_asm) as in_asm:
+        source = in_asm.read()
 
     binary = assemble(source)
 
-    with open(args.output_bin, 'wb') as f:
-        f.write(binary)
+    with open(args.output_bin, 'wb') as out_bin:
+        out_bin.write(binary)
