@@ -12,12 +12,7 @@
 # SPI1_CS_TF: B12 (OUT_AF_PUSH_PULL, 50MHz)
 # SPI1_SCLK:  B13 (OUT_AF_PUSH_PULL, 50MHz)
 # SPI1_MISO:  B14 (IN_FLOATING, 0)
-# SPI1_MOSI:  B15 (OUT_AF_OPEN_DRAIN, 50MHz)
-
-# TODOs
-# -----
-# Need to delay slightly on boot (just 1ms should do it)
-#   otherwise the SD Card won't responsd (resets will work, though)
+# SPI1_MOSI:  B15 (OUT_AF_PUSH_PULL, 50MHz)
 
 RCU_BASE_ADDR = 0x40021000  # GD32VF103 Manual: Section 5.3
 RCU_APB2EN_OFFSET = 0x18  # GD32VF103 Manual: Section 5.3.7 (GPIO ABCDE, AFIO)
@@ -49,6 +44,17 @@ SPI_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 18.11.1
 SPI_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 18.11.2
 SPI_STAT_OFFSET = 0x08  # GD32VF103 Manual: Section 18.11.3
 SPI_DATA_OFFSET = 0x0c  # GD32VF103 Manual: Section 18.11.4
+
+delay:
+    # mtime runs @ 2MHz
+    # 2000000c/s * 0.001s = 2000c
+    lui t0, %hi(0xd1000000)
+    addi t0, t0, %lo(0xd1000000)
+    lw t1, t0, 0
+    addi t1, t1, 2000
+delay_loop:
+    lw t2, t0, 0
+    blt t2, t1, delay_loop
 
 rcu_init:
     # load RCU APB2EN addr into t0
@@ -110,42 +116,17 @@ gpio_init:
     slli t2, t2, 24
     or t1, t1, t2
 
-    # SPI1_MOSI:  B15 (OUT_AF_OPEN_DRAIN, 50MHz)
+    # SPI1_MOSI:  B15 (OUT_AF_PUSH_PULL, 50MHz)
     addi t2, zero, 0b1111
     slli t2, t2, 28
     xori t2, t2, -1
     and t1, t1, t2
 
-    addi t2, zero, GPIO_CTL_OUT_AF_OPEN_DRAIN << 2 | GPIO_MODE_OUT_50MHZ
+    addi t2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     slli t2, t2, 28
     or t1, t1, t2
 
     # store the GPIO config
-    sw t0, t1, 0
-
-    # load GPIOB BOP addr into t0
-    lui t0, %hi(GPIOB_BASE_ADDR)
-    addi t0, t0, %lo(GPIOB_BASE_ADDR)
-    addi t0, t0, GPIO_BOP_OFFSET
-
-    # set SPI_CS_TF (B12)
-    addi t1, zero, 1
-    slli t1, t1, 12
-    sw t0, t1, 0
-    
-    # clear SPI_SCLK (B13)
-    addi t1, zero, 1
-    slli t1, t1, 29
-    sw t0, t1, 0
-
-    # set SPI_MISO (B14)
-    addi t1, zero, 1
-    slli t1, t1, 14
-    sw t0, t1, 0
-
-    # set SPI_MOSI (B15)
-    addi t1, zero, 1
-    slli t1, t1, 15
     sw t0, t1, 0
 
 spi_init:
@@ -156,16 +137,6 @@ spi_init:
 
     # load current SPI config into t1
     lw t1, t0, 0
-
-    # NSS software mode enable (use a bit to drive CS line)
-    addi t2, zero, 1
-    slli t2, t2, 9
-    or t1, t1, t2
-
-    # set CS pin high
-    addi t2, zero, 1
-    slli t2, t2, 8
-    or t1, t1, t2
 
     # enable SPI
     addi t2, zero, 1
@@ -232,7 +203,7 @@ spi_recv:
     addi t3, zero, 0xff
     sw t2, t3, 0
 spi_recv_wait:
-    # TODO: limit attempts to 16 to prevent infinite loop?
+    # TODO: limit attempts to 2**16 to prevent infinite loop?
     lw t3, t1, 0  # load stat into t3
     andi t3, t3, 0b01  # isolate RBNE bit
     beq t3, zero, spi_recv_wait  # keep looping until ready to recv
@@ -259,13 +230,6 @@ main:
     lui t0, %hi(SPI1_BASE_ADDR)
     addi t0, t0, %lo(SPI1_BASE_ADDR)
     addi t0, t0, SPI_CTL0_OFFSET
-
-    # set CS low (via NSS bit)
-    lw t1, t0, 0
-    addi t2, zero, 1 << 8
-    xori t2, t2, -1
-    and t1, t1, t2
-    sw t0, t1, 0
 
 sd_init:
     # send 80 (>= 74) pulses w/ MOSI and CS high

@@ -12,7 +12,8 @@ wait 1ms for SD power
 
 sd_init
 -------
-RCU: enable GPIOB and AFIO
+RCU: enable GPIOB
+RCU: enable AFIO (doesn't actually matter, though?)
 RCU: enable SPI1
 GPIO: set CS
 GPIO: clear CLK
@@ -21,7 +22,7 @@ GPIO: set MISO
 GPIO: config CS - out af pp 50
 GPIO: config CLK - out af pp 50
 GPIO: config MISO - in float (has external pull-up, would be af if input)
-GPIO: config MOSI - out af od 50 (has external pull-up)
+GPIO: config MOSI - out af od 50 (has external pull-up but pp works)
 RCU: set SPI1 reset (not necessary) (rust code enables then resets)
 RCU: clear SPI1 reset (not necessary)
 SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off)
