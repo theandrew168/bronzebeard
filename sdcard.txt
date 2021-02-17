@@ -8,7 +8,7 @@ SPI off: set NSS, clear enable
 
 delay
 -----
-wait 1ms for SD power to activate
+wait 1ms for SD power
 
 sd_init
 -------
@@ -20,17 +20,17 @@ GPIO: set MOSI
 GPIO: set MISO
 GPIO: config CS - out af pp 50
 GPIO: config CLK - out af pp 50
-GPIO: config MISO - in float
-GPIO: config MOSI - out af od 50
-RCU: set SPI1 reset (not necessary)
+GPIO: config MISO - in float (has external pull-up, would be af if input)
+GPIO: config MOSI - out af od 50 (has external pull-up)
+RCU: set SPI1 reset (not necessary) (rust code enables then resets)
 RCU: clear SPI1 reset (not necessary)
 SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off)
-SPI: enable NSS drive
+SPI: enable NSS drive (should actually not be set? based on rust code. does this only affect HW NSS? TLDR nah)
 
 sd_wakeup:
-SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off)
+SPI: set clkdiv, enable SW NSS, enable master mode, set NSS, clear enable (off, redundant)
 SPI: set clkdiv, enable SW NSS, enable master mode, clear NSS, set enable (on)
-send 0xff (8 clock pulses, not needed?)
+send 0xff (8 clock pulses, not necessary?)
 send 0x40 (CMD0)
 send 0x00 (ARG)
 send 0x00 (ARG)
