@@ -1,15 +1,17 @@
 # Read blocks from the SDCard on the Longan Nano
-# Based on:
+#
+# References:
 # https://github.com/riscv-mcu/GD32VF103_Firmware_Library/blob/master/Examples/SPI/SPI_master_slave_fullduplex_polling/main.c
 # http://elm-chan.org/docs/mmc/mmc_e.html
 # https://github.com/arduino-libraries/SD/blob/master/src/utility/Sd2Card.cpp
 # http://www.dejazzer.com/ee379/lecture_notes/lec12_sd_card.pdf
 # https://github.com/esmil/gd32vf103inator/blob/master/examples/LonganNano/sdcard.c
+# https://github.com/sipeed/Longan_GD32VF_examples/blob/master/gd32v_lcd/src/fatfs/tf_card.c
 
 # SPI Locations
-# (based on schematic)
+# (based on schematic and data sheet)
 # --------------------
-# SPI1_CS_TF: B12 (OUT_AF_PUSH_PULL, 50MHz)
+# SPI1_CS_TF: B12 (OUT_PUSH_PULL, 50MHz)
 # SPI1_SCLK:  B13 (OUT_AF_PUSH_PULL, 50MHz)
 # SPI1_MISO:  B14 (IN_FLOATING, 0)
 # SPI1_MOSI:  B15 (OUT_AF_PUSH_PULL, 50MHz)
@@ -45,17 +47,6 @@ SPI_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 18.11.2
 SPI_STAT_OFFSET = 0x08  # GD32VF103 Manual: Section 18.11.3
 SPI_DATA_OFFSET = 0x0c  # GD32VF103 Manual: Section 18.11.4
 
-delay:
-    # mtime runs @ 2MHz
-    # 2000000c/s * 0.001s = 2000c
-    lui t0, %hi(0xd1000000)
-    addi t0, t0, %lo(0xd1000000)
-    lw t1, t0, 0
-    addi t1, t1, 2000
-delay_loop:
-    lw t2, t0, 0
-    blt t2, t1, delay_loop
-
 rcu_init:
     # load RCU APB2EN addr into t0
     lui t0, %hi(RCU_BASE_ADDR)
@@ -63,8 +54,7 @@ rcu_init:
     addi t0, t0, RCU_APB2EN_OFFSET
 
     # enable GPIO ports A, B, and C
-    # enable AFIO
-    addi t1, zero, 0b00011101
+    addi t1, zero, 0b00011100
     sw t0, t1, 0
 
     # load RCU APB1EN addr into t0
@@ -86,13 +76,13 @@ gpio_init:
     # load current GPIO config into t1
     lw t1, t0, 0
 
-    # SPI1_CS_TF:  B12 (OUT_AF_PUSH_PULL, 50MHz)
+    # SPI1_CS_TF:  B12 (OUT_PUSH_PULL, 50MHz)
     addi t2, zero, 0b1111
     slli t2, t2, 16
     xori t2, t2, -1
     and t1, t1, t2
 
-    addi t2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    addi t2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     slli t2, t2, 16
     or t1, t1, t2
 
@@ -138,33 +128,27 @@ spi_init:
     # load current SPI config into t1
     lw t1, t0, 0
 
+    # software NSS
+    addi t2, zero, 1
+    slli t2, t2, 9
+    or t1, t1, t2
+
+    # NSS pulled high (won't work at all without this)
+    addi t2, zero, 1
+    slli t2, t2, 8
+    or t1, t1, t2
+
     # enable SPI
     addi t2, zero, 1
     slli t2, t2, 6
     or t1, t1, t2
 
-    # set SPI clock: 8MHz / 64 = 125KHz
-    addi t2, zero, 0b101
+    # set SPI clock: 8MHz / 32 = 250KHz
+    addi t2, zero, 0b100
     slli t2, t2, 3
     or t1, t1, t2
 
     # master mode
-    addi t2, zero, 1
-    slli t2, t2, 2
-    or t1, t1, t2
-
-    # store the SPI config
-    sw t0, t1, 0
-
-    # load SPI1 CTL1 addr into t0
-    lui t0, %hi(SPI1_BASE_ADDR)
-    addi t0, t0, %lo(SPI1_BASE_ADDR)
-    addi t0, t0, SPI_CTL1_OFFSET
-
-    # load current SPI config into t1
-    lw t1, t0, 0
-
-    # drive CS low when SPI is enabled
     addi t2, zero, 1
     slli t2, t2, 2
     or t1, t1, t2
@@ -200,10 +184,14 @@ spi_recv:
     addi t1, t0, SPI_STAT_OFFSET
     addi t2, t0, SPI_DATA_OFFSET
     # write 0xff into SPI_DATA
+    # TODO: why is this required? what does it really do?
+    # TODO: is this just sending 8 dummy bits to pulse the clock and read data?
+    # TODO: in which case shouldn't this happen every loop? (first part)
+    # TODO: and shouldn't TBE be asserted first?
     addi t3, zero, 0xff
     sw t2, t3, 0
 spi_recv_wait:
-    # TODO: limit attempts to 2**16 to prevent infinite loop?
+    # TODO: limit attempts to prevent infinite loop?
     lw t3, t1, 0  # load stat into t3
     andi t3, t3, 0b01  # isolate RBNE bit
     beq t3, zero, spi_recv_wait  # keep looping until ready to recv
@@ -226,32 +214,33 @@ spi_flush_wait:
     jalr zero ra 0  # return
 
 main:
-    # load SPI1 CTL0 addr into t0
-    lui t0, %hi(SPI1_BASE_ADDR)
-    addi t0, t0, %lo(SPI1_BASE_ADDR)
-    addi t0, t0, SPI_CTL0_OFFSET
+    # t0 = GPIOB_BOP
+    lui t0, %hi(GPIOB_BASE_ADDR)
+    addi t0, t0, %lo(GPIOB_BASE_ADDR)
+    addi t0, t0, GPIO_BOP_OFFSET
+
+    # set CS high (disable)
+    addi t1, zero, 1
+    slli t1, t1, 12
+    sw t0, t1, 0
+
+    # set CS low (enable)
+    addi t1, zero, 1
+    slli t1, t1, 28
+    sw t0, t1, 0
 
 sd_init:
-    # send 80 (>= 74) pulses w/ MOSI and CS high
-    addi s1, zero, 10
+    # send 80 (>= 74) clock pulses to "boot" the SD card
+    addi s0, zero, 10
 sd_init_cond:
-    beq s1, zero, sd_init_done
+    beq s0, zero, sd_init_done
 sd_init_body:
     addi a0, zero, 0xff
     jal ra spi_send
 sd_init_next:
-    addi s1, s1, -1
+    addi s0, s0, -1
     jal zero sd_init_cond
 sd_init_done:
-
-    # load SPI1 CTL0 addr into t0
-    lui t0, %hi(SPI1_BASE_ADDR)
-    addi t0, t0, %lo(SPI1_BASE_ADDR)
-    addi t0, t0, SPI_CTL0_OFFSET
-
-    # send a batch of 1s first
-    addi a0, zero, 0xff
-    jal ra spi_send
 
     # write CMD0 (1 byte): 0x40 | 0x00 = 0x40 (0b01 + CMD)
     # write ARG (4 bytes): 4 * 0x00
