@@ -11,18 +11,17 @@
 # GPIO Config
 # (based on schematic and data sheet)
 # --------------------
-# SPI1_CS_TF - B12 (OUT_PUSH_PULL, 50MHz)
+# SPI1_CS_TF - B12 (OUT_AF_PUSH_PULL, 50MHz)
 # SPI1_SCLK  - B13 (OUT_AF_PUSH_PULL, 50MHz)
 # SPI1_MISO  - B14 (IN_FLOATING, 0)
 # SPI1_MOSI  - B15 (OUT_AF_PUSH_PULL, 50MHz)
 
 # SPI Config
 # ----------
-# SWSSEN - NSS software mode enable
-# SWNSS  - NSS pin selection in NSS software mode
 # SPIEN  - SPI enable
 # PSC    - Master clock prescaler selection (PCLK/32) (8MHz / 32 = 250KHz)
 # MSTMOD - Master mode enable
+# NSSDRV - Drive NSS output
 
 RCU_BASE_ADDR = 0x40021000  # GD32VF103 Manual: Section 5.3
 RCU_APB2EN_OFFSET = 0x18  # GD32VF103 Manual: Section 5.3.7 (GPIO ABCDE, AFIO)
@@ -62,7 +61,8 @@ rcu_init:
     addi t0, t0, RCU_APB2EN_OFFSET
 
     # enable GPIO ports A, B, and C
-    addi t1, zero, 0b00011100
+    # enable AFIO
+    addi t1, zero, 0b00011101
     sw t0, t1, 0
 
     # load RCU APB1EN addr into t0
@@ -90,7 +90,7 @@ gpio_init:
     xori t2, t2, -1
     and t1, t1, t2
 
-    addi t2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    addi t2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     slli t2, t2, 16
     or t1, t1, t2
 
@@ -136,16 +136,6 @@ spi_init:
     # load current SPI config into t1
     lw t1, t0, 0
 
-    # software NSS
-    addi t2, zero, 1
-    slli t2, t2, 9
-    or t1, t1, t2
-
-    # NSS pulled high (won't work at all without this)
-    addi t2, zero, 1
-    slli t2, t2, 8
-    or t1, t1, t2
-
     # enable SPI
     addi t2, zero, 1
     slli t2, t2, 6
@@ -157,6 +147,22 @@ spi_init:
     or t1, t1, t2
 
     # master mode
+    addi t2, zero, 1
+    slli t2, t2, 2
+    or t1, t1, t2
+
+    # store the SPI config
+    sw t0, t1, 0
+
+    # load SPI1 CTL1 addr into t0
+    lui t0, %hi(SPI1_BASE_ADDR)
+    addi t0, t0, %lo(SPI1_BASE_ADDR)
+    addi t0, t0, SPI_CTL1_OFFSET
+
+    # load current SPI config into t1
+    lw t1, t0, 0
+
+    # enable NSSDRV
     addi t2, zero, 1
     slli t2, t2, 2
     or t1, t1, t2
@@ -222,21 +228,6 @@ spi_flush_wait:
     jalr zero ra 0  # return
 
 main:
-    # t0 = GPIOB_BOP
-    lui t0, %hi(GPIOB_BASE_ADDR)
-    addi t0, t0, %lo(GPIOB_BASE_ADDR)
-    addi t0, t0, GPIO_BOP_OFFSET
-
-    # set CS high (disable)
-    addi t1, zero, 1
-    slli t1, t1, 12
-    sw t0, t1, 0
-
-    # set CS low (enable)
-    addi t1, zero, 1
-    slli t1, t1, 28
-    sw t0, t1, 0
-
 sd_init:
     # send 80 (>= 74) clock pulses to "boot" the SD card
     addi s0, zero, 10
