@@ -8,13 +8,21 @@
 # https://github.com/esmil/gd32vf103inator/blob/master/examples/LonganNano/sdcard.c
 # https://github.com/sipeed/Longan_GD32VF_examples/blob/master/gd32v_lcd/src/fatfs/tf_card.c
 
-# SPI Locations
+# GPIO Config
 # (based on schematic and data sheet)
 # --------------------
-# SPI1_CS_TF: B12 (OUT_PUSH_PULL, 50MHz)
-# SPI1_SCLK:  B13 (OUT_AF_PUSH_PULL, 50MHz)
-# SPI1_MISO:  B14 (IN_FLOATING, 0)
-# SPI1_MOSI:  B15 (OUT_AF_PUSH_PULL, 50MHz)
+# SPI1_CS_TF - B12 (OUT_PUSH_PULL, 50MHz)
+# SPI1_SCLK  - B13 (OUT_AF_PUSH_PULL, 50MHz)
+# SPI1_MISO  - B14 (IN_FLOATING, 0)
+# SPI1_MOSI  - B15 (OUT_AF_PUSH_PULL, 50MHz)
+
+# SPI Config
+# ----------
+# SWSSEN - NSS software mode enable
+# SWNSS  - NSS pin selection in NSS software mode
+# SPIEN  - SPI enable
+# PSC    - Master clock prescaler selection (PCLK/32) (8MHz / 32 = 250KHz)
+# MSTMOD - Master mode enable
 
 RCU_BASE_ADDR = 0x40021000  # GD32VF103 Manual: Section 5.3
 RCU_APB2EN_OFFSET = 0x18  # GD32VF103 Manual: Section 5.3.7 (GPIO ABCDE, AFIO)
