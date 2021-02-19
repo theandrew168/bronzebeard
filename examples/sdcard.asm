@@ -23,6 +23,23 @@
 # MSTMOD - Master mode enable
 # NSSDRV - Drive NSS output
 
+# SD Card Config
+# --------------
+# send 80 (>= 74) clock pulses
+# CMD0 (arg=0, software reset)
+#   check for 0x01
+# CMD8 (arg=0x000001aa, check voltage range)
+#   check for 0x01 0x00 0x00 0x01 0xaa
+# CMD55 (arg=0, setup app cmd)
+# CMD41 (arg=0x40000000, start init w/ host capacity support (HCS))
+#   may take up to 1s
+#   if 0x01, retry
+#   if 0x00, success
+# CMD58 (arg=0, read operation conditions register (OCR))
+#   check card capacity status (CCS) bit
+#   if bit30 == 1, done (card is SDHC/SDXC w/ block of 512)
+#   if bit30 == 0, send CMD16 (arg=0x00000200, set block size to 512 bytes), check for 0x01
+
 RCU_BASE_ADDR = 0x40021000  # GD32VF103 Manual: Section 5.3
 RCU_APB2EN_OFFSET = 0x18  # GD32VF103 Manual: Section 5.3.7 (GPIO ABCDE, AFIO)
 RCU_APB1EN_OFFSET = 0x1c  # GD32VF103 Manual: Section 5.3.8 (SPI1)
@@ -84,7 +101,7 @@ gpio_init:
     # load current GPIO config into t1
     lw t1, t0, 0
 
-    # SPI1_CS_TF:  B12 (OUT_PUSH_PULL, 50MHz)
+    # SPI1_CS_TF:  B12 (OUT_AF_PUSH_PULL, 50MHz)
     addi t2, zero, 0b1111
     slli t2, t2, 16
     xori t2, t2, -1
@@ -191,26 +208,29 @@ spi_send_wait:
 # Procedure: spi_recv
 # Usage: jal ra spi_recv
 # Ret: a0 = byte received over SPI
+# TODO: limit attempts to prevent infinite loop?
 spi_recv:
     # t1 = stat, t2 = data
     lui t0, %hi(SPI1_BASE_ADDR)
     addi t0, t0, %lo(SPI1_BASE_ADDR)
     addi t1, t0, SPI_STAT_OFFSET
     addi t2, t0, SPI_DATA_OFFSET
-    # write 0xff into SPI_DATA
-    # TODO: why is this required? what does it really do?
-    # TODO: is this just sending 8 dummy bits to pulse the clock and read data?
-    # TODO: in which case shouldn't this happen every loop? (first part)
-    # TODO: and shouldn't TBE be asserted first?
+spi_recv_wait:
+    # wait for TBE to send dummy clock bits
+    lw t3, t1, 0  # load stat into t3
+    andi t3, t3, 0b10  # isolate TBE bit
+    beq t3, zero, spi_recv_wait  # keep looping til dummy bits can be sent
+    # send dummy clock bits
     addi t3, zero, 0xff
     sw t2, t3, 0
-spi_recv_wait:
-    # TODO: limit attempts to prevent infinite loop?
+    # wait for RBNE to confirm data was received
     lw t3, t1, 0  # load stat into t3
     andi t3, t3, 0b01  # isolate RBNE bit
-    beq t3, zero, spi_recv_wait  # keep looping until ready to recv
+    beq t3, zero, spi_recv_wait  # keep looping until data was received
+    # got data! let's read it
     lw a0, t2, 0  # read byte into a0
     addi t4, zero, 0xff  # load 0xff into t4 (MISO defaults to high)
+    # if the data is all 1s, it wasn't legit
     beq a0, t4, spi_recv_wait  # keep looping until "real" response arrives
     jalr zero, ra, 0  # return
 
@@ -243,8 +263,10 @@ sd_init_done:
 
     # write CMD0 (1 byte): 0x40 | 0x00 = 0x40 (0b01 + CMD)
     # write ARG (4 bytes): 4 * 0x00
-    # write CRC (1 byte): CMD0 -> 0x95, CMD8 -> 0x87, default 0xff (dont care?)
+    # write CRC (1 byte): 0x95 (CMD0 -> 0x95, CMD8 -> 0x87, default 0xff (dont care?))
     # total: 0x40 0x00 x00 0x00 x00 0x95
+    addi a0, zero, 0xff
+    jal ra spi_send
     addi a0, zero, 0x40
     jal ra spi_send
     addi a0, zero, 0x00
@@ -264,9 +286,159 @@ sd_init_done:
     # read resp from SD Card
     jal ra spi_recv
 
-    # success if 0x01 else failure
+    # failure if not 0x01
     addi t0, zero, 0x01
-    beq a0 t0 success
+    bne a0 t0 failure
+
+    # write CMD8 (1 byte): 0x40 | 0x08 = 0x48 (0b01 + CMD)
+    # write ARG (4 bytes): 0x00 0x00 0x01 0xaa
+    # write CRC (1 byte): 0x87 (CMD0 -> 0x95, CMD8 -> 0x87, default 0xff (dont care?))
+    # total: 0x40 0x00 x00 0x00 x00 0x95
+    addi a0, zero, 0xff
+    jal ra spi_send
+    addi a0, zero, 0x48
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x01
+    jal ra spi_send
+    addi a0, zero, 0xaa
+    jal ra spi_send
+    addi a0, zero, 0x87
+    jal ra spi_send
+
+    # wait for trans to finish
+    jal ra spi_flush
+
+    # read resp from SD Card
+    jal ra spi_recv
+
+    # failure if not 0x01
+    addi t0, zero, 0x01
+    bne a0 t0 failure
+
+    # read 4 more bytes (should be 0x00 0x00 0x01 0xaa)
+    jal ra spi_recv
+    addi t0, zero, 0x00
+    bne a0 t0 failure
+
+    jal ra spi_recv
+    addi t0, zero, 0x00
+    bne a0 t0 failure
+
+    jal ra spi_recv
+    addi t0, zero, 0x01
+    bne a0 t0 failure
+
+    jal ra spi_recv
+    addi t0, zero, 0xaa
+    bne a0 t0 failure
+
+try_init:
+    # write CMD55 (1 byte): 0x40 | 0x37 = 0x77 (0b01 + CMD)
+    # write ARG (4 bytes): 4 * 0x00
+    # write CRC (1 byte): 0x01 (CMD0 -> 0x95, CMD8 -> 0x87, default 0x01)
+    # total: 0x77 0x00 x00 0x00 x00 0x01
+    addi a0, zero, 0xff
+    jal ra spi_send
+    addi a0, zero, 0x77
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x01
+    jal ra spi_send
+
+    # failure if not 0x01
+    jal ra spi_recv
+    addi t0, zero, 0x01
+    bne a0 t0 failure
+
+    # write CMD41 (1 byte): 0x40 | 0x29 = 0x69 (0b01 + CMD)
+    # write ARG (4 bytes): 0x40 0x00 0x00 0x00
+    # write CRC (1 byte): 0x01 (CMD0 -> 0x95, CMD8 -> 0x87, default 0x01)
+    # total: 0x69 0x00 x00 0x00 x00 0x01
+    addi a0, zero, 0xff
+    jal ra spi_send
+    addi a0, zero, 0x69
+    jal ra spi_send
+    addi a0, zero, 0x40
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x01
+    jal ra spi_send
+
+    # try again if 0x01
+    jal ra spi_recv
+    addi t0, zero, 0x01
+    beq a0 t0 try_init
+
+    # failed if not 0x01 or 0x00
+    bne a0 zero failure
+
+    jal zero success
+    # resp must be 0x00 at this point (good to go)
+
+    # write CMD58 (1 byte): 0x40 | 0x3a = 0x7a (0b01 + CMD)
+    # write ARG (4 bytes): 4 * 0x00
+    # write CRC (1 byte): 0x01 (CMD0 -> 0x95, CMD8 -> 0x87, default 0x01)
+    # total: 0x7a 0x00 x00 0x00 x00 0x01
+    addi a0, zero, 0xff
+    jal ra spi_send
+    addi a0, zero, 0x7a
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x00
+    jal ra spi_send
+    addi a0, zero, 0x01
+    jal ra spi_send
+
+    # failure if not 0x00
+    jal ra spi_recv
+    bne a0 zero failure
+
+    # read 4 byte resp (OCR) into t0
+    addi s0 zero 0
+    jal ra spi_recv
+    slli a0 a0 24
+    or s0 s0 a0
+    jal ra spi_recv
+    slli a0 a0 16
+    or s0 s0 a0
+    jal ra spi_recv
+    slli a0 a0 8
+    or s0 s0 a0
+    jal ra spi_recv
+    slli a0 a0 0
+    or s0 s0 a0
+
+    # isolate CCS bit
+    addi t1 zero 1
+    slli t1 t1 30
+    andi s0 s0 t1
+
+    # failure if not in block address mode
+    beq s0 zero failure
+
+    # else success!
+    jal zero success
 
 failure:
     # load GPIOC CTL1 addr into t0
@@ -315,3 +487,4 @@ success:
     jal zero done
 
 done:
+    jal zero done
