@@ -19,7 +19,7 @@
 # SPI Config
 # ----------
 # SPIEN  - SPI enable
-# PSC    - Master clock prescaler selection (PCLK/32) (8MHz / 32 = 250KHz)
+# PSC    - Master clock prescaler selection (PCLK/64) (8MHz / 64 = 125kHz)
 # MSTMOD - Master mode enable
 # NSSDRV - Drive NSS output
 
@@ -158,8 +158,8 @@ spi_init:
     slli t2, t2, 6
     or t1, t1, t2
 
-    # set SPI clock: 8MHz / 32 = 250KHz
-    addi t2, zero, 0b100
+    # set SPI clock: 8MHz / 64 = 125kHz
+    addi t2, zero, 0b101
     slli t2, t2, 3
     or t1, t1, t2
 
@@ -388,8 +388,8 @@ try_init:
     # failed if not 0x01 or 0x00
     bne a0 zero failure
 
-    jal zero success
     # resp must be 0x00 at this point (good to go)
+    #jal zero success
 
     # write CMD58 (1 byte): 0x40 | 0x3a = 0x7a (0b01 + CMD)
     # write ARG (4 bytes): 4 * 0x00
@@ -422,12 +422,14 @@ try_init:
     jal ra spi_recv
     slli a0 a0 16
     or s0 s0 a0
+    jal zero success  # TODO: bug here, part of OCR is 0xff. need to adjust spi_recv
     jal ra spi_recv
     slli a0 a0 8
     or s0 s0 a0
     jal ra spi_recv
     slli a0 a0 0
     or s0 s0 a0
+
 
     # isolate CCS bit
     addi t1 zero 1
@@ -436,6 +438,57 @@ try_init:
 
     # failure if not in block address mode
     beq s0 zero failure
+
+#    # write CMD17 (1 byte): 0x40 | 0x11 = 0x51 (0b01 + CMD)
+#    # write ARG (4 bytes): block or addr: 0x00 0x00 0x00 0x00
+#    # write CRC (1 byte): 0x01 (CMD0 -> 0x95, CMD8 -> 0x87, default 0x01)
+#    # total: 0x51 0x00 x00 0x00 x00 0x01
+#    addi a0, zero, 0xff
+#    jal ra spi_send
+#    addi a0, zero, 0x51
+#    jal ra spi_send
+#    addi a0, zero, 0x00
+#    jal ra spi_send
+#    addi a0, zero, 0x00
+#    jal ra spi_send
+#    addi a0, zero, 0x00
+#    jal ra spi_send
+#    addi a0, zero, 0x00
+#    jal ra spi_send
+#    addi a0, zero, 0x01
+#    jal ra spi_send
+#
+#    # failure if not 0x00
+#    jal ra spi_recv
+#    bne a0 zero failure
+#
+#    # read data token
+#    jal ra spi_recv
+#    addi t0 zero 0b11111110
+#    bne a0 t0 failure
+#
+#    # read first byte (should be a backslash)
+#    jal ra spi_recv
+#    addi t0 zero 0x5a
+#    bne a0 t0 failure
+#
+#    # read 512 bytes
+#    addi s0 zero 1
+#    slli s0 s0 9
+#    addi s0 s0 -1
+#recv:
+#recv_cond:
+#    beq s0 zero recv_done
+#recv_body:
+#    jal ra spi_recv
+#recv_next:
+#    addi s0 s0 -1
+#    jal zero recv_cond
+#recv_done:
+#
+#    # read CRC (2 bytes)
+#    jal ra spi_recv
+#    jal ra spi_recv
 
     # else success!
     jal zero success
