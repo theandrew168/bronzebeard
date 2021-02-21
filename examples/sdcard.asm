@@ -234,6 +234,28 @@ spi_recv_wait:
     beq a0, t4, spi_recv_wait  # keep looping until "real" response arrives
     jalr zero, ra, 0  # return
 
+# Procedure: sd_init
+sd_init:
+    # for 10 times:
+    # assert TBE
+    # send 0xff
+    jal zero, ra, 0  # return
+
+# Procedure: sd_cmd
+# Arg: a0 = cmd (1 byte)
+# Arg: a1 = arg (4 bytes)
+# Arg: a2 = crc (1 byte)
+# Ret: a0 = r1 (1 byte)
+# Ret: a1 = r3/r7 (4 bytes)
+sd_cmd:
+    # send cmd
+    # send arg
+    # send crc (or determine CRC via simple case)
+    # recv r1
+    # recv r3/r7 (optionally)
+    # send extra 0xff
+    jalr zero, ra, 0  # return
+
 # Procedure: spi_flush
 # Usage: jal ra spi_flush
 spi_flush:
@@ -429,7 +451,6 @@ try_init:
     jal ra spi_recv
     slli a0 a0 0
     or s0 s0 a0
-
 
     # isolate CCS bit
     addi t1 zero 1
