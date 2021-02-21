@@ -81,24 +81,21 @@ SPI_DATA_OFFSET = 0x0c  # GD32VF103 Manual: Section 18.11.4
 jal zero main
 
 # Procedure: rcu_init
+# Arg: a0 = RCU base addr
 rcu_init:
-    # load RCU APB2EN addr into t0
-    lui t0, %hi(RCU_BASE_ADDR)
-    addi t0, t0, %lo(RCU_BASE_ADDR)
-    addi t0, t0, RCU_APB2EN_OFFSET
-
+    # advance to APB2EN
+    addi a0, a0, RCU_APB2EN_OFFSET
     # enable GPIO ports A, B, and C
     # enable AFIO
-    addi t1, zero, 0b00011101
-    sw t0, t1, 0
+    addi t0, zero, 0b00011101
+    sw a0, t0, 0
 
-    # advance t0 to RCU APB1EN addr
-    addi t0, t0, 4
-
+    # advance to APB1EN
+    addi a0, a0, 4
     # enable SPI1
-    addi t1, zero, 1
-    slli t1, t1, 14
-    sw t0, t1, 0
+    addi t0, zero, 1
+    slli t0, t0, 14
+    sw a0, t0, 0
 
     # return
     jalr zero, ra, 0
@@ -120,7 +117,8 @@ gpio_init_config:
     # multiply pin number by 4 to get shift amount
     addi t0, zero, 4
     mul a1, a1, t0
-    # load current config into t0
+
+    # load current config
     lw t0, a0, 0
     # clear existing pin config
     addi t1, zero, 0b1111
@@ -130,8 +128,9 @@ gpio_init_config:
     # set new pin config
     sll a2, a2, a1
     or t0, t0, a2
-    # store updated config from t0
+    # store updated config
     sw a0, t0, 0
+
     # return
     jalr zero, ra, 0
 
@@ -146,6 +145,7 @@ gpio_on:
     sll t0, t0, a1
     # turn the pin on
     sw a0, t0, 0
+
     # return
     jalr zero, ra, 0
 
@@ -161,11 +161,51 @@ gpio_off:
     slli t0, t0, 16
     # turn the pin off
     sw a0, t0, 0
+
+    # return
+    jalr zero, ra, 0
+
+# Procedure: spi_init
+# Arg: a0 = SPI base address
+# Arg: a1 = SPI clock divider
+spi_init:
+    # advance to CTL0
+    addi a0, a0, SPI_CTL0_OFFSET
+
+    # load current config
+    lw t0, a0, 0
+    # enable SPI
+    addi t1, zero, 1
+    slli t1, t1, 6
+    or t0, t0, t1
+    # set SPI clock divider
+    slli a1, a1, 3
+    or t0, t0, a1
+    # enable master mode
+    addi t1, zero, 1
+    slli t1, t1, 2
+    or t0, t0, t1
+    # store updated config
+    sw a0, t0, 0
+
+    # advance to CTL1
+    addi a0, a0, 4
+    # load current config
+    lw t0, a0, 0
+    # enable NSSDRV
+    addi t1, zero, 1
+    slli t1, t1, 2
+    or t0, t0, t1
+    # store updated config
+    sw a0, t0, 0
+
     # return
     jalr zero, ra, 0
 
 main:
     # init RCU for GPIO[ABC], AFIO, and SPI1
+    lui a0, %hi(RCU_BASE_ADDR)
+    addi a0, a0, %lo(RCU_BASE_ADDR)
     jal ra, rcu_init
 
     # init red LED (defaults to on)
@@ -195,11 +235,17 @@ main:
     addi a1, zero, 2
     jal ra, gpio_on
 
-    # turn on blue LED (by grouning the GPIO)
+    # turn on blue LED (by grounding the GPIO)
     lui a0, %hi(GPIOA_BASE_ADDR)
     addi a0, a0, %lo(GPIOA_BASE_ADDR)
     addi a1, zero, 2
     jal ra, gpio_off
+
+    # init SPI1 for SD Card
+    lui a0, %hi(SPI1_BASE_ADDR)
+    addi a0, a0, %lo(SPI1_BASE_ADDR)
+    addi a1, zero, 0b101  # 8MHz / 64 = 125kHz
+    jal ra, spi_init
 
 done:
     jal zero done
