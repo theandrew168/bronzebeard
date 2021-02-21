@@ -80,7 +80,7 @@ SPI_DATA_OFFSET = 0x0c  # GD32VF103 Manual: Section 18.11.4
 
 jal zero main
 
-# Procedure: rcu_init
+# Func: rcu_init
 # Arg: a0 = RCU base addr
 rcu_init:
     # advance to APB2EN
@@ -100,7 +100,7 @@ rcu_init:
     # return
     jalr zero, ra, 0
 
-# Procedure: gpio_init
+# Func: gpio_init
 # Arg: a0 = GPIO port base addr
 # Arg: a1 = GPIO pin number
 # Arg: a2 = GPIO config
@@ -134,7 +134,7 @@ gpio_init_config:
     # return
     jalr zero, ra, 0
 
-# Procedure: gpio_on
+# Func: gpio_on
 # Arg: a0 = GPIO port base addr
 # Arg: a1 = GPIO pin number
 gpio_on:
@@ -149,7 +149,7 @@ gpio_on:
     # return
     jalr zero, ra, 0
 
-# Procedure: gpio_off
+# Func: gpio_off
 # Arg: a0 = GPIO port base addr
 # Arg: a1 = GPIO pin number
 gpio_off:
@@ -165,9 +165,9 @@ gpio_off:
     # return
     jalr zero, ra, 0
 
-# Procedure: spi_init
-# Arg: a0 = SPI base address
-# Arg: a1 = SPI clock divider
+# Func: spi_init
+# Arg: a0 = SPI base addr
+# Arg: a1 = SPI clock div
 spi_init:
     # advance to CTL0
     addi a0, a0, SPI_CTL0_OFFSET
@@ -202,44 +202,174 @@ spi_init:
     # return
     jalr zero, ra, 0
 
+# Func: sd_init
+# Arg: a0 = SPI base addr
+sd_init:
+    addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
+    addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
+    # send 80 (>= 74) clock pulses to "boot" the SD card
+    addi t2, zero, 10
+sd_init_cond:
+    # done once counter reaches zero
+    beq t2, zero, sd_init_done
+sd_init_body:
+    # wait for TBE
+    lw t3, t0, 0  # load SPI status
+    andi t3, t3, 0x02  # isolate TBE bit
+    beq t3, zero, sd_init_body
+    # send 0xff to pulse SD card clock
+    addi t3, zero, 0xff
+    sw t1, t3, 0
+sd_init_next:
+    # decrement counter and check cond again
+    addi t2, t2, -1
+    jal zero, sd_init_cond
+sd_init_done:
+    # return
+    jalr zero, ra, 0
+
+# Func: sd_cmd
+# Arg: a0 = SPI base addr
+# Arg: a1 = SD cmd (1 byte)
+# Arg: a2 = SD arg (4 bytes)
+# Arg: a3 = SD crc (1 byte)
+# Ret: a0 = SD r1 (1 byte)
+# Ret: a1 = SD r3/r7 (4 bytes)
+sd_cmd:
+    addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
+    addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
+sd_cmd_send_wait:
+    # pulse clock til 0xff is recv'd and SD card is "ready"
+
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_wait
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_send_wait
+    # read a byte and loop again if not 0xff
+    lw t2, t1, 0
+    addi t3, zero, 0xff
+    bne t2, t3, sd_cmd_send_wait
+
+sd_cmd_send:
+    # ready to send!
+    # have to repeat the TBE wait because funcs can't nest
+sd_cmd_send_cmd:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_cmd
+    # send cmd
+    ori a1, a1, 0x40
+    sw t1, a1, 0
+sd_cmd_send_arg3:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_arg3
+    # send arg[31..24]
+    srli t2, a2, 24
+    andi t2, t2, 0xff
+    sw t1, t2, 0
+sd_cmd_send_arg2:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_arg2
+    # send arg[23..16]
+    srli t2, a2, 16
+    andi t2, t2, 0xff
+    sw t1, t2, 0
+sd_cmd_send_arg1:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_arg1
+    # send arg[15..8]
+    srli t2, a2, 8
+    andi t2, t2, 0xff
+    sw t1, t2, 0
+sd_cmd_send_arg0:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_arg0
+    # send arg[7..0]
+    srli t2, a2, 0
+    andi t2, t2, 0xff
+    sw t1, t2, 0
+sd_cmd_send_crc:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_send_crc
+    # send crc
+    sw t1, a3, 0
+
+sd_cmd_recv_wait:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_recv_wait
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_recv_wait
+    # read a byte and loop again if 0xff
+    lw t2, t1, 0
+    addi t3, zero, 0xff
+    beq t2, t3, sd_cmd_recv_wait
+sd_cmd_recv:
+    # recv r1 (will already be in t2)
+    addi a0, t2, 0
+    # recv r3/r7 (optionally: CMD8, CMD58)
+    addi a1, zero, 0
+
+    # return
+    jalr zero, ra, 0
+
 main:
     # init RCU for GPIO[ABC], AFIO, and SPI1
     lui a0, %hi(RCU_BASE_ADDR)
     addi a0, a0, %lo(RCU_BASE_ADDR)
     jal ra, rcu_init
 
-    # init red LED (defaults to on)
-    lui a0, %hi(GPIOC_BASE_ADDR)
-    addi a0, a0, %lo(GPIOC_BASE_ADDR)
+    # init SPI1_CS_TF (B12)
+    lui a0, %hi(GPIOB_BASE_ADDR)
+    addi a0, a0, %lo(GPIOB_BASE_ADDR)
+    addi a1, zero, 12
+    addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    jal ra, gpio_init
+
+    # init SPI1_SCLK (B13)
+    lui a0, %hi(GPIOB_BASE_ADDR)
+    addi a0, a0, %lo(GPIOB_BASE_ADDR)
     addi a1, zero, 13
-    addi a2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     jal ra, gpio_init
 
-    # init green LED (defaults to on)
-    lui a0, %hi(GPIOA_BASE_ADDR)
-    addi a0, a0, %lo(GPIOA_BASE_ADDR)
-    addi a1, zero, 1
-    addi a2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    # init SPI1_MISO (B14)
+    lui a0, %hi(GPIOB_BASE_ADDR)
+    addi a0, a0, %lo(GPIOB_BASE_ADDR)
+    addi a1, zero, 14
+    addi a2, zero, GPIO_CTL_IN_FLOATING << 2 | 0
     jal ra, gpio_init
 
-    # init blue LED (defaults to on)
-    lui a0, %hi(GPIOA_BASE_ADDR)
-    addi a0, a0, %lo(GPIOA_BASE_ADDR)
-    addi a1, zero, 2
-    addi a2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    # init SPI1_MOSI (B15)
+    lui a0, %hi(GPIOB_BASE_ADDR)
+    addi a0, a0, %lo(GPIOB_BASE_ADDR)
+    addi a1, zero, 15
+    addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     jal ra, gpio_init
-
-    # turn off blue LED (by powering the GPIO)
-    lui a0, %hi(GPIOA_BASE_ADDR)
-    addi a0, a0, %lo(GPIOA_BASE_ADDR)
-    addi a1, zero, 2
-    jal ra, gpio_on
-
-    # turn on blue LED (by grounding the GPIO)
-    lui a0, %hi(GPIOA_BASE_ADDR)
-    addi a0, a0, %lo(GPIOA_BASE_ADDR)
-    addi a1, zero, 2
-    jal ra, gpio_off
 
     # init SPI1 for SD Card
     lui a0, %hi(SPI1_BASE_ADDR)
@@ -247,5 +377,43 @@ main:
     addi a1, zero, 0b101  # 8MHz / 64 = 125kHz
     jal ra, spi_init
 
+    # init SD card
+    lui a0, %hi(SPI1_BASE_ADDR)
+    addi a0, a0, %lo(SPI1_BASE_ADDR)
+    jal ra, sd_init
+
+    # send CMD0 (software reset)
+    lui a0, %hi(SPI1_BASE_ADDR)
+    addi a0, a0, %lo(SPI1_BASE_ADDR)
+    addi a1, zero, 0
+    addi a2, zero, 0
+    addi a3, zero, 0x95
+    jal ra, sd_cmd
+
+    # failure if not 0x01
+    addi t0, zero, 0x01
+    bne a0, t0, failure
+
+    jal zero, success
+
+failure:
+    # init red LED (defaults to on)
+    lui a0, %hi(GPIOC_BASE_ADDR)
+    addi a0, a0, %lo(GPIOC_BASE_ADDR)
+    addi a1, zero, 13
+    addi a2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    jal ra, gpio_init
+    jal zero, done
+
+success:
+    # init green LED (defaults to on)
+    lui a0, %hi(GPIOA_BASE_ADDR)
+    addi a0, a0, %lo(GPIOA_BASE_ADDR)
+    addi a1, zero, 1
+    addi a2, zero, GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
+    jal ra, gpio_init
+    jal zero, done
+
+# infinite idle loop
 done:
     jal zero done
