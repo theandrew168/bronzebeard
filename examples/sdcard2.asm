@@ -84,18 +84,18 @@ jal zero main
 # Arg: a0 = RCU base addr
 rcu_init:
     # advance to APB2EN
-    addi a0, a0, RCU_APB2EN_OFFSET
+    addi t0, a0, RCU_APB2EN_OFFSET
     # enable GPIO ports A, B, and C
     # enable AFIO
-    addi t0, zero, 0b00011101
-    sw a0, t0, 0
+    addi t1, zero, 0b00011101
+    sw t0, t1, 0
 
     # advance to APB1EN
-    addi a0, a0, 4
+    addi t0, t0, 4
     # enable SPI1
-    addi t0, zero, 1
-    slli t0, t0, 14
-    sw a0, t0, 0
+    addi t1, zero, 1
+    slli t1, t1, 14
+    sw t0, t1, 0
 
     # return
     jalr zero, ra, 0
@@ -106,30 +106,30 @@ rcu_init:
 # Arg: a2 = GPIO config
 gpio_init:
     # advance to CTL0
-    addi a0, a0, GPIO_CTL0_OFFSET
+    addi t0, a0, GPIO_CTL0_OFFSET
     # if pin number is less than 8, CTL0 is correct
-    addi t0, zero, 8
-    blt a1, t0, gpio_init_config
+    addi t1, zero, 8
+    blt a1, t1, gpio_init_config
     # else we need CTL1 and then subtract 8 from the pin number
-    addi a0, a0, 4
+    addi t0, t0, 4
     addi a1, a1, -8
 gpio_init_config:
     # multiply pin number by 4 to get shift amount
-    addi t0, zero, 4
-    mul a1, a1, t0
+    addi t1, zero, 4
+    mul a1, a1, t1
 
     # load current config
-    lw t0, a0, 0
+    lw t1, t0, 0
     # clear existing pin config
-    addi t1, zero, 0b1111
-    sll t1, t1, a1
-    xori t1, t1, -1
-    and t0, t0, t1
+    addi t2, zero, 0b1111
+    sll t2, t2, a1
+    xori t2, t2, -1
+    and t1, t1, t2
     # set new pin config
     sll a2, a2, a1
-    or t0, t0, a2
+    or t1, t1, a2
     # store updated config
-    sw a0, t0, 0
+    sw t0, t1, 0
 
     # return
     jalr zero, ra, 0
@@ -139,12 +139,12 @@ gpio_init_config:
 # Arg: a1 = GPIO pin number
 gpio_on:
     # advance to BOP
-    addi a0, a0, GPIO_BOP_OFFSET
+    addi t0, a0, GPIO_BOP_OFFSET
     # prepare BOP bit
-    addi t0, zero, 1
-    sll t0, t0, a1
+    addi t1, zero, 1
+    sll t1, t1, a1
     # turn the pin on
-    sw a0, t0, 0
+    sw t0, t1, 0
 
     # return
     jalr zero, ra, 0
@@ -154,13 +154,13 @@ gpio_on:
 # Arg: a1 = GPIO pin number
 gpio_off:
     # advance to BOP
-    addi a0, a0, GPIO_BOP_OFFSET
+    addi t0, a0, GPIO_BOP_OFFSET
     # prepare BOP bit
-    addi t0, zero, 1
-    sll t0, t0, a1
-    slli t0, t0, 16
+    addi t1, zero, 1
+    sll t1, t1, a1
+    slli t1, t1, 16  # extra 16 bits to "clear" section
     # turn the pin off
-    sw a0, t0, 0
+    sw t0, t1, 0
 
     # return
     jalr zero, ra, 0
@@ -170,323 +170,310 @@ gpio_off:
 # Arg: a1 = SPI clock div
 spi_init:
     # advance to CTL0
-    addi a0, a0, SPI_CTL0_OFFSET
+    addi t0, a0, SPI_CTL0_OFFSET
 
     # load current config
-    lw t0, a0, 0
+    lw t1, t0, 0
     # enable SPI
-    addi t1, zero, 1
-    slli t1, t1, 6
-    or t0, t0, t1
+    addi t2, zero, 1
+    slli t2, t2, 6
+    or t1, t1, t2
     # set SPI clock divider
     slli a1, a1, 3
-    or t0, t0, a1
+    or t1, t1, a1
     # enable master mode
-    addi t1, zero, 1
-    slli t1, t1, 2
-    or t0, t0, t1
+    addi t2, zero, 1
+    slli t2, t2, 2
+    or t1, t1, t2
     # store updated config
-    sw a0, t0, 0
+    sw t0, t1, 0
 
     # advance to CTL1
-    addi a0, a0, 4
+    addi t0, t0, 4
     # load current config
-    lw t0, a0, 0
+    lw t1, t0, 0
     # enable NSSDRV
-    addi t1, zero, 1
-    slli t1, t1, 2
-    or t0, t0, t1
+    addi t2, zero, 1
+    slli t2, t2, 2
+    or t1, t1, t2
     # store updated config
-    sw a0, t0, 0
+    sw t0, t1, 0
 
+    # return
+    jalr zero, ra, 0
+
+# Func: spi_swap
+# Regs: t0-t2 (called by sd_init, sd_cmd, sd_read)
+# Arg: a0 = SPI base addr
+# Arg: a1 = byte to send
+# Ret: a1 = byte received
+spi_swap:
+    addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
+    addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
+sd_swap_wait_tbe:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_swap_wait_tbe
+    # send byte
+    sw t1, a1, zero
+sd_swap_wait_rbne:
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_swap_wait_rbne
+    # read byte
+    lw a1, t1, 0
     # return
     jalr zero, ra, 0
 
 # Func: sd_init
+# Regs: ~t0-t2 (calls spi_swap)
 # Arg: a0 = SPI base addr
 sd_init:
-    addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
-    addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
+    # save ra into sp
+    addi sp, ra, 0
     # send 80 (>= 74) clock pulses to "boot" the SD card
-    addi t2, zero, 10
+    addi t3, zero, 10
 sd_init_cond:
     # done once counter reaches zero
-    beq t2, zero, sd_init_done
+    beq t3, zero, sd_init_done
 sd_init_body:
-    # wait for TBE
-    lw t3, t0, 0  # load SPI status
-    andi t3, t3, 0x02  # isolate TBE bit
-    beq t3, zero, sd_init_body
     # send 0xff to pulse SD card clock
-    addi t3, zero, 0xff
-    sw t1, t3, 0
+    addi a1, zero, 0xff
+    jal ra, spi_swap
 sd_init_next:
     # decrement counter and check cond again
-    addi t2, t2, -1
+    addi t3, t3, -1
     jal zero, sd_init_cond
 sd_init_done:
-    # return
+    # restore ra and return
+    addi ra, sp, 0
     jalr zero, ra, 0
 
 # Func: sd_cmd
+# Regs: ~t0-t2 (calls spi_swap)
 # Arg: a0 = SPI base addr
-# Arg: a1 = SD cmd (1 byte)
-# Arg: a2 = SD arg (4 bytes)
-# Arg: a3 = SD crc (1 byte)
-# Ret: a0 = SD r1 (1 byte)
-# Ret: a1 = SD r3/r7 (4 bytes)
+# Arg: a2 = SD cmd (1 byte)
+# Arg: a3 = SD arg (4 bytes)
+# Arg: a4 = SD crc (1 byte)
+# Ret: a1 = SD r1 (1 byte)
+# Ret: a2 = SD r3/r7 (4 bytes)
 sd_cmd:
-    addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
-    addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
-
-sd_cmd_send_wait:
+    # save ra into sp
+    addi sp, ra, 0
+sd_cmd_wait:
     # pulse clock til 0xff is recv'd and SD card is "ready"
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_wait
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_send_wait
-    # read a byte and loop again if not 0xff
-    lw t2, t1, 0
     addi t3, zero, 0xff
-    bne t2, t3, sd_cmd_send_wait
+    addi a1, t3, 0
+    jal ra, spi_swap
+    bne a1, t3, sd_cmd_wait
 
 sd_cmd_send:
-    # ready to send!
-    # have to repeat the TBE wait because funcs can't nest
-sd_cmd_send_cmd:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_cmd
-    # send cmd
-    ori t2, a1, 0x40
-    sw t1, t2, 0
-sd_cmd_send_arg3:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_arg3
-    # send arg[31..24]
-    srli t2, a2, 24
-    andi t2, t2, 0xff
-    sw t1, t2, 0
-sd_cmd_send_arg2:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_arg2
-    # send arg[23..16]
-    srli t2, a2, 16
-    andi t2, t2, 0xff
-    sw t1, t2, 0
-sd_cmd_send_arg1:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_arg1
-    # send arg[15..8]
-    srli t2, a2, 8
-    andi t2, t2, 0xff
-    sw t1, t2, 0
-sd_cmd_send_arg0:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_arg0
-    # send arg[7..0]
-    srli t2, a2, 0
-    andi t2, t2, 0xff
-    sw t1, t2, 0
-sd_cmd_send_crc:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_send_crc
-    # send crc
-    ori a3, a3, 1
-    sw t1, a3, 0
+    # send cmd (OR w/ 0x40 first)
+    ori a1, a2, 0x40
+    jal ra, spi_swap
 
-sd_cmd_recv_wait:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_recv_wait
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_recv_wait
-    # read a byte and loop again if 0xff
-    lw t2, t1, 0
-    addi t3, zero, 0xff
-    beq t2, t3, sd_cmd_recv_wait
+    # send arg[31..24]
+    srli a1, a3, 24
+    andi a1, a1, 0xff
+    jal ra, spi_swap
+
+    # send arg[23..16]
+    srli a1, a3, 16
+    andi a1, a1, 0xff
+    jal ra, spi_swap
+
+    # send arg[15..8]
+    srli a1, a3, 8
+    andi a1, a1, 0xff
+    jal ra, spi_swap
+
+    # send arg[7..0]
+    srli a1, a3, 0
+    andi a1, a1, 0xff
+    jal ra, spi_swap
+
+    # send crc (OR w/ 0x01 first)
+    ori a1, a4, 0x01
+    jal ra, spi_swap
 
 sd_cmd_recv:
-    # recv r1 (will already be in t2)
-    addi a0, t2, 0
+    # loop til non 0xff is received
+    addi t3, zero, 0xff
+    addi a1, t3, 0
+    jal ra, spi_swap
+    beq a1, t3, sd_cmd_recv
+
+    # recv r1 (will already be in a1, save into a5 for now)
+    addi a5, a1, 0
     # check if CMD has an r3/r7 response (CMD8 or CMD58)
-    addi t2, zero, 8
-    beq a1, t2, sd_cmd_recv_r3r7
-    addi t2, zero, 58
-    beq a1, t2, sd_cmd_recv_r3r7
+    addi t3, zero, 8
+    beq a2, t3, sd_cmd_recv_r3r7
+    addi t3, zero, 58
+    beq a2, t3, sd_cmd_recv_r3r7
     # else done
+    addi a2, zero, 0  # set r3/r7 resp to zeor
     jal zero, sd_cmd_done
 sd_cmd_recv_r3r7:
-    # init a1 (resp) to zero
-    addi a1, zero, 0
-sd_cmd_recv_resp3:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_recv_resp3
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_recv_resp3
-    # read a byte
-    lw t2, t1, 0
-    andi t2, t2, 0xff
-    slli t2, t2, 24
-    or a1, a1, t2
-sd_cmd_recv_resp2:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_recv_resp2
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_recv_resp2
-    # read a byte
-    lw t2, t1, 0
-    andi t2, t2, 0xff
-    slli t2, t2, 16
-    or a1, a1, t2
-sd_cmd_recv_resp1:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_recv_resp1
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_recv_resp1
-    # read a byte
-    lw t2, t1, 0
-    andi t2, t2, 0xff
-    slli t2, t2, 8
-    or a1, a1, t2
-sd_cmd_recv_resp0:
-    # wait for TBE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x02  # isolate TBE bit
-    beq t2, zero, sd_cmd_recv_resp0
-    # send 0xff (dummy bits) to pulse clock
-    addi t2, zero, 0xff
-    sw t1, t2, zero
-    # wait for RBNE
-    lw t2, t0, 0  # load SPI status
-    andi t2, t2, 0x01  # isolate RBNE bit
-    beq t2, zero, sd_cmd_recv_resp0
-    # read a byte
-    lw t2, t1, 0
-    andi t2, t2, 0xff
-    slli t2, t2, 0
-    or a1, a1, t2
+    # init a2 (r3/r7 resp) to zero
+    addi a2, zero, 0
+
+    # read resp[31..24]
+    addi a1, zero, 0xff
+    jal ra, spi_swap
+    andi a1, a1, 0xff
+    slli a1, a1, 24
+    or a2, a2, a1
+
+    # read resp[23..16]
+    addi a1, zero, 0xff
+    jal ra, spi_swap
+    andi a1, a1, 0xff
+    slli a1, a1, 16
+    or a2, a2, a1
+
+    # read resp[15..8]
+    addi a1, zero, 0xff
+    jal ra, spi_swap
+    andi a1, a1, 0xff
+    slli a1, a1, 8
+    or a2, a2, a1
+
+    # read resp[7..0]
+    addi a1, zero, 0xff
+    jal ra, spi_swap
+    andi a1, a1, 0xff
+    slli a1, a1, 0
+    or a2, a2, a1
+
 sd_cmd_done:
-    # return
+    # put r1 back into a1 (from a5)
+    addi a1, a5, 0
+    # restore ra and return
+    addi ra, sp, 0
     jalr zero, ra, 0
 
+
+
 main:
+    # setup RCU base addr
     # init RCU for GPIO[ABC], AFIO, and SPI1
     lui a0, %hi(RCU_BASE_ADDR)
     addi a0, a0, %lo(RCU_BASE_ADDR)
     jal ra, rcu_init
 
-    # init SPI1_CS_TF (B12)
+    # setup GPIOB base addr
     lui a0, %hi(GPIOB_BASE_ADDR)
     addi a0, a0, %lo(GPIOB_BASE_ADDR)
+
+    # init SPI1_CS_TF (B12)
     addi a1, zero, 12
     addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     jal ra, gpio_init
 
     # init SPI1_SCLK (B13)
-    lui a0, %hi(GPIOB_BASE_ADDR)
-    addi a0, a0, %lo(GPIOB_BASE_ADDR)
     addi a1, zero, 13
     addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     jal ra, gpio_init
 
     # init SPI1_MISO (B14)
-    lui a0, %hi(GPIOB_BASE_ADDR)
-    addi a0, a0, %lo(GPIOB_BASE_ADDR)
     addi a1, zero, 14
     addi a2, zero, GPIO_CTL_IN_FLOATING << 2 | 0
     jal ra, gpio_init
 
     # init SPI1_MOSI (B15)
-    lui a0, %hi(GPIOB_BASE_ADDR)
-    addi a0, a0, %lo(GPIOB_BASE_ADDR)
     addi a1, zero, 15
     addi a2, zero, GPIO_CTL_OUT_AF_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ
     jal ra, gpio_init
 
-    # init SPI1 for SD Card
+    # setup SPI1 base addr
     lui a0, %hi(SPI1_BASE_ADDR)
     addi a0, a0, %lo(SPI1_BASE_ADDR)
+
+    # init SPI1
     addi a1, zero, 0b101  # 8MHz / 64 = 125kHz
     jal ra, spi_init
 
     # init SD card
-    lui a0, %hi(SPI1_BASE_ADDR)
-    addi a0, a0, %lo(SPI1_BASE_ADDR)
     jal ra, sd_init
 
     # send CMD0 (software reset)
-    lui a0, %hi(SPI1_BASE_ADDR)
-    addi a0, a0, %lo(SPI1_BASE_ADDR)
-    addi a1, zero, 0
     addi a2, zero, 0
-    addi a3, zero, 0x95
+    addi a3, zero, 0
+    addi a4, zero, 0x95
     jal ra, sd_cmd
 
-    # failure if r1 not 0x01
+    # failure if r1 != 0x01
     addi t0, zero, 0x01
-    bne a0, t0, failure
+    bne a1, t0, failure
 
     # send CMD8 (check voltage range)
-    lui a0, %hi(SPI1_BASE_ADDR)
-    addi a0, a0, %lo(SPI1_BASE_ADDR)
-    addi a1, zero, 8
-    addi a2, zero, 0x000001aa
-    addi a3, zero, 0x87
+    addi a2, zero, 8
+    addi a3, zero, 0x000001aa
+    addi a4, zero, 0x87
     jal ra, sd_cmd
 
-    # failure if r1 not 0x01
+    # failure if r1 != 0x01
     addi t0, zero, 0x01
-    bne a0, t0, failure
-
-    # failure if r3/r7 not 0x000001aa
-    addi t0, zero, 0x000001aa
     bne a1, t0, failure
+
+    # failure if r3/r7 != 0x000001aa
+    addi t0, zero, 0x000001aa
+    bne a2, t0, failure
+
+init_loop:
+    # send CMD55 (app cmd)
+    addi a2, zero, 55
+    addi a3, zero, 0
+    addi a4, zero, 0x01
+    jal ra, sd_cmd
+
+    # failure if r1 != 0x01
+    addi t0, zero, 0x01
+    bne a1, t0, failure
+
+    # send CMD41 (start init w/ host capacity support (HCS) bit set)
+    addi a2, zero, 41
+    addi a3, zero, 1
+    slli a3, a2, 30
+    addi a4, zero, 0x01
+    jal ra, sd_cmd
+
+    # try again if r1 == 0x01
+    addi t0, zero, 0x01
+    beq a1, t0, init_loop
+
+    # failure if r1 not 0x00 or 0x01
+    bne a1, zero, failure
+init_done:
+
+    # send CMD58 (read operation conditions register (OCR))
+    addi a2, zero, 58
+    addi a3, zero, 0
+    addi a4, zero, 0x01
+    jal ra, sd_cmd
+
+    # failure if r1 != 0x00
+    bne a1, zero, failure
+
+    # isolate card capacity status (CCS) bit
+    addi t0, zero, 1
+    slli t0, t0, 30
+    andi a2, a2, t0
+
+    # success if block address mode w/ 512 byte blocks
+    bne a2, zero, success
+
+    # else set block size to 512 bytes
+    # send CMD16 (set block size)
+    addi a2, zero, 16
+    addi a3, zero, 0x00000200
+    addi a4, zero, 0x01
+    jal ra, sd_cmd
+
+    # error if r1 != 0x00
+    bne a1, zero, failure
 
     jal zero, success
 
