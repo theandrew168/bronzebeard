@@ -231,9 +231,10 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 | `28-31` | `x28-31` | `t3-6`  | Temporary registers |
 
 ## Instructions
-This table provides summaries for the baseline RISC-V instructions.
+These tables provide summaries for the baseline RISC-V instructions and common extensions.
 Full [specifications](https://riscv.org/technical/specifications/) be found on the RISC-V website.
 
+### RV32I Base Instruction Set
 | Name    | Parameters    | Description |
 | ------- | ------------- | ----------- |
 | `lui`   | rd, imm       | load upper 20 bits of `rd` with 20-bit `imm`, fill lower 12 bits with zeroes |
@@ -273,3 +274,15 @@ Full [specifications](https://riscv.org/technical/specifications/) be found on t
 | `sra`   | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
 | `or`    | rd, rs1, rs2  | bitwise OR `rs2` with `rs1` and store into `rd` |
 | `and`   | rd, rs1, rs2  | bitwise AND `rs2` with `rs1` and store into `rd` |
+
+### RV32M Standard Extension
+| Name     | Parameters    | Description |
+| -------- | ------------- | ----------- |
+| `mul`    | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (signed) and store lower 32 bits into `rd` |
+| `mulh`   | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (signed) and store upper 32 bits into `rd` |
+| `mulhsu` | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `mulhu`  | rd, rs1, rs2  | multiply `rs1` (unsigned) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `div`    | rd, rs1, rs2  | divide (signed) `rs1` by `rs2` and store into `rd` |
+| `divu`   | rd, rs1, rs2  | divide (unsigned) `rs1` by `rs2` and store into `rd` |
+| `rem`    | rd, rs1, rs2  | remainder (signed) of `rs1` divided by `rs2` and store into `rd` |
+| `remu`   | rd, rs1, rs2  | remainder (unsigned) of `rs1` divided by `rs2` and store into `rd` |
