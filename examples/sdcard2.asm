@@ -238,9 +238,9 @@ sd_init_done:
 sd_cmd:
     addi t0, a0, SPI_STAT_OFFSET  # t0 = STAT addr
     addi t1, a0, SPI_DATA_OFFSET  # t1 = DATA addr
+
 sd_cmd_send_wait:
     # pulse clock til 0xff is recv'd and SD card is "ready"
-
     # wait for TBE
     lw t2, t0, 0  # load SPI status
     andi t2, t2, 0x02  # isolate TBE bit
@@ -266,8 +266,8 @@ sd_cmd_send_cmd:
     andi t2, t2, 0x02  # isolate TBE bit
     beq t2, zero, sd_cmd_send_cmd
     # send cmd
-    ori a1, a1, 0x40
-    sw t1, a1, 0
+    ori t2, a1, 0x40
+    sw t1, t2, 0
 sd_cmd_send_arg3:
     # wait for TBE
     lw t2, t0, 0  # load SPI status
@@ -310,6 +310,7 @@ sd_cmd_send_crc:
     andi t2, t2, 0x02  # isolate TBE bit
     beq t2, zero, sd_cmd_send_crc
     # send crc
+    ori a3, a3, 1
     sw t1, a3, 0
 
 sd_cmd_recv_wait:
@@ -328,12 +329,89 @@ sd_cmd_recv_wait:
     lw t2, t1, 0
     addi t3, zero, 0xff
     beq t2, t3, sd_cmd_recv_wait
+
 sd_cmd_recv:
     # recv r1 (will already be in t2)
     addi a0, t2, 0
-    # recv r3/r7 (optionally: CMD8, CMD58)
+    # check if CMD has an r3/r7 response (CMD8 or CMD58)
+    addi t2, zero, 8
+    beq a1, t2, sd_cmd_recv_r3r7
+    addi t2, zero, 58
+    beq a1, t2, sd_cmd_recv_r3r7
+    # else done
+    jal zero, sd_cmd_done
+sd_cmd_recv_r3r7:
+    # init a1 (resp) to zero
     addi a1, zero, 0
-
+sd_cmd_recv_resp3:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_recv_resp3
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_recv_resp3
+    # read a byte
+    lw t2, t1, 0
+    andi t2, t2, 0xff
+    slli t2, t2, 24
+    or a1, a1, t2
+sd_cmd_recv_resp2:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_recv_resp2
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_recv_resp2
+    # read a byte
+    lw t2, t1, 0
+    andi t2, t2, 0xff
+    slli t2, t2, 16
+    or a1, a1, t2
+sd_cmd_recv_resp1:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_recv_resp1
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_recv_resp1
+    # read a byte
+    lw t2, t1, 0
+    andi t2, t2, 0xff
+    slli t2, t2, 8
+    or a1, a1, t2
+sd_cmd_recv_resp0:
+    # wait for TBE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x02  # isolate TBE bit
+    beq t2, zero, sd_cmd_recv_resp0
+    # send 0xff (dummy bits) to pulse clock
+    addi t2, zero, 0xff
+    sw t1, t2, zero
+    # wait for RBNE
+    lw t2, t0, 0  # load SPI status
+    andi t2, t2, 0x01  # isolate RBNE bit
+    beq t2, zero, sd_cmd_recv_resp0
+    # read a byte
+    lw t2, t1, 0
+    andi t2, t2, 0xff
+    slli t2, t2, 0
+    or a1, a1, t2
+sd_cmd_done:
     # return
     jalr zero, ra, 0
 
@@ -390,9 +468,25 @@ main:
     addi a3, zero, 0x95
     jal ra, sd_cmd
 
-    # failure if not 0x01
+    # failure if r1 not 0x01
     addi t0, zero, 0x01
     bne a0, t0, failure
+
+    # send CMD8 (check voltage range)
+    lui a0, %hi(SPI1_BASE_ADDR)
+    addi a0, a0, %lo(SPI1_BASE_ADDR)
+    addi a1, zero, 8
+    addi a2, zero, 0x000001aa
+    addi a3, zero, 0x87
+    jal ra, sd_cmd
+
+    # failure if r1 not 0x01
+    addi t0, zero, 0x01
+    bne a0, t0, failure
+
+    # failure if r3/r7 not 0x000001aa
+    addi t0, zero, 0x000001aa
+    bne a1, t0, failure
 
     jal zero, success
 
