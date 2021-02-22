@@ -36,17 +36,24 @@
 # CMD0 (arg=0, software reset)
 #   check for 0x01
 # CMD8 (arg=0x000001aa, check voltage range)
-#   check for 0x01 0x00 0x00 0x01 0xaa
+#   check for 0x01 : 0x00 0x00 0x01 0xaa
 # CMD55 (arg=0, setup app cmd)
+#   check for 0x01
 # CMD41 (arg=0x40000000, start init w/ host capacity support (HCS))
-#   may take up to 1s
-#   if 0x01, retry
+#   if 0x01, retry @ CMD55
 #   if 0x00, success
 # CMD58 (arg=0, read operation conditions register (OCR))
 #   check card capacity status (CCS) bit (need this fact later!)
-#   if bit30 == 1, done (card is SDHC/SDXC w/ block of 512)
-#   if bit30 == 0, send CMD16 (arg=0x00000200, set block size to 512 bytes), check for 0x00
+#   if bit30 == 1, ready to read (card is SDHC/SDXC w/ block of 512)
+#   if bit30 == 0,
+#       CMD16 (arg=0x00000200, set block size to 512 bytes), check for 0x00
 # CMD17 (arg=0, read first block of data)
+#   check for 0x00
+# READ_BLOCK
+#   wait til resp isn't 0xff
+#   check data token (should be 0xfe)
+#   read 512 bytes of data
+#   read 2 byte CRC
 
 ROM_BASE_ADDR = 0x08000000
 RAM_BASE_ADDR = 0x20000000
