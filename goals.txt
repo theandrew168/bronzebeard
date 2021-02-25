@@ -6,11 +6,11 @@ M extension for integer mul / div
 -----
 Type hints
 Better error messages (file:number line)
-Tests for each pass
 
 0.0.9
 -----
-Include statement / feature
+Include statement
+Define flag: -D FOO=3 -D BAR
 
 0.0.10
 -----

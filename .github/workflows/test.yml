@@ -23,9 +23,9 @@ jobs:
         pip install wheel
         pip install mypy pytest
         pip install -e .
-    - name: Run mypy
-      run: |
-        mypy --ignore-missing-imports bronzebeard
+#    - name: Run mypy
+#      run: |
+#        mypy --ignore-missing-imports bronzebeard
     - name: Run pytest
       run: |
         pytest
