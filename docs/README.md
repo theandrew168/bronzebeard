@@ -43,9 +43,10 @@ addi x1, zero, 12
 ```
 
 ### Constants
-A constant in Bronzebeard is the named result of an expression.
+A constant in Bronzebeard is the named result of an integer expression.
+Floating point numbers or any other non-integer expression results aren't supported at this time.
 Numbers can be represented as decimal, binary, or hex.
-Simple math operations such as addition, multiplication, shifting, and binary ops all work as expected.
+Simple math operations such as addition, multiplication, shifting, and binary ops all work (mostly) as expected.
 
 Here are a few examples:
 ```
