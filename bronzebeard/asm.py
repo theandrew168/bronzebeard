@@ -880,8 +880,6 @@ def assemble(path: str) -> bytes:
     items = resolve_instructions(items)
     items = resolve_packs(items)
     program = resolve_blobs(items)
-    from pprint import pprint
-    pprint(env)
     return program
 
 
