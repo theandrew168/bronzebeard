@@ -4,13 +4,8 @@ M extension for integer mul / div
 
 0.0.8
 -----
-Type hints
+Type hints (not sure if this is worth the fuss / readability hit)
 Better error messages (file:number line)
-TODO: do something cleaner about expr -> imm (resolve_immediates)
-TODO: use lists instead of iterables
-  * being lazy doesn't matter if multiple passes are required
-TODO: add test that forth.asm is currently breaking
-TODO: make mypy happy
 
 0.0.9
 -----

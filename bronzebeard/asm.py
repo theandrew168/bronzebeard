@@ -1,16 +1,15 @@
 import abc
 import argparse
 from collections import namedtuple
+import copy
 from ctypes import c_uint32
 from functools import partial
 import os
 import re
 import struct
-import sys
-from typing import cast, Dict, Iterable, List, Tuple, Union
 
 
-REGISTERS: Dict[str, int] = {
+REGISTERS = {
     'x0': 0, 'zero': 0,
     'x1': 1, 'ra': 1,
     'x2': 2, 'sp': 2,
@@ -46,28 +45,25 @@ REGISTERS: Dict[str, int] = {
 }
 
 
-# a register can be int 0-31 or a "nice" name like x0, zero, or t10
-Register = Union[int, str]
-
-def lookup_register(reg: Register) -> int:
+def lookup_register(reg):
     # check if register corresponds to a valid name
     if reg in REGISTERS:
-        reg = REGISTERS[str(reg)]#cast(str, reg)]
+        reg = REGISTERS[reg]
 
     # ensure register is a number
     try:
         reg = int(reg)
     except ValueError:
-        raise ValueError('Register is not a number or valid name: {}'.format(reg))
+        raise ValueError('Reg is not a number or valid name: {}'.format(reg))
 
     # ensure register is between 0 and 31
     if reg < 0 or reg > 31:
-        raise ValueError('Register must be between 0 and 31: {}'.format(reg))
+        raise ValueError('Reg must be between 0 and 31: {}'.format(reg))
 
     return reg
 
 
-def r_type(rd: Register, rs1: Register, rs2: Register, opcode: int, funct3: int, funct7: int) -> bytes:
+def r_type(rd, rs1, rs2, opcode, funct3, funct7):
     rd = lookup_register(rd)
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
@@ -83,7 +79,7 @@ def r_type(rd: Register, rs1: Register, rs2: Register, opcode: int, funct3: int,
     return struct.pack('<I', code)
 
 
-def i_type(rd: Register, rs1: Register, imm: int, opcode: int, funct3: int) -> bytes:
+def i_type(rd, rs1, imm, opcode, funct3):
     rd = lookup_register(rd)
     rs1 = lookup_register(rs1)
 
@@ -102,7 +98,7 @@ def i_type(rd: Register, rs1: Register, imm: int, opcode: int, funct3: int) -> b
     return struct.pack('<I', code)
 
 
-def s_type(rs1: Register, rs2: Register, imm: int, opcode: int, funct3: int) -> bytes:
+def s_type(rs1, rs2, imm, opcode, funct3):
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
 
@@ -125,7 +121,7 @@ def s_type(rs1: Register, rs2: Register, imm: int, opcode: int, funct3: int) -> 
     return struct.pack('<I', code)
 
 
-def b_type(rs1: Register, rs2: Register, imm: int, opcode: int, funct3: int) -> bytes:
+def b_type(rs1, rs2, imm, opcode, funct3):
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
 
@@ -155,7 +151,7 @@ def b_type(rs1: Register, rs2: Register, imm: int, opcode: int, funct3: int) -> 
     return struct.pack('<I', code)
 
 
-def u_type(rd: Register, imm: int, opcode: int) -> bytes:
+def u_type(rd, imm, opcode):
     rd = lookup_register(rd)
 
     if imm < -0x80000 or imm > 0x7ffff:
@@ -171,7 +167,7 @@ def u_type(rd: Register, imm: int, opcode: int) -> bytes:
     return struct.pack('<I', code)
 
 
-def j_type(rd: Register, imm: int, opcode: int) -> bytes:
+def j_type(rd, imm, opcode):
     rd = lookup_register(rd)
 
     if imm < -0x100000 or imm > 0x0fffff:
@@ -319,73 +315,105 @@ INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 
 
-def sign_extend(value: int, bits: int) -> int:
+def sign_extend(value, bits):
     sign_bit = 1 << (bits - 1)
     return (value & (sign_bit - 1)) - (value & sign_bit)
 
 
-def relocate_hi(imm: int) -> int:
+def relocate_hi(imm):
     if imm & 0x800:
         imm += 2**12
     return sign_extend((imm >> 12) & 0x000fffff, 20)
 
 
-def relocate_lo(imm: int) -> int:
+def relocate_lo(imm):
     return sign_extend(imm & 0x00000fff, 12)
 
 
-# environment and expressions
-Env = Dict[str, int]
+# a single, unmodified line of assembly source code
+class Line:
 
-class Expression(abc.ABC):
+    def __init__(self, file, number, contents):
+        self.file = file
+        self.number = number
+        self.contents = contents
+
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.file, self.number, self.contents)
+
+    def __str__(self):
+        return '{}:{}: {}'.format(self.file, self.number, self.contents)
+
+
+# tokens emitted from a lexed line
+class Tokens:
+
+    def __init__(self, line, tokens):
+        self.line = line
+        self.tokens = tokens
+
+    def __str__(self):
+        return str(self.tokens)
+
+
+# expressions
+class Expr(abc.ABC):
 
     @abc.abstractmethod
-    def eval(self, position: int, env: Env) -> int:
+    def eval(self, position, env):
         """Evaluate an expression to an integer"""
 
 
-class Arithmetic(Expression):
-    expr: str
+# arithmetic / lookup / combo of both
+class Arithmetic(Expr):
 
-    def __init__(self, expr: str) -> None:
+    def __init__(self, expr):
         self.expr = expr
 
-    def eval(self, position: int, env: Env) -> int:
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.expr)
+
+    def eval(self, position, env):
         return eval(self.expr, env)
 
 
-class Position(Expression):
-    label: str
-    expr: Arithmetic
+class Position(Expr):
 
-    def __init__(self, label: str, expr: Arithmetic) -> None:
-        self.label = label
+    def __init__(self, reference, expr):
+        self.reference = reference
         self.expr = expr
 
-    def eval(self, position: int, env: Env) -> int:
-        dest = env[self.label]
+    def __repr__(self):
+        return '{}({!r}, {!r})'.format(type(self).__name__, self.reference, self.expr)
+
+    def eval(self, position, env):
+        dest = env[self.reference]
         base = self.expr.eval(position, env)
         return base + dest
 
 
-class Offset(Expression):
-    label: str
+class Offset(Expr):
 
-    def __init__(self, label: str) -> None:
-        self.label = label
+    def __init__(self, reference):
+        self.reference = reference
 
-    def eval(self, position: int, env: Env) -> int:
-        dest = env[self.label]
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.reference)
+
+    def eval(self, position, env):
+        dest = env[self.reference]
         return dest - position
 
 
-class Hi(Expression):
-    expr: Expression
+class Hi(Expr):
 
-    def __init__(self, expr: Expression) -> None:
+    def __init__(self, expr):
         self.expr = expr
 
-    def eval(self, position: int, env: Env) -> int:
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.expr)
+
+    def eval(self, position, env):
         if isinstance(self.expr, Hi) or isinstance(self.expr, Lo):
             raise TypeError('%hi and %lo expressions cannot nest')
 
@@ -393,13 +421,15 @@ class Hi(Expression):
         return relocate_hi(value)
 
 
-class Lo(Expression):
-    expr: Expression
+class Lo(Expr):
 
-    def __init__(self, expr: Expression) -> None:
+    def __init__(self, expr) -> None:
         self.expr = expr
 
-    def eval(self, position: int, env: Env) -> int:
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.expr)
+
+    def eval(self, position, env):
         if isinstance(self.expr, Hi) or isinstance(self.expr, Lo):
             raise TypeError('%hi and %lo expressions cannot nest')
 
@@ -407,249 +437,256 @@ class Lo(Expression):
         return relocate_lo(value)
 
 
-# a single, unmodified line of assembly source code
-class Line:
-    file: str
-    number: int
-    contents: str
-
-    def __init__(self, file: str, number: int, contents: str) -> None:
-        self.file = file
-        self.number = number
-        self.contents = contents
-
-    def __str__(self) -> str:
-        return '{}:{}: {}'.format(self.file, self.number, self.contents)
-
-
-# tokens emitted from a lexed line
-class Tokens:
-    line: Line
-    tokens: List[str]
-
-    def __init__(self, line: Line, tokens: List[str]):
-        self.line = line
-        self.tokens = tokens
-
-    def __str__(self) -> str:
-        return str(self.tokens)
-
-
 # base class for assembly "things"
 class Item(abc.ABC):
-    line: Line
 
-    def __init__(self, line: Line) -> None:
-        self.line = line
+    def __init__(self, line=None, parent=None):
+        # will always exactly one or the other (can follow parents to line)
+        if line is None and parent is None:
+            raise RuntimeError('one of "line" or "parent" must be set')
+        self._line = line
+        self._parent = parent
 
-    def __str__(self) -> str:
-        return '{} @ {}'.format(self.__class__.__name__, self.line)
+    def __str__(self):
+        s = '{!r}'.format(self)
+        item = self._parent
+        while item is not None:
+            s += '\n  ^ {!r}'.format(item)
+            item = item._parent
+        s += '\n  ^ {!r}'.format(self.line)
+        return s
+
+    @property
+    def line(self):
+        # follow parent links til root
+        item = self
+        while item._parent is not None:
+            item = item._parent
+        # root _should_ have a line
+        if item._line is None:
+            raise RuntimeError('no Line found in Item, this is a programmer error!')
+        return item._line
 
     @abc.abstractmethod
-    def size(self, position: int) -> int:
+    def size(self, position):
         """Check the size of this item at the given position in a program"""
 
 
 class Align(Item):
-    alignment: int
 
-    def __init__(self, line: Line, alignment: int) -> None:
-        super().__init__(line)
+    def __init__(self, alignment, line=None, parent=None):
+        super().__init__(line, parent)
         self.alignment = alignment
 
-    def size(self, position: int) -> int:
-        return self.alignment - (position % self.alignment)
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.alignment)
+
+    def size(self, position):
+        padding = self.alignment - (position % self.alignment)
+        if padding == self.alignment:
+            return 0
+        else:
+            return padding
 
 
 class Label(Item):
-    name: str
 
-    def __init__(self, line: Line, name: str) -> None:
-        super().__init__(line)
+    def __init__(self, name, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.name)
+
+    def size(self, position):
         return 0
 
 
 class Constant(Item):
-    name: str
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r})'.format(type(self).__name__, self.name, self.expr)
+
+    def size(self, position):
         return 0
 
 
 class Pack(Item):
-    fmt: str
-    expr: Expression
 
-    def __init__(self, line: Line, fmt: str, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, fmt, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.fmt = fmt
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r})'.format(type(self).__name__, self.fmt, self.expr)
+
+    def size(self, position):
         return struct.calcsize(self.fmt)
 
 
 class Blob(Item):
-    data: bytes
 
-    def __init__(self, line: Line, data: bytes) -> None:
-        super().__init__(line)
+    def __init__(self, data, line=None, parent=None):
+        super().__init__(line, parent)
         self.data = data
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        # repr is still valid, just wanted a more consistent hex format
+        s = ''.join(['\\x{:02x}'.format(b) for b in self.data])
+        return '{}(b\'{}\')'.format(type(self).__name__, s)
+
+    def size(self, position):
         return len(self.data)
 
 
 class RTypeInstruction(Item):
-    name: str
-    rd: Register
-    rs1: Register
-    rs2: Register
 
-    def __init__(self, line: Line, name: str, rd: Register, rs1: Register, rs2: Register) -> None:
-        super().__init__(line)
+    def __init__(self, name, rd, rs1, rs2, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rd = rd
         self.rs1 = rs1
         self.rs2 = rs2
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
+
+    def size(self, position):
         return 4
 
 
 class ITypeInstruction(Item):
-    name: str
-    rd: Register
-    rs1: Register
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, rd: Register, rs1: Register, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, rd, rs1, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rd = rd
         self.rs1 = rs1
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.expr)
+
+    def size(self, position):
         return 4
 
 
 class STypeInstruction(Item):
-    name: str
-    rs1: Register
-    rs2: Register
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, rs1: Register, rs2: Register, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, rs1, rs2, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rs1 = rs1
         self.rs2 = rs2
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
+
+    def size(self, position):
         return 4
 
 
 class BTypeInstruction(Item):
-    name: str
-    rs1: Register
-    rs2: Register
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, rs1: Register, rs2: Register, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, rs1, rs2, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rs1 = rs1
         self.rs2 = rs2
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
+
+    def size(self, position):
         return 4
 
 
 class UTypeInstruction(Item):
-    name: str
-    rd: Register
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, rd: Register, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, rd, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rd = rd
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
+
+    def size(self, position):
         return 4
 
 
 class JTypeInstruction(Item):
-    name: str
-    rd: Register
-    expr: Expression
 
-    def __init__(self, line: Line, name: str, rd: Register, expr: Expression) -> None:
-        super().__init__(line)
+    def __init__(self, name, rd, expr, line=None, parent=None):
+        super().__init__(line, parent)
         self.name = name
         self.rd = rd
         self.expr = expr
 
-    def size(self, position: int) -> int:
+    def __repr__(self):
+        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
+
+    def size(self, position):
         return 4
 
 
-def read_assembly(path_or_source: str) -> Iterable[Line]:
+def read_assembly(path_or_source):
     if os.path.exists(path_or_source):
         path = path_or_source
         with open(path) as f:
             source = f.read()
     else:
-        path = __name__
+        path = '<source>'
         source = path_or_source
 
+    lines = []
     for i, line in enumerate(source.splitlines(), start=1):
-        yield Line(path, i, line)
+        # skip empty lines
+        if len(line.strip()) == 0:
+            continue
+        lines.append(Line(path, i, line))
+
+    return lines
 
 
-def lex_assembly(lines: Iterable[Line]) -> Iterable[Tokens]:
+def lex_assembly(lines):
+    tokens = []
     for line in lines:
         # strip comments
         contents = re.sub(r'#.*?$', r'', line.contents, flags=re.MULTILINE)
-
         # strip whitespace
         contents = contents.strip()
-
         # skip empty lines
         if len(contents) == 0:
             continue
-
         # split line into tokens
-        tokens = re.split(r'[\s,()\'"]+', contents)
-
+        toks = re.split(r'[\s,()\'"]+', contents)
         # remove empty tokens
-        while '' in tokens:
-            tokens.remove('')
+        while '' in toks:
+            toks.remove('')
+        tokens.append(Tokens(line, toks))
 
-        yield Tokens(line, tokens)
+    return tokens
 
 
 # helper for parsing exprs since they occur in multiple places
-def parse_expression(expr: List[str]):
+# TODO: catch invalid nesting here?
+def parse_expression(expr):
     if expr[0].lower() == '%position':
-        _, label, *expr = expr
-        return Position(label, Arithmetic(' '.join(expr)))
+        _, reference, *expr = expr
+        return Position(reference, Arithmetic(' '.join(expr)))
     elif expr[0].lower() == '%offset':
-        _, label = expr
-        return Offset(label)
+        _, reference = expr
+        return Offset(reference)
     elif expr[0].lower() == '%hi':
         _, *expr = expr
         return Hi(parse_expression(expr))
@@ -660,27 +697,32 @@ def parse_expression(expr: List[str]):
         return Arithmetic(' '.join(expr))
 
 
-def parse_assembly(tokens: Iterable[Tokens]) -> Iterable[Item]:
+def parse_assembly(tokens):
+    items = []
     for t in tokens:
         line = t.line
         toks = t.tokens
 
         # labels
         if len(toks) == 1 and toks[0].endswith(':'):
-            label = toks[0].rstrip(':')
-            yield Label(line, label)
+            name = toks[0].rstrip(':')
+            label = Label(name, line=line)
+            items.append(label)
         # constants
         elif len(toks) >= 3 and toks[1] == '=':
             name, _, *expr = toks
-            yield Constant(line, name, parse_expression(expr))
+            constant = Constant(name, parse_expression(expr), line=line)
+            items.append(constant)
         # aligns
         elif toks[0].lower() == 'align':
             _, alignment = toks
-            yield Align(line, int(alignment))
+            align = Align(int(alignment), line=line)
+            items.append(align)
         # packs
         elif toks[0].lower() == 'pack':
             _, fmt, *expr = toks
-            yield Pack(line, fmt, parse_expression(expr))
+            pack = Pack(fmt, parse_expression(expr), line=line)
+            items.append(pack)
         # bytes (TODO: essentially eval'd here, should they be?)
         elif toks[0].lower() == 'bytes':
             _, *expr = toks
@@ -688,27 +730,32 @@ def parse_assembly(tokens: Iterable[Tokens]) -> Iterable[Item]:
             for byte in data:
                 if byte < 0 or byte > 255:
                     raise ValueError('bytes literal not in range [0, 255] at {}'.format(line))
-            yield Blob(line, bytes(data))
+            blob = Blob(bytes(data), line=line)
+            items.append(blob)
         # strings (TODO: essentially eval'd here, should they be?)
         elif toks[0].lower() == 'string':
             _, *expr = toks
             text = ' '.join(expr)
-            yield Blob(line, text.encode())
+            blob = Blob(text.encode(), line=line)
+            items.append(blob)
         # r-type instructions
         elif toks[0].lower() in R_TYPE_INSTRUCTIONS:
             name, rd, rs1, rs2 = toks
             name = name.lower()
-            yield RTypeInstruction(line, name, rd, rs1, rs2)
+            inst = RTypeInstruction(name, rd, rs1, rs2, line=line)
+            items.append(inst)
         # i-type instructions
         elif toks[0].lower() in I_TYPE_INSTRUCTIONS:
             name, rd, rs1, *expr = toks
             name = name.lower()
-            yield ITypeInstruction(line, name, rd, rs1, parse_expression(expr))
+            inst = ITypeInstruction(name, rd, rs1, parse_expression(expr), line=line)
+            items.append(inst)
         # s-type instructions
         elif toks[0].lower() in S_TYPE_INSTRUCTIONS:
             name, rs1, rs2, *expr = toks
             name = name.lower()
-            yield STypeInstruction(line, name, rs1, rs2, parse_expression(expr))
+            inst = STypeInstruction(name, rs1, rs2, parse_expression(expr), line=line)
+            items.append(inst)
         # b-type instructions
         elif toks[0].lower() in B_TYPE_INSTRUCTIONS:
             name, rs1, rs2, *expr = toks
@@ -716,12 +763,14 @@ def parse_assembly(tokens: Iterable[Tokens]) -> Iterable[Item]:
             # ensure behavior is "offset" for branch instructions
             if expr[0] != '%offset':
                 expr.insert(0, '%offset')
-            yield BTypeInstruction(line, name, rs1, rs2, parse_expression(expr))
+            inst = BTypeInstruction(name, rs1, rs2, parse_expression(expr), line=line)
+            items.append(inst)
         # u-type instructions
         elif toks[0].lower() in U_TYPE_INSTRUCTIONS:
             name, rd, *expr = toks
             name = name.lower()
-            yield UTypeInstruction(line, name, rd, parse_expression(expr))
+            inst = UTypeInstruction(name, rd, parse_expression(expr), line=line)
+            items.append(inst)
         # j-type instructions
         elif toks[0].lower() in J_TYPE_INSTRUCTIONS:
             name, rd, *expr = toks
@@ -729,110 +778,194 @@ def parse_assembly(tokens: Iterable[Tokens]) -> Iterable[Item]:
             # ensure behavior is "offset" for branch instructions
             if expr[0] != '%offset':
                 expr.insert(0, '%offset')
-            yield JTypeInstruction(line, name, rd, parse_expression(expr))
+            inst = JTypeInstruction(name, rd, parse_expression(expr), line=line)
+            items.append(inst)
         else:
-            print(toks)
             raise ValueError('invalid item at {}'.format(line))
 
+    return items
 
-def resolve_aligns(items: Iterable[Item]) -> Iterable[Item]:
+
+def resolve_aligns(items):
     position = 0
-
+    new_items = []
     for item in items:
         if isinstance(item, Align):
             padding = item.size(position)
             position += padding
-            yield Blob(item.line, b'\x00' * padding)
+            blob = Blob(b'\x00' * padding, parent=item)
+            new_items.append(blob)
         else:
             position += item.size(position)
-            yield item
+            new_items.append(item)
+
+    return new_items
 
 
-def resolve_labels(items: Iterable[Item], env: Env) -> Iterable[Item]:
+def resolve_labels(items, env):
+    new_env = copy.deepcopy(env)
+
     position = 0
-
+    new_items = []
     for item in items:
         if isinstance(item, Label):
-            env[item.name] = position
+            new_env[item.name] = position
         else:
             position += item.size(position)
-            yield item
+            new_items.append(item)
+
+    return new_items, new_env
 
 
-def resolve_constants(items: Iterable[Item], env: Env) -> Iterable[Item]:
+def resolve_constants(items, env):
+    new_env = copy.deepcopy(env)
+
     position = 0
-
+    new_items = []
     for item in items:
         if isinstance(item, Constant):
             if item.name in REGISTERS:
                 raise ValueError('constant name shadows register name "{}" at: {}'.format(item.name, item.line))
-            env[item.name] = item.expr.eval(position, env)
+            new_env[item.name] = item.expr.eval(position, new_env)
         else:
             position += item.size(position)
-            yield item
+            new_items.append(item)
+
+    return new_items, new_env
 
 
-def resolve_registers(items: Iterable[Item], env: Env) -> Iterable[Item]:
+def resolve_registers(items, env):
+    new_items = []
     for item in items:
-        if hasattr(item, 'rd'):
-            item.rd = env.get(item.rd) or item.rd
-        if hasattr(item, 'rs1'):
-            item.rs1 = env.get(item.rs1) or item.rs1
-        if hasattr(item, 'rs2'):
-            item.rs2 = env.get(item.rs2) or item.rs2
-        yield item
+        if isinstance(item, RTypeInstruction):
+            rd = env.get(item.rd) or item.rd
+            rs1 = env.get(item.rs1) or item.rs1
+            rs2 = env.get(item.rs2) or item.rs2
+            inst = RTypeInstruction(item.name, rd, rs1, rs2, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, ITypeInstruction):
+            rd = env.get(item.rd) or item.rd
+            rs1 = env.get(item.rs1) or item.rs1
+            inst = ITypeInstruction(item.name, rd, rs1, item.expr, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, STypeInstruction):
+            rs1 = env.get(item.rs1) or item.rs1
+            rs2 = env.get(item.rs2) or item.rs2
+            inst = STypeInstruction(item.name, rs1, rs2, item.expr, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, BTypeInstruction):
+            rs1 = env.get(item.rs1) or item.rs1
+            rs2 = env.get(item.rs2) or item.rs2
+            inst = BTypeInstruction(item.name, rs1, rs2, item.expr, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, UTypeInstruction):
+            rd = env.get(item.rd) or item.rd
+            inst = UTypeInstruction(item.name, rd, item.expr, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, JTypeInstruction):
+            rd = env.get(item.rd) or item.rd
+            inst = JTypeInstruction(item.name, rd, item.expr, parent=item)
+            new_items.append(inst)
+        else:
+            new_items.append(item)
+
+    return new_items
 
 
-def resolve_immediates(items: Iterable[Item], env: Env) -> Iterable[Item]:
+def resolve_immediates(items, env):
     position = 0
-
+    new_items = []
     for item in items:
-        if hasattr(item, 'expr'):
-            item.expr = item.expr.eval(position, env)
-        position += item.size(position)
-        yield item
+        if isinstance(item, ITypeInstruction):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            inst = ITypeInstruction(item.name, item.rd, item.rs1, imm, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, STypeInstruction):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            inst = STypeInstruction(item.name, item.rs1, item.rs2, imm, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, BTypeInstruction):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            inst = BTypeInstruction(item.name, item.rs1, item.rs2, imm, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, UTypeInstruction):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            inst = UTypeInstruction(item.name, item.rd, imm, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, JTypeInstruction):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            inst = JTypeInstruction(item.name, item.rd, imm, parent=item)
+            new_items.append(inst)
+        elif isinstance(item, Pack):
+            imm = item.expr.eval(position, env)
+            position += item.size(position)
+            pack = Pack(item.fmt, imm, parent=item)
+            new_items.append(pack)
+        else:
+            position += item.size(position)
+            new_items.append(item)
+
+    return new_items
 
 
-def resolve_instructions(items: Iterable[Item]) -> Iterable[Item]:
+def resolve_instructions(items):
+    new_items = []
     for item in items:
         if isinstance(item, RTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.rs1, item.rs2)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         elif isinstance(item, ITypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.rs1, item.expr)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         elif isinstance(item, STypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rs1, item.rs2, item.expr)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         elif isinstance(item, BTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rs1, item.rs2, item.expr)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         elif isinstance(item, UTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.expr)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         elif isinstance(item, JTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.expr)
-            yield Blob(item.line, code)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
         else:
-            yield item
+            new_items.append(item)
+
+    return new_items
 
 
-def resolve_packs(items: Iterable[Item]) -> Iterable[Item]:
+def resolve_packs(items):
+    new_items = []
     for item in items:
         if isinstance(item, Pack):
             data = struct.pack(item.fmt, item.expr)
-            yield Blob(item.line, data)
+            blob = Blob(data, parent=item)
+            new_items.append(blob)
         else:
-            yield item
+            new_items.append(item)
+
+    return new_items
 
 
-def resolve_blobs(items: Iterable[Item]) -> bytes:
+def resolve_blobs(items):
     output = bytearray()
     for item in items:
         if not isinstance(item, Blob):
@@ -852,34 +985,44 @@ def resolve_blobs(items: Iterable[Item]) -> bytes:
 # 7. Resolve packs  (convert Pack to Blob)
 # 8. Resolve blobs  (merge all Blobs into a single binary)
 
-def assemble(path: str) -> bytes:
+def assemble(path_or_source, verbose=False):
     """
     Assemble a RISC-V assembly program into a raw binary.
 
-    :param source: A string of the assembly source program.
-    :returns: The assembled binary as bytes.
+    :param path_or_source: Path to an assembly file or raw assembly source
+    :returns: Assembled binary as bytes
     """
 
     # lex and parse the source
-    lines = read_assembly(path)
+    lines = read_assembly(path_or_source)
     tokens = lex_assembly(lines)
     items = parse_assembly(tokens)
 
     # exclude Python builtins from eval env
     # https://docs.python.org/3/library/functions.html#eval
-    env: Dict[str, int] = {
+    env = {
         '__builtins__': 0,
     }
     env.update(REGISTERS)
 
     items = resolve_aligns(items)
-    items = list(resolve_labels(items, env))
-    items = list(resolve_constants(items, env))
+    items, env = resolve_labels(items, env)
+    items, env = resolve_constants(items, env)
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
     items = resolve_instructions(items)
     items = resolve_packs(items)
     program = resolve_blobs(items)
+
+    if verbose:
+        from pprint import pprint
+        succint_env = {k: v for k, v in env.items() if k not in REGISTERS}
+        succint_env.pop('__builtins__')
+        pprint(succint_env)
+        for item in items:
+            print(item)
+        pprint(succint_env)
+
     return program
 
 
@@ -890,8 +1033,9 @@ if __name__ == '__main__':
     )
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('output_bin', type=str, help='output binary file')
+    parser.add_argument('--verbose', action='store_true', help='verbose assembler output')
     args = parser.parse_args()
 
-    binary = assemble(args.input_asm)
+    binary = assemble(args.input_asm, args.verbose)
     with open(args.output_bin, 'wb') as out_bin:
         out_bin.write(binary)

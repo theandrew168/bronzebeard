@@ -763,6 +763,38 @@ def test_remu(rd, rs1, rs2, code):
     assert asm.REMU(rd, rs1, rs2) == struct.pack('<I', code)
 
 
+def test_read_assembly():
+    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
+    lines = asm.read_assembly(source)
+    assert len(lines) == 3
+    assert lines[1].contents == 'addi t1, zero, 2'
+    for i, line in enumerate(lines, start=1):
+        assert line.file == '<source>'
+        assert line.number == i
+
+
+def test_lex_assembly():
+    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
+    lines = asm.read_assembly(source)
+    tokens = asm.lex_assembly(lines)
+    assert len(tokens) == 3
+    assert tokens[1].tokens == ['addi', 't1', 'zero', '2']
+
+
+def test_parse_assembly():
+    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
+    lines = asm.read_assembly(source)
+    tokens = asm.lex_assembly(lines)
+    items = asm.parse_assembly(tokens)
+    assert len(items) == 3
+    assert isinstance(items[1], asm.ITypeInstruction)
+    assert items[1].name == 'addi'
+    assert items[1].rd == 't1'
+    assert items[1].rs1 == 'zero'
+    assert isinstance(items[1].expr, asm.Arithmetic)
+    assert items[1].expr.expr == '2'
+
+
 def test_assembler_basic():
     source = """
     addi t0 zero 1
