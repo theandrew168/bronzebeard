@@ -4,21 +4,24 @@ M extension for integer mul / div
 
 0.0.8
 -----
-Better error messages (file:number line)
+Clean up the general design
+Verbose output
 
 0.0.9
 -----
-Include statement
-Define flag: -D FOO=3 -D BAR
+A extension for completeness
+C extension for potential optimizations
 
 0.0.10
 -----
-C extension for potential optimizations
+Include statement
+Include flag: -I examples/ -I src/
+Define flag: -D FOO=3 -D BAR
 
 0.0.11
 ------
-Basic TUI using prompt_toolkit (or pyvim)
+Better error messages
 
 0.0.12
 ------
-Basic GUI using tkinter
+Basic GUI via Thonny plugin?
