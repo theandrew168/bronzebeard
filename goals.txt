@@ -4,7 +4,6 @@ M extension for integer mul / div
 
 0.0.8
 -----
-Type hints (not sure if this is worth the fuss / readability hit)
 Better error messages (file:number line)
 
 0.0.9

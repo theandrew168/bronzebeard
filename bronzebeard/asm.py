@@ -1015,13 +1015,13 @@ def assemble(path_or_source, verbose=False):
     program = resolve_blobs(items)
 
     if verbose:
-        from pprint import pprint
         succint_env = {k: v for k, v in env.items() if k not in REGISTERS}
         succint_env.pop('__builtins__')
-        pprint(succint_env)
+        for k, v in succint_env.items():
+            print('{} = {} (0x{:08x})'.format(k, v, v))
+        print()
         for item in items:
             print(item)
-        pprint(succint_env)
 
     return program
 
