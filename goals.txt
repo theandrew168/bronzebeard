@@ -10,19 +10,29 @@ Verbose output
 0.0.9
 -----
 Defer bytes / string eval to separate passes
-A extension for completeness
-C extension for potential optimizations
 
 0.0.10
------
-Include statement
-Include flag: -I examples/ -I src/
-Define flag: -D FOO=3 -D BAR
+------
+A extension for atomic ops
 
 0.0.11
 ------
-Better error messages
+C extension for compressed instructions
+optimizations flag to find and apply compressions
 
 0.0.12
+-----
+Define flag: -D FOO=3 -D BAR
+
+0.0.13
+------
+Include statement
+Include flag: -I examples/ -I src/
+
+0.0.14
+------
+Better error messages
+
+0.0.15
 ------
 Basic GUI via Thonny plugin?
