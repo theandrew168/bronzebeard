@@ -454,6 +454,7 @@ class Item(abc.ABC):
             s += '\n  ^ {!r}'.format(item)
             item = item._parent
         s += '\n  ^ {!r}'.format(self.line)
+        s += '\n    ^ {}'.format(self.line)
         return s
 
     @property
@@ -528,6 +529,33 @@ class Pack(Item):
 
     def size(self, position):
         return struct.calcsize(self.fmt)
+
+
+class String(Item):
+
+    def __init__(self, values, line=None, parent=None):
+        super().__init__(line, parent)
+        self.values = values
+
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.values)
+
+    def size(self, position):
+        return len(' '.join(self.values))
+
+
+class Bytes(Item):
+
+    def __init__(self, values, line=None, parent=None):
+        super().__init__(line, parent)
+        self.values = values
+
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.values)
+
+    def size(self, position):
+        # this works because each byte occupies 1 byte
+        return len(self.values)
 
 
 class Blob(Item):
@@ -723,21 +751,16 @@ def parse_assembly(tokens):
             _, fmt, *expr = toks
             pack = Pack(fmt, parse_expression(expr), line=line)
             items.append(pack)
-        # bytes (TODO: essentially eval'd here, should they be?)
+        # bytes
         elif toks[0].lower() == 'bytes':
-            _, *expr = toks
-            data = [int(byte, base=0) for byte in expr]
-            for byte in data:
-                if byte < 0 or byte > 255:
-                    raise ValueError('bytes literal not in range [0, 255] at {}'.format(line))
-            blob = Blob(bytes(data), line=line)
-            items.append(blob)
-        # strings (TODO: essentially eval'd here, should they be?)
+            _, *values = toks
+            bytes = Bytes(values, line=line)
+            items.append(bytes)
+        # strings
         elif toks[0].lower() == 'string':
-            _, *expr = toks
-            text = ' '.join(expr)
-            blob = Blob(text.encode(), line=line)
-            items.append(blob)
+            _, *values = toks
+            string = String(values, line=line)
+            items.append(string)
         # r-type instructions
         elif toks[0].lower() in R_TYPE_INSTRUCTIONS:
             name, rd, rs1, rs2 = toks
@@ -965,6 +988,36 @@ def resolve_packs(items):
     return new_items
 
 
+def resolve_bytes(items):
+    new_items = []
+    for item in items:
+        if isinstance(item, Bytes):
+            data = [int(byte, base=0) for byte in item.values]
+            for byte in data:
+                if byte < 0 or byte > 255:
+                    raise ValueError('bytes literal not in range [0, 255] at {}'.format(line))
+            blob = Blob(bytes(data), parent=item)
+            new_items.append(blob)
+        else:
+            new_items.append(item)
+
+    return new_items
+
+
+def resolve_strings(items):
+    new_items = []
+    for item in items:
+        if isinstance(item, String):
+            text = ' '.join(item.values)
+            print(text)
+            blob = Blob(text.encode(), parent=item)
+            new_items.append(blob)
+        else:
+            new_items.append(item)
+
+    return new_items
+
+
 def resolve_blobs(items):
     output = bytearray()
     for item in items:
@@ -975,15 +1028,17 @@ def resolve_blobs(items):
 
 
 # Passes:
-# 0. Read + Lex + Parse source
-# 1. Resolve aligns  (convert aligns to blobs based on position)
-# 2. Resolve labels  (store label locations into env)
-# 3. Resolve constants  (eval expr and update env)
-# 4. Resolve registers  (could be constants for readability)
-# 5. Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
-# 6. Resolve instructions  (convert xTypeInstruction to Blob)
-# 7. Resolve packs  (convert Pack to Blob)
-# 8. Resolve blobs  (merge all Blobs into a single binary)
+#  0. Read + Lex + Parse source
+#  1. Resolve aligns  (convert aligns to blobs based on position)
+#  2. Resolve labels  (store label locations into env)
+#  3. Resolve constants  (eval expr and update env)
+#  4. Resolve registers  (could be constants for readability)
+#  5. Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
+#  6. Resolve instructions  (convert xTypeInstruction to Blob)
+#  7. Resolve bytes  (convert Bytes to Blob)
+#  8. Resolve strings  (convert String to Blob)
+#  9. Resolve packs  (convert Pack to Blob)
+# 10. Resolve blobs  (merge all Blobs into a single binary)
 
 def assemble(path_or_source, verbose=False):
     """
@@ -1011,6 +1066,8 @@ def assemble(path_or_source, verbose=False):
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
     items = resolve_instructions(items)
+    items = resolve_bytes(items)
+    items = resolve_strings(items)
     items = resolve_packs(items)
     program = resolve_blobs(items)
 

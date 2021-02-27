@@ -9,6 +9,7 @@ Verbose output
 
 0.0.9
 -----
+Defer bytes / string eval to separate passes
 A extension for completeness
 C extension for potential optimizations
 

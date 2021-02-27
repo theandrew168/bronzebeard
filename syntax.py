@@ -15,6 +15,8 @@ from prompt_toolkit.styles import style_from_pygments_cls
 # Usage:
 # pip install prompt_toolkit
 # python3 syntax.py examples/example.asm emacs
+#
+# References:
 # https://python-prompt-toolkit.readthedocs.io/en/master/pages/printing_text.html
 # https://pygments.org/docs/lexerdevelopment/
 # https://pygments.org/docs/tokens/
