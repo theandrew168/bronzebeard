@@ -194,116 +194,155 @@ def j_type(rd, imm, opcode):
     return struct.pack('<I', code)
 
 
+def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
+    aq = int(aq)
+    rl = int(rl)
+    if aq not in [0, 1]:
+        raise ValueError('aq must be either 0 or 1')
+    if rl not in [0, 1]:
+        raise ValueError('rl must be either 0 or 1')
+
+    funct7 = funct5 << 2 | aq << 1 | rl
+    return r_type(rd, rs1, rs2, opcode, funct3, funct7)
+
+
 # RV32I Base Instruction Set
-LUI    = partial(u_type, opcode=0b0110111)
-AUIPC  = partial(u_type, opcode=0b0010111)
-JAL    = partial(j_type, opcode=0b1101111)
-JALR   = partial(i_type, opcode=0b1100111, funct3=0b000)
-BEQ    = partial(b_type, opcode=0b1100011, funct3=0b000)
-BNE    = partial(b_type, opcode=0b1100011, funct3=0b001)
-BLT    = partial(b_type, opcode=0b1100011, funct3=0b100)
-BGE    = partial(b_type, opcode=0b1100011, funct3=0b101)
-BLTU   = partial(b_type, opcode=0b1100011, funct3=0b110)
-BGEU   = partial(b_type, opcode=0b1100011, funct3=0b111)
-LB     = partial(i_type, opcode=0b0000011, funct3=0b000)
-LH     = partial(i_type, opcode=0b0000011, funct3=0b001)
-LW     = partial(i_type, opcode=0b0000011, funct3=0b010)
-LBU    = partial(i_type, opcode=0b0000011, funct3=0b100)
-LHU    = partial(i_type, opcode=0b0000011, funct3=0b101)
-SB     = partial(s_type, opcode=0b0100011, funct3=0b000)
-SH     = partial(s_type, opcode=0b0100011, funct3=0b001)
-SW     = partial(s_type, opcode=0b0100011, funct3=0b010)
-ADDI   = partial(i_type, opcode=0b0010011, funct3=0b000)
-SLTI   = partial(i_type, opcode=0b0010011, funct3=0b010)
-SLTIU  = partial(i_type, opcode=0b0010011, funct3=0b011)
-XORI   = partial(i_type, opcode=0b0010011, funct3=0b100)
-ORI    = partial(i_type, opcode=0b0010011, funct3=0b110)
-ANDI   = partial(i_type, opcode=0b0010011, funct3=0b111)
-SLLI   = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
-SRLI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
-SRAI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
-ADD    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
-SUB    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
-SLL    = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
-SLT    = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
-SLTU   = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
-XOR    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
-SRL    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
-SRA    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
-OR     = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
-AND    = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+LUI      = partial(u_type, opcode=0b0110111)
+AUIPC    = partial(u_type, opcode=0b0010111)
+JAL      = partial(j_type, opcode=0b1101111)
+JALR     = partial(i_type, opcode=0b1100111, funct3=0b000)
+BEQ      = partial(b_type, opcode=0b1100011, funct3=0b000)
+BNE      = partial(b_type, opcode=0b1100011, funct3=0b001)
+BLT      = partial(b_type, opcode=0b1100011, funct3=0b100)
+BGE      = partial(b_type, opcode=0b1100011, funct3=0b101)
+BLTU     = partial(b_type, opcode=0b1100011, funct3=0b110)
+BGEU     = partial(b_type, opcode=0b1100011, funct3=0b111)
+LB       = partial(i_type, opcode=0b0000011, funct3=0b000)
+LH       = partial(i_type, opcode=0b0000011, funct3=0b001)
+LW       = partial(i_type, opcode=0b0000011, funct3=0b010)
+LBU      = partial(i_type, opcode=0b0000011, funct3=0b100)
+LHU      = partial(i_type, opcode=0b0000011, funct3=0b101)
+SB       = partial(s_type, opcode=0b0100011, funct3=0b000)
+SH       = partial(s_type, opcode=0b0100011, funct3=0b001)
+SW       = partial(s_type, opcode=0b0100011, funct3=0b010)
+ADDI     = partial(i_type, opcode=0b0010011, funct3=0b000)
+SLTI     = partial(i_type, opcode=0b0010011, funct3=0b010)
+SLTIU    = partial(i_type, opcode=0b0010011, funct3=0b011)
+XORI     = partial(i_type, opcode=0b0010011, funct3=0b100)
+ORI      = partial(i_type, opcode=0b0010011, funct3=0b110)
+ANDI     = partial(i_type, opcode=0b0010011, funct3=0b111)
+SLLI     = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+SRLI     = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
+SRAI     = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
+ADD      = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
+SUB      = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
+SLL      = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
+SLT      = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
+SLTU     = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
+XOR      = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
+SRL      = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
+SRA      = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
+OR       = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
+AND      = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
 
 # RV32M Standard Extension
-MUL    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
-MULH   = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
-MULHSU = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
-MULHU  = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
-DIV    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
-DIVU   = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
-REM    = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
-REMU   = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
+MUL      = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
+MULH     = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
+MULHSU   = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
+MULHU    = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
+DIV      = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
+DIVU     = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
+REM      = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
+REMU     = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
+
+# RV32A Standard Extension
+LRW      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00010)
+SCW      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00011)
+AMOSWAPW = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00001)
+AMOADDW  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00000)
+AMOXORW  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00100)
+AMOANDW  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01100)
+AMOORW   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01000)
+AMOMINW  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10000)
+AMOMAXW  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10100)
+AMOMINUW = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11000)
+AMOMAXUW = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11100)
 
 R_TYPE_INSTRUCTIONS = {
-    'slli':   SLLI,
-    'srli':   SRLI,
-    'srai':   SRAI,
-    'add':    ADD,
-    'sub':    SUB,
-    'sll':    SLL,
-    'slt':    SLT,
-    'sltu':   SLTU,
-    'xor':    XOR,
-    'srl':    SRL,
-    'sra':    SRA,
-    'or':     OR,
-    'and':    AND,
-    'mul':    MUL,
-    'mulh':   MULH,
-    'mulhsu': MULHSU,
-    'mulhu':  MULHU,
-    'div':    DIV,
-    'divu':   DIVU,
-    'rem':    REM,
-    'remu':   REMU,
+    'slli':      SLLI,
+    'srli':      SRLI,
+    'srai':      SRAI,
+    'add':       ADD,
+    'sub':       SUB,
+    'sll':       SLL,
+    'slt':       SLT,
+    'sltu':      SLTU,
+    'xor':       XOR,
+    'srl':       SRL,
+    'sra':       SRA,
+    'or':        OR,
+    'and':       AND,
+    'mul':       MUL,
+    'mulh':      MULH,
+    'mulhsu':    MULHSU,
+    'mulhu':     MULHU,
+    'div':       DIV,
+    'divu':      DIVU,
+    'rem':       REM,
+    'remu':      REMU,
 }
 
 I_TYPE_INSTRUCTIONS = {
-    'jalr':   JALR,
-    'lb':     LB,
-    'lh':     LH,
-    'lw':     LW,
-    'lbu':    LBU,
-    'lhu':    LHU,
-    'addi':   ADDI,
-    'slti':   SLTI,
-    'sltiu':  SLTIU,
-    'xori':   XORI,
-    'ori':    ORI,
-    'andi':   ANDI,
+    'jalr':      JALR,
+    'lb':        LB,
+    'lh':        LH,
+    'lw':        LW,
+    'lbu':       LBU,
+    'lhu':       LHU,
+    'addi':      ADDI,
+    'slti':      SLTI,
+    'sltiu':     SLTIU,
+    'xori':      XORI,
+    'ori':       ORI,
+    'andi':      ANDI,
 }
 
 S_TYPE_INSTRUCTIONS = {
-    'sb':     SB,
-    'sh':     SH,
-    'sw':     SW,
+    'sb':        SB,
+    'sh':        SH,
+    'sw':        SW,
 }
 
 B_TYPE_INSTRUCTIONS = {
-    'beq':    BEQ,
-    'bne':    BNE,
-    'blt':    BLT,
-    'bge':    BGE,
-    'bltu':   BLTU,
-    'bgeu':   BGEU,
+    'beq':       BEQ,
+    'bne':       BNE,
+    'blt':       BLT,
+    'bge':       BGE,
+    'bltu':      BLTU,
+    'bgeu':      BGEU,
 }
 
 U_TYPE_INSTRUCTIONS = {
-    'lui':    LUI,
-    'auipc':  AUIPC,
+    'lui':       LUI,
+    'auipc':     AUIPC,
 }
 
 J_TYPE_INSTRUCTIONS = {
-    'jal':    JAL,
+    'jal':       JAL,
+}
+
+A_TYPE_INSTRUCTIONS = {
+    'lr.w':      LRW,
+    'sc.w':      SCW,
+    'amoswap.w': AMOSWAPW,
+    'amoadd.w':  AMOADDW,
+    'amoxor.w':  AMOXORW,
+    'amoand.w':  AMOANDW,
+    'amoor.w':   AMOORW,
+    'amomin.w':  AMOMINW,
+    'amomax.w':  AMOMAXW,
+    'amominu.w': AMOMINUW,
+    'amomaxu.w': AMOMAXUW,
 }
 
 INSTRUCTIONS = {}
@@ -313,6 +352,7 @@ INSTRUCTIONS.update(S_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(A_TYPE_INSTRUCTIONS)
 
 
 def sign_extend(value, bits):
@@ -517,18 +557,18 @@ class Constant(Item):
         return 0
 
 
-class Pack(Item):
+class Bytes(Item):
 
-    def __init__(self, fmt, expr, line=None, parent=None):
+    def __init__(self, values, line=None, parent=None):
         super().__init__(line, parent)
-        self.fmt = fmt
-        self.expr = expr
+        self.values = values
 
     def __repr__(self):
-        return '{}({!r}, {!r})'.format(type(self).__name__, self.fmt, self.expr)
+        return '{}({!r})'.format(type(self).__name__, self.values)
 
     def size(self, position):
-        return struct.calcsize(self.fmt)
+        # this works because each byte occupies 1 byte
+        return len(self.values)
 
 
 class String(Item):
@@ -544,18 +584,18 @@ class String(Item):
         return len(' '.join(self.values))
 
 
-class Bytes(Item):
+class Pack(Item):
 
-    def __init__(self, values, line=None, parent=None):
+    def __init__(self, fmt, expr, line=None, parent=None):
         super().__init__(line, parent)
-        self.values = values
+        self.fmt = fmt
+        self.expr = expr
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.values)
+        return '{}({!r}, {!r})'.format(type(self).__name__, self.fmt, self.expr)
 
     def size(self, position):
-        # this works because each byte occupies 1 byte
-        return len(self.values)
+        return struct.calcsize(self.fmt)
 
 
 class Blob(Item):
@@ -662,6 +702,26 @@ class JTypeInstruction(Item):
 
     def __repr__(self):
         return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
+
+    def size(self, position):
+        return 4
+
+
+class ATypeInstruction(Item):
+
+    def __init__(self, name, rd, rs1, rs2, aq=0, rl=0, line=None, parent=None):
+        super().__init__(line, parent)
+        self.name = name
+        self.rd = rd
+        self.rs1 = rs1
+        self.rs2 = rs2
+        self.aq = aq
+        self.rl = rl
+
+    def __repr__(self):
+        s = '{}({!r}, {!r}, {!r}, {!r}, aq={!r}, rl={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2, self.aq, self.rl)
+        return s
 
     def size(self, position):
         return 4
@@ -803,6 +863,18 @@ def parse_assembly(tokens):
                 expr.insert(0, '%offset')
             inst = JTypeInstruction(name, rd, parse_expression(expr), line=line)
             items.append(inst)
+        # a-type instructions
+        elif toks[0].lower() in A_TYPE_INSTRUCTIONS:
+            name, rd, rs1, rs2, *ordering = toks
+            # check for specific ordering bits
+            if len(ordering) == 0:
+                aq, rl = 0, 0
+            elif len(ordering) == 2:
+                aq, rl = ordering
+            else:
+                raise ValueError('invalid ordering bits for atomic inst at {}'.format(line))
+            inst = ATypeInstruction(name, rd, rs1, rs2, aq, rl, line=line)
+            items.append(inst)
         else:
             raise ValueError('invalid item at {}'.format(line))
 
@@ -889,6 +961,12 @@ def resolve_registers(items, env):
             rd = env.get(item.rd) or item.rd
             inst = JTypeInstruction(item.name, rd, item.expr, parent=item)
             new_items.append(inst)
+        elif isinstance(item, ATypeInstruction):
+            rd = env.get(item.rd) or item.rd
+            rs1 = env.get(item.rs1) or item.rs1
+            rs2 = env.get(item.rs2) or item.rs2
+            inst = ATypeInstruction(item.name, rd, rs1, rs2, item.aq, item.rl, parent=item)
+            new_items.append(inst)
         else:
             new_items.append(item)
 
@@ -967,6 +1045,11 @@ def resolve_instructions(items):
         elif isinstance(item, JTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.expr)
+            blob = Blob(code, parent=item)
+            new_items.append(blob)
+        elif isinstance(item, ATypeInstruction):
+            encode_func = INSTRUCTIONS[item.name]
+            code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         else:

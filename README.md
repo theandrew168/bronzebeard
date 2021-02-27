@@ -4,7 +4,7 @@ Minimal ecosystem for bare-metal RISC-V development
 ## What
 Bronzebeard is a collection of tools for writing [RISC-V](https://en.wikipedia.org/wiki/Riscv) assembly and working with hobbyist development devices.
 It is designed for programs that will run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or pre-existing software of any kind.
-The assembler currently supports RV32IM (AC are coming soon).
+The assembler currently supports RV32IMA (C is coming soon).
 
 ## Why
 Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
