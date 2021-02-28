@@ -214,6 +214,39 @@ def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
     return r_type(rd, rs1, rs2, opcode, funct3, funct7)
 
 
+def cr_type(imm, opcode, funct3):
+    if imm < -0x800 or imm > 0x7ff:
+        raise ValueError('11-bit multiple of 2 immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
+    if imm % 2 != 0:
+        raise ValueError('11-bit multiple of 2 immediate must be a muliple of 2: {}'.format(imm))
+
+    imm = imm >> 1
+    imm = c_uint32(imm).value & 0b11111111111
+
+    imm_11 = (imm >> 10) & 0b1
+    imm_10 = (imm >> 9) & 0b1
+    imm_9_8 = (imm >> 7) & 0b11
+    imm_7 = (imm >> 6) & 0b1
+    imm_6 = (imm >> 5) & 0b1
+    imm_5 = (imm >> 4) & 0b1
+    imm_4 = (imm >> 3) & 0b1
+    imm_3_1 = imm & 0b111
+
+    code = 0
+    code |= opcode
+    code |= imm_5 << 2
+    code |= imm_3_1 << 3
+    code |= imm_7 << 6
+    code |= imm_6 << 7
+    code |= imm_10 << 8
+    code |= imm_9_8 << 9
+    code |= imm_4 << 11
+    code |= imm_11 << 12
+    code |= funct3 << 13
+
+    return struct.pack('<I', code)
+
+
 def ciw_type(rd, imm, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
 
