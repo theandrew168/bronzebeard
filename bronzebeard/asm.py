@@ -42,10 +42,21 @@ REGISTERS = {
     'x29': 29, 't4': 29,
     'x30': 30, 't5': 30,
     'x31': 31, 't6': 31,
+
+    # aliases for compressed instruction registers
+    'c.x8':  0b000, 'c.s0': 0b000,
+    'c.x9':  0b001, 'c.s1': 0b001,
+    'c.x10': 0b010, 'c.a0': 0b010,
+    'c.x11': 0b011, 'c.a1': 0b011,
+    'c.x12': 0b100, 'c.a2': 0b100,
+    'c.x13': 0b101, 'c.a3': 0b101,
+    'c.x14': 0b110, 'c.a4': 0b110,
+    'c.x15': 0b111, 'c.a5': 0b111,
 }
 
 
-def lookup_register(reg):
+# TODO: flag for compressed -> check if valid and convert?
+def lookup_register(reg, compressed=False):
     # check if register corresponds to a valid name
     if reg in REGISTERS:
         reg = REGISTERS[reg]
@@ -127,10 +138,10 @@ def b_type(rs1, rs2, imm, opcode, funct3):
 
     if imm < -0x1000 or imm > 0x0fff:
         raise ValueError('12-bit multiple of 2 immediate must be between -0x1000 (-4096) and 0x0fff (4095): {}'.format(imm))
-    if imm % 2 == 1:
+    if imm % 2 != 0:
         raise ValueError('12-bit multiple of 2 immediate must be a muliple of 2: {}'.format(imm))
 
-    imm = imm // 2
+    imm = imm >> 1
     imm = c_uint32(imm).value & 0b111111111111
 
     imm_12 = (imm >> 11) & 0b1
@@ -172,10 +183,10 @@ def j_type(rd, imm, opcode):
 
     if imm < -0x100000 or imm > 0x0fffff:
         raise ValueError('20-bit multiple of 2 immediate must be between -0x100000 (-1048576) and 0x0fffff (1048575): {}'.format(imm))
-    if imm % 2 == 1:
+    if imm % 2 != 0:
         raise ValueError('20-bit multiple of 2 immediate must be a muliple of 2: {}'.format(imm))
 
-    imm = imm // 2
+    imm = imm >> 1
     imm = c_uint32(imm).value & 0b11111111111111111111
 
     imm_20 = (imm >> 19) & 0b1
@@ -206,143 +217,180 @@ def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
     return r_type(rd, rs1, rs2, opcode, funct3, funct7)
 
 
-# RV32I Base Instruction Set
-LUI       = partial(u_type, opcode=0b0110111)
-AUIPC     = partial(u_type, opcode=0b0010111)
-JAL       = partial(j_type, opcode=0b1101111)
-JALR      = partial(i_type, opcode=0b1100111, funct3=0b000)
-BEQ       = partial(b_type, opcode=0b1100011, funct3=0b000)
-BNE       = partial(b_type, opcode=0b1100011, funct3=0b001)
-BLT       = partial(b_type, opcode=0b1100011, funct3=0b100)
-BGE       = partial(b_type, opcode=0b1100011, funct3=0b101)
-BLTU      = partial(b_type, opcode=0b1100011, funct3=0b110)
-BGEU      = partial(b_type, opcode=0b1100011, funct3=0b111)
-LB        = partial(i_type, opcode=0b0000011, funct3=0b000)
-LH        = partial(i_type, opcode=0b0000011, funct3=0b001)
-LW        = partial(i_type, opcode=0b0000011, funct3=0b010)
-LBU       = partial(i_type, opcode=0b0000011, funct3=0b100)
-LHU       = partial(i_type, opcode=0b0000011, funct3=0b101)
-SB        = partial(s_type, opcode=0b0100011, funct3=0b000)
-SH        = partial(s_type, opcode=0b0100011, funct3=0b001)
-SW        = partial(s_type, opcode=0b0100011, funct3=0b010)
-ADDI      = partial(i_type, opcode=0b0010011, funct3=0b000)
-SLTI      = partial(i_type, opcode=0b0010011, funct3=0b010)
-SLTIU     = partial(i_type, opcode=0b0010011, funct3=0b011)
-XORI      = partial(i_type, opcode=0b0010011, funct3=0b100)
-ORI       = partial(i_type, opcode=0b0010011, funct3=0b110)
-ANDI      = partial(i_type, opcode=0b0010011, funct3=0b111)
-SLLI      = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
-SRLI      = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
-SRAI      = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
-ADD       = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
-SUB       = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
-SLL       = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
-SLT       = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
-SLTU      = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
-XOR       = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
-SRL       = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
-SRA       = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
-OR        = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
-AND       = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+def ciw_type(rd, imm, opcode, funct3):
+    rd = lookup_register(rd)
 
-# RV32M Standard Extension
-MUL       = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
-MULH      = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
-MULHSU    = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
-MULHU     = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
-DIV       = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
-DIVU      = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
-REM       = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
-REMU      = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
+    if imm <= 0:
+        raise ValueError('8-bit non-zero unsigned immediate must be greater than zero: {}'.format(imm))
+    if imm > 0xff * 4:
+        raise ValueError('8-bit non-zero unsigned immediate must be less than or equal to 0xff: {}'.format(imm))
+    if imm % 4 != 0:
+        raise ValueError('8-bit non-zero unsigned immediate must be a multiple of 4: {}'.format(imm))
 
-# RV32A Standard Extension
-LR_W      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00010)
-SC_W      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00011)
-AMOSWAP_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00001)
-AMOADD_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00000)
-AMOXOR_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00100)
-AMOAND_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01100)
-AMOOR_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01000)
-AMOMIN_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10000)
-AMOMAX_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10100)
-AMOMINU_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11000)
-AMOMAXU_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11100)
+    imm = imm >> 2
+    imm = c_uint32(imm).value & 0b11111111
+
+    imm_9_6 = (imm >> 4) & 0b1111
+    imm_5_4 = (imm >> 2) & 0b11
+    imm_3 = (imm >> 1) & 0b1
+    imm_2 = imm & 0b1
+
+    code = 0
+    code |= opcode
+    code |= rd << 2
+    code |= imm_3 << 5
+    code |= imm_2 << 6
+    code |= imm_9_6 << 7
+    code |= imm_5_4 << 11
+    code |= funct3 << 13
+
+    return struct.pack('<I', code)
+
+
+# RV32I Base Integer Instruction Set
+LUI        = partial(u_type, opcode=0b0110111)
+AUIPC      = partial(u_type, opcode=0b0010111)
+JAL        = partial(j_type, opcode=0b1101111)
+JALR       = partial(i_type, opcode=0b1100111, funct3=0b000)
+BEQ        = partial(b_type, opcode=0b1100011, funct3=0b000)
+BNE        = partial(b_type, opcode=0b1100011, funct3=0b001)
+BLT        = partial(b_type, opcode=0b1100011, funct3=0b100)
+BGE        = partial(b_type, opcode=0b1100011, funct3=0b101)
+BLTU       = partial(b_type, opcode=0b1100011, funct3=0b110)
+BGEU       = partial(b_type, opcode=0b1100011, funct3=0b111)
+LB         = partial(i_type, opcode=0b0000011, funct3=0b000)
+LH         = partial(i_type, opcode=0b0000011, funct3=0b001)
+LW         = partial(i_type, opcode=0b0000011, funct3=0b010)
+LBU        = partial(i_type, opcode=0b0000011, funct3=0b100)
+LHU        = partial(i_type, opcode=0b0000011, funct3=0b101)
+SB         = partial(s_type, opcode=0b0100011, funct3=0b000)
+SH         = partial(s_type, opcode=0b0100011, funct3=0b001)
+SW         = partial(s_type, opcode=0b0100011, funct3=0b010)
+ADDI       = partial(i_type, opcode=0b0010011, funct3=0b000)
+SLTI       = partial(i_type, opcode=0b0010011, funct3=0b010)
+SLTIU      = partial(i_type, opcode=0b0010011, funct3=0b011)
+XORI       = partial(i_type, opcode=0b0010011, funct3=0b100)
+ORI        = partial(i_type, opcode=0b0010011, funct3=0b110)
+ANDI       = partial(i_type, opcode=0b0010011, funct3=0b111)
+SLLI       = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+SRLI       = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
+SRAI       = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
+ADD        = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
+SUB        = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
+SLL        = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
+SLT        = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
+SLTU       = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
+XOR        = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
+SRL        = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
+SRA        = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
+OR         = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
+AND        = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+
+# RV32M Standard Extension for Integer Multiplication and Division
+MUL        = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
+MULH       = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
+MULHSU     = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
+MULHU      = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
+DIV        = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
+DIVU       = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
+REM        = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
+REMU       = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
+
+# RV32A Standard Extension for Atomic Instructions
+LR_W       = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00010)
+SC_W       = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00011)
+AMOSWAP_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00001)
+AMOADD_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00000)
+AMOXOR_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00100)
+AMOAND_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01100)
+AMOOR_W    = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01000)
+AMOMIN_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10000)
+AMOMAX_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10100)
+AMOMINU_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11000)
+AMOMAXU_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11100)
+
+# RV32C Standard Extension for Compressed Instructions
+C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
 
 R_TYPE_INSTRUCTIONS = {
-    'slli':      SLLI,
-    'srli':      SRLI,
-    'srai':      SRAI,
-    'add':       ADD,
-    'sub':       SUB,
-    'sll':       SLL,
-    'slt':       SLT,
-    'sltu':      SLTU,
-    'xor':       XOR,
-    'srl':       SRL,
-    'sra':       SRA,
-    'or':        OR,
-    'and':       AND,
-    'mul':       MUL,
-    'mulh':      MULH,
-    'mulhsu':    MULHSU,
-    'mulhu':     MULHU,
-    'div':       DIV,
-    'divu':      DIVU,
-    'rem':       REM,
-    'remu':      REMU,
+    'slli':       SLLI,
+    'srli':       SRLI,
+    'srai':       SRAI,
+    'add':        ADD,
+    'sub':        SUB,
+    'sll':        SLL,
+    'slt':        SLT,
+    'sltu':       SLTU,
+    'xor':        XOR,
+    'srl':        SRL,
+    'sra':        SRA,
+    'or':         OR,
+    'and':        AND,
+    'mul':        MUL,
+    'mulh':       MULH,
+    'mulhsu':     MULHSU,
+    'mulhu':      MULHU,
+    'div':        DIV,
+    'divu':       DIVU,
+    'rem':        REM,
+    'remu':       REMU,
 }
 
 I_TYPE_INSTRUCTIONS = {
-    'jalr':      JALR,
-    'lb':        LB,
-    'lh':        LH,
-    'lw':        LW,
-    'lbu':       LBU,
-    'lhu':       LHU,
-    'addi':      ADDI,
-    'slti':      SLTI,
-    'sltiu':     SLTIU,
-    'xori':      XORI,
-    'ori':       ORI,
-    'andi':      ANDI,
+    'jalr':       JALR,
+    'lb':         LB,
+    'lh':         LH,
+    'lw':         LW,
+    'lbu':        LBU,
+    'lhu':        LHU,
+    'addi':       ADDI,
+    'slti':       SLTI,
+    'sltiu':      SLTIU,
+    'xori':       XORI,
+    'ori':        ORI,
+    'andi':       ANDI,
 }
 
 S_TYPE_INSTRUCTIONS = {
-    'sb':        SB,
-    'sh':        SH,
-    'sw':        SW,
+    'sb':         SB,
+    'sh':         SH,
+    'sw':         SW,
 }
 
 B_TYPE_INSTRUCTIONS = {
-    'beq':       BEQ,
-    'bne':       BNE,
-    'blt':       BLT,
-    'bge':       BGE,
-    'bltu':      BLTU,
-    'bgeu':      BGEU,
+    'beq':        BEQ,
+    'bne':        BNE,
+    'blt':        BLT,
+    'bge':        BGE,
+    'bltu':       BLTU,
+    'bgeu':       BGEU,
 }
 
 U_TYPE_INSTRUCTIONS = {
-    'lui':       LUI,
-    'auipc':     AUIPC,
+    'lui':        LUI,
+    'auipc':      AUIPC,
 }
 
 J_TYPE_INSTRUCTIONS = {
-    'jal':       JAL,
+    'jal':        JAL,
 }
 
 A_TYPE_INSTRUCTIONS = {
-    'lr.w':      LR_W,
-    'sc.w':      SC_W,
-    'amoswap.w': AMOSWAP_W,
-    'amoadd.w':  AMOADD_W,
-    'amoxor.w':  AMOXOR_W,
-    'amoand.w':  AMOAND_W,
-    'amoor.w':   AMOOR_W,
-    'amomin.w':  AMOMIN_W,
-    'amomax.w':  AMOMAX_W,
-    'amominu.w': AMOMINU_W,
-    'amomaxu.w': AMOMAXU_W,
+    'lr.w':       LR_W,
+    'sc.w':       SC_W,
+    'amoswap.w':  AMOSWAP_W,
+    'amoadd.w':   AMOADD_W,
+    'amoxor.w':   AMOXOR_W,
+    'amoand.w':   AMOAND_W,
+    'amoor.w':    AMOOR_W,
+    'amomin.w':   AMOMIN_W,
+    'amomax.w':   AMOMAX_W,
+    'amominu.w':  AMOMINU_W,
+    'amomaxu.w':  AMOMAXU_W,
+}
+
+CIW_TYPE_INSTRUCTIONS = {
+    'c.addi4spn': C_ADDI4SPN,
 }
 
 INSTRUCTIONS = {}
@@ -353,6 +401,7 @@ INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(A_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(CIW_TYPE_INSTRUCTIONS)
 
 
 def sign_extend(value, bits):

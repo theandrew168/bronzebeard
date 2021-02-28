@@ -961,6 +961,19 @@ def test_amomaxu_w(rd, rs1, rs2, aq, rl, code):
     assert asm.AMOMAXU_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
+@pytest.mark.parametrize(
+    'rd,      nzuimm, code', [
+    ('c.x8',  4,      0b0000000001000000),
+    ('c.x8',  1020,   0b0001111111100000),
+    ('c.x15', 0x01*4, 0b0000000001011100),
+    ('c.x15', 0xff*4, 0b0001111111111100),
+    ('c.x8',  8,      0b0000000000100000),
+    ('c.x8',  12,     0b0000000001100000),
+])
+def test_c_addi4spn(rd, nzuimm, code):
+    assert asm.C_ADDI4SPN(rd, nzuimm) == struct.pack('<I', code)
+
+
 def test_read_assembly():
     source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
     lines = asm.read_assembly(source)
