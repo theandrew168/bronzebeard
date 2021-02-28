@@ -42,20 +42,9 @@ REGISTERS = {
     'x29': 29, 't4': 29,
     'x30': 30, 't5': 30,
     'x31': 31, 't6': 31,
-
-    # aliases for compressed instruction registers
-    'c.x8':  0b000, 'c.s0': 0b000,
-    'c.x9':  0b001, 'c.s1': 0b001,
-    'c.x10': 0b010, 'c.a0': 0b010,
-    'c.x11': 0b011, 'c.a1': 0b011,
-    'c.x12': 0b100, 'c.a2': 0b100,
-    'c.x13': 0b101, 'c.a3': 0b101,
-    'c.x14': 0b110, 'c.a4': 0b110,
-    'c.x15': 0b111, 'c.a5': 0b111,
 }
 
 
-# TODO: flag for compressed -> check if valid and convert?
 def lookup_register(reg, compressed=False):
     # check if register corresponds to a valid name
     if reg in REGISTERS:
@@ -65,11 +54,19 @@ def lookup_register(reg, compressed=False):
     try:
         reg = int(reg)
     except ValueError:
-        raise ValueError('Reg is not a number or valid name: {}'.format(reg))
+        raise ValueError('register is not a number or valid name: {}'.format(reg))
 
     # ensure register is between 0 and 31
     if reg < 0 or reg > 31:
-        raise ValueError('Reg must be between 0 and 31: {}'.format(reg))
+        raise ValueError('register must be between 0 and 31: {}'.format(reg))
+
+    # check for compressed instruction register, validate and apply
+    if compressed:
+        # must be in "common" registers: x8-x15
+        if reg < 8 or reg > 15:
+            raise ValueError('compressed instruction register must be between x8 and x15: {}'.format(reg))
+        # subtract 8 to get compressed, 3-bit reg value
+        reg -= 8
 
     return reg
 
@@ -218,7 +215,7 @@ def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
 
 
 def ciw_type(rd, imm, opcode, funct3):
-    rd = lookup_register(rd)
+    rd = lookup_register(rd, compressed=True)
 
     if imm <= 0:
         raise ValueError('8-bit non-zero unsigned immediate must be greater than zero: {}'.format(imm))
