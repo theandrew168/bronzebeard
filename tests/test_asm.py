@@ -777,8 +777,8 @@ def test_remu(rd, rs1, rs2, code):
     (0,  31,  31,  0,  0,  0b00010001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b00010001111111111010111110101111),
 ])
-def test_lrw(rd, rs1, rs2, aq, rl, code):
-    assert asm.LRW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_lr_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.LR_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -795,8 +795,8 @@ def test_lrw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b00011001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b00011001111111111010111110101111),
 ])
-def test_scw(rd, rs1, rs2, aq, rl, code):
-    assert asm.SCW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_sc_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.SC_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -813,8 +813,8 @@ def test_scw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b00001001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b00001001111111111010111110101111),
 ])
-def test_amoswapw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOSWAPW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amoswap_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOSWAP_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -831,8 +831,8 @@ def test_amoswapw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b00000001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b00000001111111111010111110101111),
 ])
-def test_amoaddw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOADDW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amoadd_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOADD_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -849,8 +849,8 @@ def test_amoaddw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b00100001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b00100001111111111010111110101111),
 ])
-def test_amoxorw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOXORW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amoxor_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOXOR_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -867,8 +867,8 @@ def test_amoxorw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b01100001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b01100001111111111010111110101111),
 ])
-def test_amoandw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOANDW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amoand_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOAND_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -885,8 +885,8 @@ def test_amoandw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b01000001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b01000001111111111010111110101111),
 ])
-def test_amoorw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOORW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amoor_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOOR_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -903,8 +903,8 @@ def test_amoorw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b10000001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b10000001111111111010111110101111),
 ])
-def test_amominw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOMINW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amomin_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOMIN_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -921,8 +921,8 @@ def test_amominw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b10100001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b10100001111111111010111110101111),
 ])
-def test_amomaxw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOMAXW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amomax_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOMAX_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -939,8 +939,8 @@ def test_amomaxw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b11000001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b11000001111111111010111110101111),
 ])
-def test_amominuw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOMINUW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amominu_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOMINU_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
@@ -957,8 +957,8 @@ def test_amominuw(rd, rs1, rs2, aq, rl, code):
     (0,  31,  31,  0,  0,  0b11100001111111111010000000101111),
     (31, 31,  31,  0,  0,  0b11100001111111111010111110101111),
 ])
-def test_amomaxuw(rd, rs1, rs2, aq, rl, code):
-    assert asm.AMOMAXUW(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
+def test_amomaxu_w(rd, rs1, rs2, aq, rl, code):
+    assert asm.AMOMAXU_W(rd, rs1, rs2, aq=aq, rl=rl) == struct.pack('<I', code)
 
 
 def test_read_assembly():
@@ -1166,11 +1166,11 @@ def test_assembler_atomics():
     """
     binary = asm.assemble(source)
     target = b''.join([
-        asm.LRW(0, 0, 0),
-        asm.LRW(0, 0, 0, aq=0, rl=0),
-        asm.LRW(0, 0, 0, aq=1, rl=0),
-        asm.LRW(0, 0, 0, aq=0, rl=1),
-        asm.LRW(0, 0, 0, aq=1, rl=1),
-        asm.AMOMAXUW('t0', 't1', 't2'),
+        asm.LR_W(0, 0, 0),
+        asm.LR_W(0, 0, 0, aq=0, rl=0),
+        asm.LR_W(0, 0, 0, aq=1, rl=0),
+        asm.LR_W(0, 0, 0, aq=0, rl=1),
+        asm.LR_W(0, 0, 0, aq=1, rl=1),
+        asm.AMOMAXU_W('t0', 't1', 't2'),
     ])
     assert binary == target
