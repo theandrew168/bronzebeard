@@ -12,6 +12,7 @@ Can useful software be developed without relying on any of it?
 That's the question that this project seeks to answer.
 I believe that the rise of RISC-V provides a great opportunity to explore different methods of program development.
 Installing a full operating system doesn't have to be a prerequisite to building something useful.
+Check out the [DerzForth](https://github.com/theandrew168/derzforth) project for more elaboration of this idea.
 
 ## How
 Bronzebeard and its tools are implemented purely in Python.
