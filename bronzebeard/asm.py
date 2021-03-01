@@ -247,13 +247,69 @@ def cr_type(imm, opcode, funct3):
     return struct.pack('<I', code)
 
 
+def cl_type(rd, rs1, imm, opcode, funct3):
+    rd = lookup_register(rd, compressed=True)
+    rs1 = lookup_register(rs1, compressed=True)
+
+    if imm < -64 or imm > 63:
+        raise ValueError('5-bit immediate must be between -0x40 (-64) and 0x3f (63): {}'.format(imm))
+    if imm % 4 != 0:
+        raise ValueError('5-bit immediate must be a multiple of 4: {}'.format(imm))
+
+    imm = imm >> 2
+    imm = c_uint32(imm).value & 0b11111
+
+    imm_6 = (imm >> 4) & 0b1
+    imm_5_3 = (imm >> 1) & 0b111
+    imm_2 = imm & 0b1
+
+    code = 0
+    code |= opcode
+    code |= rd << 2
+    code |= imm_6 << 5
+    code |= imm_2 << 6
+    code |= rs1 << 7
+    code |= imm_5_3 << 10
+    code |= funct3 << 13
+
+    return struct.pack('<I', code)
+
+
+def cs_type(rs1, rs2, imm, opcode, funct3):
+    rs1 = lookup_register(rs1, compressed=True)
+    rs2 = lookup_register(rs2, compressed=True)
+
+    if imm < -64 or imm > 63:
+        raise ValueError('5-bit immediate must be between -0x40 (-64) and 0x3f (63): {}'.format(imm))
+    if imm % 4 != 0:
+        raise ValueError('5-bit immediate must be a multiple of 4: {}'.format(imm))
+
+    imm = imm >> 2
+    imm = c_uint32(imm).value & 0b11111
+
+    imm_6 = (imm >> 4) & 0b1
+    imm_5_3 = (imm >> 1) & 0b111
+    imm_2 = imm & 0b1
+
+    code = 0
+    code |= opcode
+    code |= rs2 << 2
+    code |= imm_6 << 5
+    code |= imm_2 << 6
+    code |= rs1 << 7
+    code |= imm_5_3 << 10
+    code |= funct3 << 13
+
+    return struct.pack('<I', code)
+
+
 def ciw_type(rd, imm, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
 
     if imm <= 0:
         raise ValueError('8-bit non-zero unsigned immediate must be greater than zero: {}'.format(imm))
-    if imm > 0xff * 4:
-        raise ValueError('8-bit non-zero unsigned immediate must be less than or equal to 0xff: {}'.format(imm))
+    if imm > 0x3ff:
+        raise ValueError('8-bit non-zero unsigned immediate must be less than or equal to 0x3ff (1023): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('8-bit non-zero unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -341,6 +397,33 @@ AMOMAXU_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11100)
 
 # RV32C Standard Extension for Compressed Instructions
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
+C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
+C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
+
+#C_NOP      =
+#C_ADDI     =
+#C_JAL      =
+#C_LI       =
+#C_ADDI16SP =
+#C_LUI      =
+#C_SRLI     =
+#C_SRAI     =
+#C_ANDI     =
+#C_SUB      =
+#C_XOR      =
+#C_OR       =
+#C_AND      =
+#C_J        =
+#C_BEQZ     =
+#C_BNEZ     =
+
+#C_SLLI     =
+#C_LWSP     =
+#C_JR       =
+#C_MV       =
+#C_JALR     =
+#C_ADD      =
+#C_SWSP     =
 
 R_TYPE_INSTRUCTIONS = {
     'slli':       SLLI,
@@ -417,6 +500,14 @@ A_TYPE_INSTRUCTIONS = {
     'amomax.w':   AMOMAX_W,
     'amominu.w':  AMOMINU_W,
     'amomaxu.w':  AMOMAXU_W,
+}
+
+CL_TYPE_INSTRUCTIONS = {
+    'c.lw':       C_LW,
+}
+
+CS_TYPE_INSTRUCTIONS = {
+    'c.sw':       C_SW,
 }
 
 CIW_TYPE_INSTRUCTIONS = {

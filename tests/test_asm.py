@@ -974,6 +974,36 @@ def test_c_addi4spn(rd, nzuimm, code):
     assert asm.C_ADDI4SPN(rd, nzuimm) == struct.pack('<I', code)
 
 
+@pytest.mark.parametrize(
+    'rd, rs1, imm, code', [
+    (8,  8,   0,   0b0100000000000000),
+    (8,  8,   -4,  0b0101110001100000),
+    (8,  8,   -64, 0b0100000000100000),
+    (8,  8,   60,  0b0101110001000000),
+    (8,  15,  0,   0b0100001110000000),
+    (15, 8,   -4,  0b0101110001111100),
+    (15, 15,  -64, 0b0100001110111100),
+    (15, 15,  60,  0b0101111111011100),
+])
+def test_c_lw(rd, rs1, imm, code):
+    assert asm.C_LW(rd, rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rs1, rs2, imm, code', [
+    (8,   8,   0,   0b1100000000000000),
+    (8,   8,   -4,  0b1101110001100000),
+    (8,   8,   -64, 0b1100000000100000),
+    (8,   8,   60,  0b1101110001000000),
+    (8,   15,  0,   0b1100000000011100),
+    (15,  8,   -4,  0b1101111111100000),
+    (15,  15,  -64, 0b1100001110111100),
+    (15,  15,  60,  0b1101111111011100),
+])
+def test_c_sw(rs1, rs2, imm, code):
+    assert asm.C_SW(rs1, rs2, imm) == struct.pack('<I', code)
+
+
 def test_read_assembly():
     source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
     lines = asm.read_assembly(source)
