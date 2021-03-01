@@ -78,6 +78,21 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
+## Usage
+```
+usage: python -m bronzebeard.asm [-h] [--verbose] input_asm output_bin
+
+Assemble RISC-V source code
+
+positional arguments:
+  input_asm   input source file
+  output_bin  output binary file
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --verbose   verbose assembler output
+```
+
 ## Assemble
 With Bronzebeard installed:
 ```
