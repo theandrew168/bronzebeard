@@ -1171,7 +1171,6 @@ def resolve_strings(items):
     for item in items:
         if isinstance(item, String):
             text = ' '.join(item.values)
-            print(text)
             blob = Blob(text.encode(), parent=item)
             new_items.append(blob)
         else:
