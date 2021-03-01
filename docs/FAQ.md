@@ -68,12 +68,14 @@ Storing the config back to memory is necessary to have it take effect.
 Given that RISC-V is a load/store architecture, this general flow is likely to be seen all over the place.
 
 ## Is examples/forth.asm ready to use?
+NOTE: This example has been expanded into its own project: [DerzForth](https://github.com/theandrew168/derzforth).
+
 One big caveat to take note of: many USB-to-TTL serial cables supply 5V of power.
 The 4 pins on the end of the Nano are GND, TX, RX, and 3V3.
 Therefore if you attach the 4 cables from the adapter directly to these pins, the chip will bug out, run way too fast, and potentially be damaged.
 To avoid this, you can either power the Nano via USB-C and leave the serial cable's 5V line unplugged or you can jump the 5V line over to the 5V input on the far corner of the device.
 
-As for the [examples/forth.asm](https://github.com/theandrew168/bronzebeard/blob/master/examples/forth.asm) example, it does work.
+As for the [forth.asm](https://github.com/theandrew168/bronzebeard/blob/master/examples/forth.asm) example, it does work.
 It's just so minimal at this point that it's sort of hard to tell.
 By default, it only supports the bare minimum builtin words as documented [here](https://github.com/theandrew168/bronzebeard/blob/master/docs/forth.md).
 In order to build up the dictionary into something useful, it is necessary to enter most of the commands from [prelude.forth](https://github.com/theandrew168/bronzebeard/blob/master/examples/prelude.forth).
