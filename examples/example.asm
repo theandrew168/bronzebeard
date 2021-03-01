@@ -1,3 +1,6 @@
+# Example program to showcase assembler syntax
+# This example doesn't actually do anything useful!
+
 # constants
 FOO = 42
 BAR = FOO * 2
