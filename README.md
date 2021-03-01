@@ -77,51 +77,22 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
-## Longan Nano
-This section details how to run programs on the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html).
-
-### Cables
-1. Attach the USB to USB-C cable for programming via DFU
-2. (Optional) Attach the USB to TTL Serial cable ([adafruit](https://www.adafruit.com/product/954), [sparkfun](https://www.sparkfun.com/products/12977))
-    * Attach GND to GND
-    * Attach TX to RX
-    * Attach RX to TX
-    * Don't attach VCC (or jump to the 5V input if you want power via this cable)
-
-### Assemble
+## Assemble
 With Bronzebeard installed:
 ```
-python3 -m bronzebeard.asm examples/led.asm led.bin
+python3 -m bronzebeard.asm examples/example.asm example.bin
 ```
 
-### Program
-Enable DFU mode on the Longan Nano: press BOOT, press RESET, release RESET, release BOOT.
+## Program
+Enable DFU mode on your given device:
+* **Longan Nano** - press BOOT, press RESET, release RESET, release BOOT
+* **Wio Lite** - set BOOT switch to 1, press and release RESET
+
 ```
-python3 -m bronzebeard.dfu 28e9:0189 led.bin
+python3 -m bronzebeard.dfu 28e9:0189 example.bin
 ```
 
-After programming, press and release RESET in order to put the device back into normal mode.
-
-### Interact
-If you have flashed a program that includes serial interaction, We can use [pySerial's](https://pyserial.readthedocs.io/en/latest/index.html) built-in terminal to communiate with the device.
-
-To get a list of available serial ports, run the following command:
-```
-python3 -m serial.tools.list_ports
-```
-
-One of them should be the device we want to communicate with.
-You can specify the device port in the following command in order to initiate the connection.
-```
-python3 -m serial.tools.miniterm <device_port> 115200
-```
-
-Here are a few potential examples:
-```
-# Windows
-python3 -m serial.tools.miniterm COM3 115200
-# macOS
-python3 -m serial.tools.miniterm /dev/TODO_what_goes_here 115200
-# Linux
-python3 -m serial.tools.miniterm /dev/ttyUSB0 115200
-```
+# Execute!
+After programming, put the device back into normal mode:
+* **Longan Nano** - press and release RESET
+* **Wio Lite** - set BOOT switch to 0, press and release RESET
