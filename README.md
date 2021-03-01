@@ -92,7 +92,7 @@ Enable DFU mode on your given device:
 python3 -m bronzebeard.dfu 28e9:0189 example.bin
 ```
 
-# Execute!
+## Execute!
 After programming, put the device back into normal mode:
 * **Longan Nano** - press and release RESET
 * **Wio Lite** - set BOOT switch to 0, press and release RESET
