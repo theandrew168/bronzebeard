@@ -1039,7 +1039,7 @@ def test_c_li(rd_rs1, imm, code):
 @pytest.mark.parametrize(
     'rd_rs1, imm,  code', [
     (2,      16,   0b0110000100000101),
-    (2 ,     496,  0b0110000101111101),
+    (2,      496,  0b0110000101111101),
     (2,      -16,  0b0111000101111101),
     (2,      -512, 0b0111000100000001),
 ])
@@ -1176,6 +1176,24 @@ def test_c_j(imm, code):
 ])
 def test_c_beqz(rs1, imm, code):
     assert asm.C_BEQZ(rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rs1, imm,  code', [
+    (8,   0,    0b1110000000000001),
+    (8,   2,    0b1110000000001001),
+    (8,   4,    0b1110000000010001),
+    (8,   8,    0b1110010000000001),
+    (8,   16,   0b1110100000000001),
+    (8,   32,   0b1110000000000101),
+    (8,   64,   0b1110000000100001),
+    (8,   128,  0b1110000001000001),
+    (8,   254,  0b1110110001111101),
+    (15,  -2,   0b1111111111111101),
+    (15,  -256, 0b1111001110000001),
+])
+def test_c_bnez(rs1, imm, code):
+    assert asm.C_BNEZ(rs1, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(

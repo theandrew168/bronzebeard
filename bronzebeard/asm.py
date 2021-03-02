@@ -278,8 +278,8 @@ def cis_type(rd_rs1, imm, opcode, funct3):
 
 # CI variation
 # c.lwsp
-def cls_type(rd_rs1, imm, opcode, funct3):
-    rd_rs1 = lookup_register(rd_rs1)
+def cls_type(rd, imm, opcode, funct3):
+    rd = lookup_register(rd)
 
     if imm < 0 or imm > 252:
         raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xfc (252): {}'.format(imm))
@@ -295,7 +295,7 @@ def cls_type(rd_rs1, imm, opcode, funct3):
     code = 0
     code |= opcode
     code |= imm_6_2 << 2
-    code |= rd_rs1 << 7
+    code |= rd << 7
     code |= imm_7 << 12
     code |= funct3 << 13
 
@@ -575,7 +575,7 @@ AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
 C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
 C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
-C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)
+C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # c.nop syntax will be special
 C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000)
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
 C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010)
