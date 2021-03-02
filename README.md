@@ -20,8 +20,10 @@ Bronzebeard and its tools are implemented purely in Python.
 A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) is the centerpiece.
 It has been written in order to be free from large, complex toolchains.
 This keeps the project portable, minimal, and easy to understand.
-At the moment, Bronzebeard only targets the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
-However, there are plans to broaden support to also include [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b).
+
+## Devices
+At the moment, Bronzebeard has only been used to target the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
+There are plans to test on additional RISC-V boards such as the [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b) in the future.
 
 ## Documentation
 Most of the surface-level documentation for Bronzebeard lives right here in this README.
@@ -100,16 +102,10 @@ With Bronzebeard installed:
 python3 -m bronzebeard.asm examples/example.asm example.bin
 ```
 
-## Program
-Enable DFU mode on your given device:
-* **Longan Nano** - press BOOT, press RESET, release RESET, release BOOT
-* **Wio Lite** - set BOOT switch to 1, press and release RESET
+## Program (via DFU)
+NOTE: The DFU implemention included with Bronzebeard only supports the Longan Nano and Wio Lite at this time.
 
+With the target device in DFU mode:
 ```
-python3 -m bronzebeard.dfu 28e9:0189 example.bin
+python3 -m bronzebeard.dfu <device_id> example.bin
 ```
-
-## Execute!
-After programming, put the device back into normal mode:
-* **Longan Nano** - press and release RESET
-* **Wio Lite** - set BOOT switch to 0, press and release RESET

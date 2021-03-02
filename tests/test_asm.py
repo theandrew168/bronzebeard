@@ -962,7 +962,7 @@ def test_amomaxu_w(rd, rs1, rs2, aq, rl, code):
 
 
 @pytest.mark.parametrize(
-    'rd, nzuimm, code', [
+    'rd, imm,     code', [
     (8,  4,      0b0000000001000000),
     (8,  1020,   0b0001111111100000),
     (15, 0x01*4, 0b0000000001011100),
@@ -970,20 +970,17 @@ def test_amomaxu_w(rd, rs1, rs2, aq, rl, code):
     (8,  8,      0b0000000000100000),
     (8,  12,     0b0000000001100000),
 ])
-def test_c_addi4spn(rd, nzuimm, code):
-    assert asm.C_ADDI4SPN(rd, nzuimm) == struct.pack('<I', code)
+def test_c_addi4spn(rd, imm, code):
+    assert asm.C_ADDI4SPN(rd, imm) == struct.pack('<I', code)
 
 
 @pytest.mark.parametrize(
     'rd, rs1, imm, code', [
     (8,  8,   0,   0b0100000000000000),
-    (8,  8,   -4,  0b0101110001100000),
-    (8,  8,   -64, 0b0100000000100000),
-    (8,  8,   60,  0b0101110001000000),
+    (8,  8,   124, 0b0101110001100000),
     (8,  15,  0,   0b0100001110000000),
-    (15, 8,   -4,  0b0101110001111100),
-    (15, 15,  -64, 0b0100001110111100),
-    (15, 15,  60,  0b0101111111011100),
+    (15, 8,   0,   0b0100000000011100),
+    (15, 15,  124, 0b0101111111111100),
 ])
 def test_c_lw(rd, rs1, imm, code):
     assert asm.C_LW(rd, rs1, imm) == struct.pack('<I', code)
@@ -992,16 +989,204 @@ def test_c_lw(rd, rs1, imm, code):
 @pytest.mark.parametrize(
     'rs1, rs2, imm, code', [
     (8,   8,   0,   0b1100000000000000),
-    (8,   8,   -4,  0b1101110001100000),
-    (8,   8,   -64, 0b1100000000100000),
-    (8,   8,   60,  0b1101110001000000),
+    (8,   8,   124, 0b1101110001100000),
     (8,   15,  0,   0b1100000000011100),
-    (15,  8,   -4,  0b1101111111100000),
-    (15,  15,  -64, 0b1100001110111100),
-    (15,  15,  60,  0b1101111111011100),
+    (15,  8,   0,   0b1100001110000000),
+    (15,  15,  124, 0b1101111111111100),
 ])
 def test_c_sw(rs1, rs2, imm, code):
     assert asm.C_SW(rs1, rs2, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'code', [
+    0b0000000000000001,
+])
+def test_c_nop(code):
+    assert asm.C_NOP() == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (1,      1,   0b0000000010000101),
+    (1 ,     31,  0b0000000011111101),
+    (1,      -1,  0b0001000011111101),
+    (1,      -32, 0b0001000010000001),
+    (31,     1,   0b0000111110000101),
+    (31,     31,  0b0000111111111101),
+    (31,     -1,  0b0001111111111101),
+    (31,     -32, 0b0001111110000001),
+])
+def test_c_addi(rd_rs1, imm, code):
+    assert asm.C_ADDI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (1,      1,   0b0100000010000101),
+    (1 ,     31,  0b0100000011111101),
+    (1,      -1,  0b0101000011111101),
+    (1,      -32, 0b0101000010000001),
+    (31,     1 ,  0b0100111110000101),
+    (31,     31,  0b0100111111111101),
+    (31,     -1,  0b0101111111111101),
+    (31,     -32, 0b0101111110000001),
+])
+def test_c_li(rd_rs1, imm, code):
+    assert asm.C_LI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm,  code', [
+    (2,      16,   0b0110000100000101),
+    (2 ,     496,  0b0110000101111101),
+    (2,      -16,  0b0111000101111101),
+    (2,      -512, 0b0111000100000001),
+])
+def test_c_addi16sp(rd_rs1, imm, code):
+    assert asm.C_ADDI16SP(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (1,      1,   0b0110000010000101),
+    (1 ,     31,  0b0110000011111101),
+    (1,      -1,  0b0111000011111101),
+    (1,      -32, 0b0111000010000001),
+    (31,     1 ,  0b0110111110000101),
+    (31,     31,  0b0110111111111101),
+    (31,     -1,  0b0111111111111101),
+    (31,     -32, 0b0111111110000001),
+])
+def test_c_lui(rd_rs1, imm, code):
+    assert asm.C_LUI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (8,      1,   0b1000010000000101),
+    (8 ,     31,  0b1000010001111101),
+    (15,     1 ,  0b1000011110000101),
+    (15,     31,  0b1000011111111101),
+])
+def test_c_srai(rd_rs1, imm, code):
+    assert asm.C_SRAI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (8,      1,   0b1000100000000101),
+    (8 ,     31,  0b1000100001111101),
+    (15,     1 ,  0b1000101110000101),
+    (15,     31,  0b1000101111111101),
+])
+def test_c_andi(rd_rs1, imm, code):
+    assert asm.C_ANDI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (8,      1,   0b1000000000000101),
+    (8 ,     31,  0b1000000001111101),
+    (15,     1 ,  0b1000001110000101),
+    (15,     31,  0b1000001111111101),
+])
+def test_c_srli(rd_rs1, imm, code):
+    assert asm.C_SRLI(rd_rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, rs2, code', [
+    (8,      8,   0b1000110000000001),
+    (8 ,     15,  0b1000110000011101),
+    (15,     8 ,  0b1000111110000001),
+    (15,     15,  0b1000111110011101),
+])
+def test_c_sub(rd_rs1, rs2, code):
+    assert asm.C_SUB(rd_rs1, rs2) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, rs2, code', [
+    (8,      8,   0b1000110000100001),
+    (8 ,     15,  0b1000110000111101),
+    (15,     8 ,  0b1000111110100001),
+    (15,     15,  0b1000111110111101),
+])
+def test_c_xor(rd_rs1, rs2, code):
+    assert asm.C_XOR(rd_rs1, rs2) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, rs2, code', [
+    (8,      8,   0b1000110001000001),
+    (8 ,     15,  0b1000110001011101),
+    (15,     8 ,  0b1000111111000001),
+    (15,     15,  0b1000111111011101),
+])
+def test_c_or(rd_rs1, rs2, code):
+    assert asm.C_OR(rd_rs1, rs2) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, rs2, code', [
+    (8,      8,   0b1000110001100001),
+    (8 ,     15,  0b1000110001111101),
+    (15,     8 ,  0b1000111111100001),
+    (15,     15,  0b1000111111111101),
+])
+def test_c_and(rd_rs1, rs2, code):
+    assert asm.C_AND(rd_rs1, rs2) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'imm,   code', [
+    (0,     0b1010000000000001),
+    (2,     0b1010000000001001),
+    (4,     0b1010000000010001),
+    (8,     0b1010000000100001),
+    (16,    0b1010100000000001),
+    (32,    0b1010000000000101),
+    (64,    0b1010000010000001),
+    (128,   0b1010000001000001),
+    (256,   0b1010001000000001),
+    (512,   0b1010010000000001),
+    (1024,  0b1010000100000001),
+    (2046,  0b1010111111111101),
+    (-2,    0b1011111111111101),
+    (-2048, 0b1011000000000001),
+])
+def test_c_j(imm, code):
+    assert asm.C_J(imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rs1, imm,  code', [
+    (8,   0,    0b1100000000000001),
+    (8,   2,    0b1100000000001001),
+    (8,   4,    0b1100000000010001),
+    (8,   8,    0b1100010000000001),
+    (8,   16,   0b1100100000000001),
+    (8,   32,   0b1100000000000101),
+    (8,   64,   0b1100000000100001),
+    (8,   128,  0b1100000001000001),
+    (8,   254,  0b1100110001111101),
+    (15,  -2,   0b1101111111111101),
+    (15,  -256, 0b1101001110000001),
+])
+def test_c_beqz(rs1, imm, code):
+    assert asm.C_BEQZ(rs1, imm) == struct.pack('<I', code)
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
+    (1,      1,   0b0000000010000110),
+    (1 ,     31,  0b0000000011111110),
+    (31,     1 ,  0b0000111110000110),
+    (31,     31,  0b0000111111111110),
+])
+def test_c_slli(rd_rs1, imm, code):
+    assert asm.C_SLLI(rd_rs1, imm) == struct.pack('<I', code)
 
 
 def test_read_assembly():
