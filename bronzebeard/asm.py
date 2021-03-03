@@ -290,7 +290,7 @@ def cls_type(rd, imm, opcode, funct3):
     imm = c_uint32(imm).value & 0b111111
 
     imm_7 = (imm >> 5) & 0b1
-    imm_6_2 = imm & 0b1111
+    imm_6_2 = imm & 0b11111
 
     code = 0
     code |= opcode
@@ -318,6 +318,7 @@ def css_type(rs2, imm, opcode, funct3):
     imm_5_2 = imm & 0b1111
 
     code = 0
+    code |= opcode
     code |= rs2 << 2
     code |= imm_7_6 << 7
     code |= imm_5_2 << 9
