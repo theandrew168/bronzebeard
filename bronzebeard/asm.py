@@ -10,61 +10,53 @@ import struct
 
 
 REGISTERS = {
-    'x0': 0, 'zero': 0,
-    'x1': 1, 'ra': 1,
-    'x2': 2, 'sp': 2,
-    'x3': 3, 'gp': 3,
-    'x4': 4, 'tp': 4,
-    'x5': 5, 't0': 5,
-    'x6': 6, 't1': 6,
-    'x7': 7, 't2': 7,
-    'x8': 8, 's0': 8, 'fp': 8,
-    'x9': 9, 's1': 9,
-    'x10': 10, 'a0': 10,
-    'x11': 11, 'a1': 11,
-    'x12': 12, 'a2': 12,
-    'x13': 13, 'a3': 13,
-    'x14': 14, 'a4': 14,
-    'x15': 15, 'a5': 15,
-    'x16': 16, 'a6': 16,
-    'x17': 17, 'a7': 17,
-    'x18': 18, 's2': 18,
-    'x19': 19, 's3': 19,
-    'x20': 20, 's4': 20,
-    'x21': 21, 's5': 21,
-    'x22': 22, 's6': 22,
-    'x23': 23, 's7': 23,
-    'x24': 24, 's8': 24,
-    'x25': 25, 's9': 25,
-    'x26': 26, 's10': 26,
-    'x27': 27, 's11': 27,
-    'x28': 28, 't3': 28,
-    'x29': 29, 't4': 29,
-    'x30': 30, 't5': 30,
-    'x31': 31, 't6': 31,
+    # ints  # strs    # names    # aliases
+    0:  0,  '0':  0,  'x0':  0,  'zero': 0,
+    1:  1,  '1':  1,  'x1':  1,  'ra':   1,
+    2:  2,  '2':  2,  'x2':  2,  'sp':   2,
+    3:  3,  '3':  3,  'x3':  3,  'gp':   3,
+    4:  4,  '4':  4,  'x4':  4,  'tp':   4,
+    5:  5,  '5':  5,  'x5':  5,  't0':   5,
+    6:  6,  '6':  6,  'x6':  6,  't1':   6,
+    7:  7,  '7':  7,  'x7':  7,  't2':   7,
+    8:  8,  '8':  8,  'x8':  8,  's0':   8, 'fp': 8,
+    9:  9,  '9':  9,  'x9':  9,  's1':   9,
+    10: 10, '10': 10, 'x10': 10, 'a0':   10,
+    11: 11, '11': 11, 'x11': 11, 'a1':   11,
+    12: 12, '12': 12, 'x12': 12, 'a2':   12,
+    13: 13, '13': 13, 'x13': 13, 'a3':   13,
+    14: 14, '14': 14, 'x14': 14, 'a4':   14,
+    15: 15, '15': 15, 'x15': 15, 'a5':   15,
+    16: 16, '16': 16, 'x16': 16, 'a6':   16,
+    17: 17, '17': 17, 'x17': 17, 'a7':   17,
+    18: 18, '18': 18, 'x18': 18, 's2':   18,
+    19: 19, '19': 19, 'x19': 19, 's3':   19,
+    20: 20, '20': 20, 'x20': 20, 's4':   20,
+    21: 21, '21': 21, 'x21': 21, 's5':   21,
+    22: 22, '22': 22, 'x22': 22, 's6':   22,
+    23: 23, '23': 23, 'x23': 23, 's7':   23,
+    24: 24, '24': 24, 'x24': 24, 's8':   24,
+    25: 25, '25': 25, 'x25': 25, 's9':   25,
+    26: 26, '26': 26, 'x26': 26, 's10':  26,
+    27: 27, '27': 27, 'x27': 27, 's11':  27,
+    28: 28, '28': 28, 'x28': 28, 't3':   28,
+    29: 29, '29': 29, 'x29': 29, 't4':   29,
+    30: 30, '30': 30, 'x30': 30, 't5':   30,
+    31: 31, '31': 31, 'x31': 31, 't6':   31,
 }
 
 
 def lookup_register(reg, compressed=False):
-    # check if register corresponds to a valid name
-    if reg in REGISTERS:
-        reg = REGISTERS[reg]
+    if reg not in REGISTERS:
+        raise ValueError('register must be a valid integer, name, or alias: {}'.format(value))
 
-    # ensure register is a number
-    try:
-        reg = int(reg)
-    except ValueError:
-        raise ValueError('register is not a number or valid name: {}'.format(reg))
-
-    # ensure register is between 0 and 31
-    if reg < 0 or reg > 31:
-        raise ValueError('register must be between 0 and 31: {}'.format(reg))
+    reg = REGISTERS[reg]
 
     # check for compressed instruction register, validate and apply
     if compressed:
         # must be in "common" registers: x8-x15
         if reg < 8 or reg > 15:
-            raise ValueError('compressed instruction register must be between x8 and x15: {}'.format(reg))
+            raise ValueError('compressed register must be between 8 and 15: {}'.format(reg))
         # subtract 8 to get compressed, 3-bit reg value
         reg -= 8
 
@@ -1157,7 +1149,7 @@ def lex_assembly(lines):
     tokens = []
     for line in lines:
         # strip comments
-        contents = re.sub(r'#.*?$', r'', line.contents, flags=re.MULTILINE)
+        contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
         # strip whitespace
         contents = contents.strip()
         # skip empty lines
