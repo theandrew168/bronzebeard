@@ -76,7 +76,7 @@ def r_type(rd, rs1, rs2, opcode, funct3, funct7):
     code |= rs2 << 20
     code |= funct7 << 25
 
-    return struct.pack('<I', code)
+    return code
 
 
 def i_type(rd, rs1, imm, opcode, funct3):
@@ -95,7 +95,7 @@ def i_type(rd, rs1, imm, opcode, funct3):
     code |= rs1 << 15
     code |= imm << 20
 
-    return struct.pack('<I', code)
+    return code
 
 
 def s_type(rs1, rs2, imm, opcode, funct3):
@@ -118,7 +118,7 @@ def s_type(rs1, rs2, imm, opcode, funct3):
     code |= rs2 << 20
     code |= imm_11_5 << 25
 
-    return struct.pack('<I', code)
+    return code
 
 
 def b_type(rs1, rs2, imm, opcode, funct3):
@@ -148,7 +148,7 @@ def b_type(rs1, rs2, imm, opcode, funct3):
     code |= imm_10_5 << 25
     code |= imm_12 << 31
 
-    return struct.pack('<I', code)
+    return code
 
 
 def u_type(rd, imm, opcode):
@@ -164,7 +164,7 @@ def u_type(rd, imm, opcode):
     code |= rd << 7
     code |= imm << 12
 
-    return struct.pack('<I', code)
+    return code
 
 
 def j_type(rd, imm, opcode):
@@ -191,7 +191,7 @@ def j_type(rd, imm, opcode):
     code |= imm_10_1 << 21
     code |= imm_20 << 31
 
-    return struct.pack('<I', code)
+    return code
 
 
 def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
@@ -217,7 +217,7 @@ def cr_type(rd_rs1, rs2, opcode, funct4):
     code |= rd_rs1 << 7
     code |= funct4 << 12
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.nop, c.addi, c.li, c.lui, c.slli
@@ -239,7 +239,7 @@ def ci_type(rd_rs1, imm, opcode, funct3):
     code |= imm_5 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # CI variation
@@ -265,7 +265,7 @@ def cis_type(rd_rs1, imm, opcode, funct3):
     code |= imm_9 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # CI variation
@@ -291,7 +291,7 @@ def cls_type(rd, imm, opcode, funct3):
     code |= imm_7 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.swsp
@@ -316,7 +316,7 @@ def css_type(rs2, imm, opcode, funct3):
     code |= imm_5_2 << 9
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.addi4spn
@@ -345,7 +345,7 @@ def ciw_type(rd, imm, opcode, funct3):
     code |= imm_5_4 << 11
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.lw
@@ -374,7 +374,7 @@ def cl_type(rd, rs1, imm, opcode, funct3):
     code |= imm_5_3 << 10
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.sw
@@ -403,7 +403,7 @@ def cs_type(rs1, rs2, imm, opcode, funct3):
     code |= imm_5_3 << 10
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.sub, c.xor, c.or, c.and
@@ -418,7 +418,7 @@ def ca_type(rd_rs1, rs2, opcode, funct2, funct6):
     code |= rd_rs1 << 7
     code |= funct6 << 10
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.beqz, c.bnez
@@ -444,7 +444,7 @@ def cb_type(rs1, imm, opcode, funct3):
     code |= imm_8 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # CB variation
@@ -465,7 +465,7 @@ def cbi_type(rd_rs1, imm, opcode, funct2, funct3):
     code |= imm_5 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # c.jal, c.j
@@ -499,7 +499,7 @@ def cj_type(imm, opcode, funct3):
     code |= imm_11 << 12
     code |= funct3 << 13
 
-    return struct.pack('<I', code)
+    return code
 
 
 # RV32I Base Integer Instruction Set
@@ -1423,36 +1423,43 @@ def resolve_instructions(items):
         if isinstance(item, RTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.rs1, item.rs2)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, ITypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.rs1, item.expr)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, STypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rs1, item.rs2, item.expr)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, BTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rs1, item.rs2, item.expr)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, UTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.expr)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, JTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.expr)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         elif isinstance(item, ATypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
+            code = struct.pack('<I', code)
             blob = Blob(code, parent=item)
             new_items.append(blob)
         else:
