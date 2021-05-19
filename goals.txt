@@ -1,41 +1,5 @@
-0.0.7
------
-M extension for integer mul / div
-
-0.0.8
------
-Clean up the general design
-Verbose output
-
-0.0.9
------
-Defer bytes / string eval to separate passes
-
-0.0.10
-------
-A extension for atomic ops
-
-0.0.11
-------
-C extension for compressed instructions
-
-0.0.12
-------
-optimizations flag to find and apply compressions
-
-0.0.13
------
+Optimizations flag to find and apply compressions
 Define flag: -D FOO=3 -D BAR
-
-0.0.14
-------
 Include statement
 Include flag: -I examples/ -I src/
-
-0.0.15
-------
 Better error messages
-
-0.0.16
-------
-Basic GUI via Thonny plugin?
