@@ -790,17 +790,6 @@ class LineTokens:
         self.tokens = tokens
 
 
-## tokens emitted from a lexed line
-#class Tokens:
-#
-#    def __init__(self, line, tokens):
-#        self.line = line
-#        self.tokens = tokens
-#
-#    def __str__(self):
-#        return str(self.tokens)
-#
-
 # expressions
 class Expr(abc.ABC):
 
@@ -860,6 +849,7 @@ class Hi(Expr):
         return '{}({!r})'.format(type(self).__name__, self.expr)
 
     def eval(self, position, env):
+        # TODO: move this check to the parser
         if isinstance(self.expr, Hi) or isinstance(self.expr, Lo):
             raise TypeError('%hi and %lo expressions cannot nest')
 
@@ -876,6 +866,7 @@ class Lo(Expr):
         return '{}({!r})'.format(type(self).__name__, self.expr)
 
     def eval(self, position, env):
+        # TODO: move this check to the parser
         if isinstance(self.expr, Hi) or isinstance(self.expr, Lo):
             raise TypeError('%hi and %lo expressions cannot nest')
 
@@ -1133,7 +1124,7 @@ def lex_assembly(lines):
 
 
 # helper for parsing exprs since they occur in multiple places
-# TODO: catch invalid nesting here?
+# TODO: catch invalid expr nesting here
 def parse_expression(expr):
     head = expr[0].lower()
     if head == '%position':
@@ -1521,8 +1512,8 @@ def assemble(path_or_source, compress=False, verbose=False):
 
     # read, lex, and parse the source
     lines = read_assembly(path_or_source)
-    tokens = lex_assembly(lines)
-    items = parse_assembly(tokens)
+    line_tokens = lex_assembly(lines)
+    items = parse_assembly(line_tokens)
 
     # run items through each pass
     items = resolve_aligns(items)
