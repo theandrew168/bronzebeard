@@ -326,7 +326,7 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.addi4spn` | rd', nzuimm       | TODO        |
 | `c.lw`       | rd', rs1', uimm   | TODO        |
 | `c.sw`       | rs1', rs2', uimm  | TODO        |
-| `c.nop`      | <none>            | TODO        |
+| `c.nop`      | \<none\>          | TODO        |
 | `c.addi`     | rd/rs1!=0, nzimm  | TODO        |
 | `c.jal`      | imm               | TODO        |
 | `c.li`       | rd!=0, imm        | TODO        |
