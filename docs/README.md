@@ -149,8 +149,8 @@ data:
     string foo bar data here
     bytes 0x00 0x01 0x02 0x03
 
-# instructions must be aligned to a 32-bit boundary
-align 4
+# instructions must be aligned to a 16-bit boundary (32-bit boundary without C extension support)
+align 2
 
 # main program starts here
 main:
