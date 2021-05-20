@@ -276,13 +276,76 @@ Full [specifications](https://riscv.org/technical/specifications/) be found on t
 | `and`   | rd, rs1, rs2  | bitwise AND `rs2` with `rs1` and store into `rd` |
 
 ### RV32M Standard Extension
-| Name     | Parameters    | Description |
-| -------- | ------------- | ----------- |
-| `mul`    | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (signed) and store lower 32 bits into `rd` |
-| `mulh`   | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (signed) and store upper 32 bits into `rd` |
-| `mulhsu` | rd, rs1, rs2  | multiply `rs1` (signed) by `rs2` (unsigned) and store upper 32 bits into `rd` |
-| `mulhu`  | rd, rs1, rs2  | multiply `rs1` (unsigned) by `rs2` (unsigned) and store upper 32 bits into `rd` |
-| `div`    | rd, rs1, rs2  | divide (signed) `rs1` by `rs2` and store into `rd` |
-| `divu`   | rd, rs1, rs2  | divide (unsigned) `rs1` by `rs2` and store into `rd` |
-| `rem`    | rd, rs1, rs2  | remainder (signed) of `rs1` divided by `rs2` and store into `rd` |
-| `remu`   | rd, rs1, rs2  | remainder (unsigned) of `rs1` divided by `rs2` and store into `rd` |
+| Name     | Parameters   | Description |
+| -------- | ------------ | ----------- |
+| `mul`    | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (signed) and store lower 32 bits into `rd` |
+| `mulh`   | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (signed) and store upper 32 bits into `rd` |
+| `mulhsu` | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `mulhu`  | rd, rs1, rs2 | multiply `rs1` (unsigned) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `div`    | rd, rs1, rs2 | divide (signed) `rs1` by `rs2` and store into `rd` |
+| `divu`   | rd, rs1, rs2 | divide (unsigned) `rs1` by `rs2` and store into `rd` |
+| `rem`    | rd, rs1, rs2 | remainder (signed) of `rs1` divided by `rs2` and store into `rd` |
+| `remu`   | rd, rs1, rs2 | remainder (unsigned) of `rs1` divided by `rs2` and store into `rd` |
+
+### RV32A Standard Extension
+All of the following atomic instructions also accept two additional parameters: `aq` and `rl`.
+These are short for "acquire" and "release" and must either be both specified or both unspecified.
+The default for each if unspecified is zero.
+
+For example:
+```
+# both aq and rl are zero
+lr.w t0 t1
+lr.w t0 t1 0 0
+
+# both aq and rl are one
+lr.w t0 t1 1 1
+
+# mix and match
+lr.w t0 t1 0 1  # aq=0, rl=1
+lr.w t0 t1 1 0  # aq=1, rl=0
+```
+ 
+| Name        | Parameters   | Description |
+| ----------- | ------------ | ----------- |
+| `lr.w`      | rd, rs1      | TODO        |
+| `sc.w`      | rd, rs1, rs2 | TODO        |
+| `amoswap.w` | rd, rs1, rs2 | TODO        |
+| `amoadd.w`  | rd, rs1, rs2 | TODO        |
+| `amoxor.w`  | rd, rs1, rs2 | TODO        |
+| `amoand.w`  | rd, rs1, rs2 | TODO        |
+| `amoor.w`   | rd, rs1, rs2 | TODO        |
+| `amomin.w`  | rd, rs1, rs2 | TODO        |
+| `amomax.w`  | rd, rs1, rs2 | TODO        |
+| `amominu.w` | rd, rs1, rs2 | TODO        |
+| `amomaxu.w` | rd, rs1, rs2 | TODO        |
+
+### RV32C Standard Extension
+| Name         | Parameters        | Description |
+| ------------ | ----------------- | ----------- |
+| `c.addi4spn` | rd', nzuimm       | TODO        |
+| `c.lw`       | rd', rs1', uimm   | TODO        |
+| `c.sw`       | rs1', rs2', uimm  | TODO        |
+| `c.nop`      | <none>            | TODO        |
+| `c.addi`     | rd/rs1!=0, nzimm  | TODO        |
+| `c.jal`      | imm               | TODO        |
+| `c.li`       | rd!=0, imm        | TODO        |
+| `c.addi16sp` | nzimm             | TODO        |
+| `c.lui`      | rd!={0,2}, nzimm  | TODO        |
+| `c.srli`     | rd'/rs1', nzuimm  | TODO        |
+| `c.srai`     | rd'/rs1', nzuimm  | TODO        |
+| `c.andi`     | rd'/rs1', imm     | TODO        |
+| `c.sub`      | rd'/rs1', rs2'    | TODO        |
+| `c.xor`      | rd'/rs1', rs2'    | TODO        |
+| `c.or`       | rd'/rs1', rs2'    | TODO        |
+| `c.and`      | rd'/rs1', rs2'    | TODO        |
+| `c.j`        | imm               | TODO        |
+| `c.beqz`     | rs1', imm         | TODO        |
+| `c.bnez`     | rs1', imm         | TODO        |
+| `c.slli`     | rd/rs1!=0, nzuimm | TODO        |
+| `c.lwsp`     | rd!=0, uimm       | TODO        |
+| `c.jr`       | rs1!=0            | TODO        |
+| `c.mv`       | rd!=0, rs2!=0     | TODO        |
+| `c.jalr`     | rs1!=0            | TODO        |
+| `c.add`      | rd/rs1!=0, rs2!=0 | TODO        |
+| `c.swsp`     | rs2, uimm         | TODO        |

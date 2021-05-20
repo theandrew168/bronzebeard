@@ -194,6 +194,7 @@ def j_type(rd, imm, opcode):
 
 
 def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
+    # TODO: better error message here, note that it must be explicitly 0 or 1
     aq = int(aq)
     rl = int(rl)
     if aq not in [0, 1]:
@@ -201,6 +202,7 @@ def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
     if rl not in [0, 1]:
         raise ValueError('rl must be either 0 or 1')
 
+    # build aq/rl into a funct7 and defer to r_type
     funct7 = funct5 << 2 | aq << 1 | rl
     return r_type(rd, rs1, rs2, opcode, funct3, funct7)
 
@@ -768,7 +770,6 @@ def relocate_lo(imm):
     return sign_extend(imm & 0x00000fff, 12)
 
 
-# a single, unmodified line of assembly source code
 class Line:
 
     def __init__(self, file, number, contents):
@@ -790,7 +791,6 @@ class LineTokens:
         self.tokens = tokens
 
 
-# expressions
 class Expr(abc.ABC):
 
     @abc.abstractmethod
@@ -1082,6 +1082,9 @@ class ATypeInstruction(Item):
         return 4
 
 
+# TODO: classes for compressed instruction types
+
+
 def read_assembly(path_or_source):
     if os.path.exists(path_or_source):
         path = path_or_source
@@ -1236,6 +1239,7 @@ def parse_assembly(line_tokens):
                 raise ValueError('invalid ordering bits for atomic instruction:\n{}'.format(line))
             inst = ATypeInstruction(name, rd, rs1, rs2, aq, rl)
             items.append(inst)
+        # TODO: compressed instructions
         else:
             raise ValueError('invalid syntax:\n{}'.format(line))
 
@@ -1375,7 +1379,14 @@ def resolve_immediates(items, env):
     return new_items
 
 
-def resolve_compressions(items):
+def check_compressible(items):
+    # check if any instructions meet the criteria for a compressed equivalent
+    return items
+
+
+def validate_compressed(items):
+    # validate all of the compressed inst nit-picks:
+    # register restrictions, immediate restrictions, etc
     return items
 
 
@@ -1521,7 +1532,9 @@ def assemble(path_or_source, compress=False, verbose=False):
     items, env = resolve_constants(items, env)
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
-    items = resolve_compressions(items)
+    if compress:
+        items = check_compressible(items)
+    items = validate_compressed(items)
     items = resolve_instructions(items)
     items = resolve_bytes(items)
     items = resolve_strings(items)
