@@ -115,23 +115,23 @@ The `align` keyword tells the assembler to enforce alignment to a certain byte b
 This alignment is achieved by padding the binary with `0x00` bytes until it aligns with the bounary.
 In pseudo-code, the assembler adds zeroes until: `len(binary) % alignment == 0`.
 ```
-# align the current location in the binary to 4 bytes
-align 4
+# align the current location in the binary to 2 bytes
+align 2
 ```
 
 Alignment is important when mixing instructions and data into the same binary (which happens quite often).
 According to the RISC-V spec, instructions MUST be aligned to a 32-bit (4 byte) boundary unless the CPU supports the "C" Standard Extension for Compressed Instructions (in which case the alignment requirement is relaxed to a 16-bit (2 byte) boundary).
 
-For example, the following code is invalid (on an RV32IMAC device) because the instruction is not on a 16-bit boundary (it is only on an 8-bit boundary):
+For example, the following code is invalid (on an RV32IMAC device) because the instruction is not on a 16-bit boundary:
 ```
-bytes 0x42  # occupies 1 byte
+bytes 0x42          # occupies 1 byte
 addi zero, zero, 0  # misaligned :(
 ```
 
 To fix this, we need to tell the assembler to ensure that the binary is aligned to 16 bits (2 bytes) before proceeding:
 ```
-bytes 0x42  # occupies 1 byte
-align 2  # will pad the binary with 1 0x00 byte
+bytes 0x42          # occupies 1 byte
+align 2             # will pad the binary with 1 0x00 byte
 addi zero, zero, 0  # aligned :)
 ```
 
