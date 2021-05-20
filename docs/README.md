@@ -3,15 +3,14 @@ This document describes the assembly language dialect that Bronzebeard understan
 
 ## General
 RISC-V assembly programs are written as plain text files.
-The file extension is mostly arbitrary, but I recommend using `.txt` or `.asm`.
-Using `.txt` will make for better default behavior on Windows systems.
+The file extension is mostly arbitrary but `.asm` and `.S` are quite common.
 An assembly program is a linear sequence of "items".
 Items can be many things: labels, instructions, literal bytes and strings, etc.
 
 The Bronzebeard assembly syntax also supports basic comments.
 Single-line comments can be intermixed with the source code by using the `#` character.
 Multi-line comments are not supported at this point in time.
-You can always emulate multi-line comments by using multiple single-line comments to construct larger blocks.
+However, you can always emulate multi-line comments by using multiple single-line comments to construct larger blocks.
 
 ### Labels
 Labels are single-token items that end with a colon such as `foo:` or `bar:`.
@@ -65,6 +64,7 @@ BAZ = BAR >> 1 & 0b11111
 **NOTE:** Since parentheses are treated as whitespace by the lexer, any precedence grouping within an expression disappears.
 Be careful with this!
 If you have a calculation that requires a specific order of operations, break it up into smaller, separate definitions.
+The actual precedence rules and evaluation of arithmetic expressions is handled by the Python lauguage itself (via the [eval](https://docs.python.org/3/library/functions.html#eval) builtin).
 
 ### Modifiers
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
@@ -120,19 +120,18 @@ align 4
 ```
 
 Alignment is important when mixing instructions and data into the same binary (which happens quite often).
-According to the RISC-V spec, instructions MUST be aligned to a 32-bit (4 byte) boundary.
-Otherwise, errors will arise.
+According to the RISC-V spec, instructions MUST be aligned to a 32-bit (4 byte) boundary unless the CPU supports the "C" Standard Extension for Compressed Instructions (in which case the alignment requirement is relaxed to a 16-bit (2 byte) boundary).
 
-For example, the following code is invalid because the instruction is not on a 32-bit boundary (it is only on an 8-bit boundary):
+For example, the following code is invalid (on an RV32IMAC device) because the instruction is not on a 16-bit boundary (it is only on an 8-bit boundary):
 ```
 bytes 0x42  # occupies 1 byte
 addi zero, zero, 0  # misaligned :(
 ```
 
-To fix this, we need to tell the assembler to ensure that the binary is aligned to 32 bits (4 bytes) before proceeding:
+To fix this, we need to tell the assembler to ensure that the binary is aligned to 16 bits (2 bytes) before proceeding:
 ```
 bytes 0x42  # occupies 1 byte
-align 4  # will pad the binary with 3 0x00 bytes
+align 2  # will pad the binary with 1 0x00 byte
 addi zero, zero, 0  # aligned :)
 ```
 
