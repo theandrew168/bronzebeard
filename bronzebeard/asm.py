@@ -62,7 +62,7 @@ def lookup_register(reg, compressed=False):
     return reg
 
 
-def r_type(rd, rs1, rs2, opcode, funct3, funct7):
+def r_type(rd, rs1, rs2, *, opcode, funct3, funct7):
     rd = lookup_register(rd)
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
@@ -78,7 +78,7 @@ def r_type(rd, rs1, rs2, opcode, funct3, funct7):
     return code
 
 
-def i_type(rd, rs1, imm, opcode, funct3):
+def i_type(rd, rs1, imm, *, opcode, funct3):
     rd = lookup_register(rd)
     rs1 = lookup_register(rs1)
 
@@ -97,7 +97,7 @@ def i_type(rd, rs1, imm, opcode, funct3):
     return code
 
 
-def s_type(rs1, rs2, imm, opcode, funct3):
+def s_type(rs1, rs2, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
 
@@ -120,7 +120,7 @@ def s_type(rs1, rs2, imm, opcode, funct3):
     return code
 
 
-def b_type(rs1, rs2, imm, opcode, funct3):
+def b_type(rs1, rs2, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
 
@@ -150,7 +150,7 @@ def b_type(rs1, rs2, imm, opcode, funct3):
     return code
 
 
-def u_type(rd, imm, opcode):
+def u_type(rd, imm, *, opcode):
     rd = lookup_register(rd)
 
     if imm < -0x80000 or imm > 0x7ffff:
@@ -166,7 +166,7 @@ def u_type(rd, imm, opcode):
     return code
 
 
-def j_type(rd, imm, opcode):
+def j_type(rd, imm, *, opcode):
     rd = lookup_register(rd)
 
     if imm < -0x100000 or imm > 0x0fffff:
@@ -193,7 +193,7 @@ def j_type(rd, imm, opcode):
     return code
 
 
-def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
+def a_type(rd, rs1, rs2, *, opcode, funct3, funct5, aq=0, rl=0):
     # TODO: better error message here, note that it must be explicitly 0 or 1
     aq = int(aq)
     rl = int(rl)
@@ -204,11 +204,11 @@ def a_type(rd, rs1, rs2, opcode, funct3, funct5, aq=0, rl=0):
 
     # build aq/rl into a funct7 and defer to r_type
     funct7 = funct5 << 2 | aq << 1 | rl
-    return r_type(rd, rs1, rs2, opcode, funct3, funct7)
+    return r_type(rd, rs1, rs2, opcode=opcode, funct3=funct3, funct7=funct7)
 
 
 # c.jr, c.mv, c.jalr, c.add
-def cr_type(rd_rs1, rs2, opcode, funct4):
+def cr_type(rd_rs1, rs2, *, opcode, funct4):
     rd_rs1 = lookup_register(rd_rs1)
     rs2 = lookup_register(rs2)
 
@@ -222,7 +222,7 @@ def cr_type(rd_rs1, rs2, opcode, funct4):
 
 
 # c.nop, c.addi, c.li, c.lui, c.slli
-def ci_type(rd_rs1, imm, opcode, funct3):
+def ci_type(rd_rs1, imm, *, opcode, funct3):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < -32 or imm > 31:
@@ -245,7 +245,7 @@ def ci_type(rd_rs1, imm, opcode, funct3):
 
 # CI variation
 # c.addi16sp
-def cis_type(rd_rs1, imm, opcode, funct3):
+def cis_type(rd_rs1, imm, *, opcode, funct3):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < -512 or imm > 496:
@@ -271,7 +271,7 @@ def cis_type(rd_rs1, imm, opcode, funct3):
 
 # CI variation
 # c.lwsp
-def cls_type(rd, imm, opcode, funct3):
+def cls_type(rd, imm, *, opcode, funct3):
     rd = lookup_register(rd)
 
     if imm < 0 or imm > 252:
@@ -296,7 +296,7 @@ def cls_type(rd, imm, opcode, funct3):
 
 
 # c.swsp
-def css_type(rs2, imm, opcode, funct3):
+def css_type(rs2, imm, *, opcode, funct3):
     rs2 = lookup_register(rs2)
 
     if imm < 0 or imm > 252:
@@ -321,7 +321,7 @@ def css_type(rs2, imm, opcode, funct3):
 
 
 # c.addi4spn
-def ciw_type(rd, imm, opcode, funct3):
+def ciw_type(rd, imm, *, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
 
     if imm < 0 or imm > 1020:
@@ -350,7 +350,7 @@ def ciw_type(rd, imm, opcode, funct3):
 
 
 # c.lw
-def cl_type(rd, rs1, imm, opcode, funct3):
+def cl_type(rd, rs1, imm, *, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
     rs1 = lookup_register(rs1, compressed=True)
 
@@ -379,7 +379,7 @@ def cl_type(rd, rs1, imm, opcode, funct3):
 
 
 # c.sw
-def cs_type(rs1, rs2, imm, opcode, funct3):
+def cs_type(rs1, rs2, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1, compressed=True)
     rs2 = lookup_register(rs2, compressed=True)
 
@@ -408,7 +408,7 @@ def cs_type(rs1, rs2, imm, opcode, funct3):
 
 
 # c.sub, c.xor, c.or, c.and
-def ca_type(rd_rs1, rs2, opcode, funct2, funct6):
+def ca_type(rd_rs1, rs2, *, opcode, funct2, funct6):
     rd_rs1 = lookup_register(rd_rs1, compressed=True)
     rs2 = lookup_register(rs2, compressed=True)
 
@@ -423,7 +423,7 @@ def ca_type(rd_rs1, rs2, opcode, funct2, funct6):
 
 
 # c.beqz, c.bnez
-def cb_type(rs1, imm, opcode, funct3):
+def cb_type(rs1, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1, compressed=True)
 
     imm = imm >> 1
@@ -450,7 +450,7 @@ def cb_type(rs1, imm, opcode, funct3):
 
 # CB variation
 # c.srli, c.srai, c.andi
-def cbi_type(rd_rs1, imm, opcode, funct2, funct3):
+def cbi_type(rd_rs1, imm, *, opcode, funct2, funct3):
     rd_rs1 = lookup_register(rd_rs1, compressed=True)
 
     imm = c_uint32(imm).value & 0b111111
@@ -470,7 +470,7 @@ def cbi_type(rd_rs1, imm, opcode, funct2, funct3):
 
 
 # c.jal, c.j
-def cj_type(imm, opcode, funct3):
+def cj_type(imm, *, opcode, funct3):
     if imm < -2048 or imm > 2046:
         raise ValueError('11-bit MO2 immediate must be between -0x800 (-2048) and 0x7fe (2046): {}'.format(imm))
     if imm % 2 != 0:
@@ -1379,14 +1379,8 @@ def resolve_immediates(items, env):
     return new_items
 
 
-def check_compressible(items):
+def resolve_compressible(items):
     # check if any instructions meet the criteria for a compressed equivalent
-    return items
-
-
-def validate_compressed(items):
-    # validate all of the compressed inst nit-picks:
-    # register restrictions, immediate restrictions, etc
     return items
 
 
@@ -1499,7 +1493,7 @@ def resolve_blobs(items):
 #  3. Resolve constants  (eval expr and update env)
 #  4. Resolve registers  (could be constants for readability)
 #  5. Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
-#  6. Resolve compressions  (identify and compress eligible instructions)
+#  6. Resolve compressible  (identify and compress eligible instructions)
 #  7. Resolve instructions  (convert xTypeInstruction to Blob)
 #  8. Resolve bytes  (convert Bytes to Blob)
 #  9. Resolve strings  (convert String to Blob)
@@ -1533,8 +1527,7 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
     if compress:
-        items = check_compressible(items)
-    items = validate_compressed(items)
+        items = resolve_compressible(items)
     items = resolve_instructions(items)
     items = resolve_bytes(items)
     items = resolve_strings(items)

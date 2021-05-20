@@ -2,9 +2,8 @@
 Minimal ecosystem for bare-metal RISC-V development
 
 ## What
-Bronzebeard is a collection of tools for writing [RISC-V](https://en.wikipedia.org/wiki/Riscv) assembly and working with hobbyist development devices.
-It is designed for programs that will run on [bare metal](https://en.wikipedia.org/wiki/Bare_machine) with no reliance on [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or pre-existing software of any kind.
-The assembler currently supports RV32IMAC.
+Bronzebeard is first and foremost a [single-file](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) [nanopass](https://legacy.cs.indiana.edu/~dyb/pubs/nano-jfp.pdf) assembler for developing [bare metal](https://en.wikipedia.org/wiki/Bare_machine) [RISC-V](https://en.wikipedia.org/wiki/Riscv) programs.
+It is designed for applications that stand on their own without relying on [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or pre-existing software of any kind.
 
 ## Why
 Much of modern software has accrued vast amounts of bulk and complexity throughout the years.
@@ -17,11 +16,11 @@ Check out the [DerzForth](https://github.com/theandrew168/derzforth) project for
 
 ## How
 Bronzebeard and its tools are implemented purely in Python.
-A simple, standalone [assembler](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) is the centerpiece.
 It has been written in order to be free from large, complex toolchains.
 This keeps the project portable, minimal, and easy to understand.
 
 ## Devices
+The assembler itself supports the base 32-bit instruction set as well as the M, A, and C extensions (RV32IMAC).
 At the moment, Bronzebeard has only been used to target the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
 There are plans to test on additional RISC-V boards such as the [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b) in the future.
 
