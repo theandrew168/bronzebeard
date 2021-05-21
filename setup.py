@@ -13,6 +13,7 @@ setup(
     url='https://github.com/theandrew168/bronzebeard',
     packages=['bronzebeard'],
     install_requires=[
+        'appdirs',
         'pyserial',
         'pyusb',
     ],

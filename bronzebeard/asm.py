@@ -975,7 +975,19 @@ class Blob(Item):
         return len(self.data)
 
 
-class RTypeInstruction(Item):
+class Instruction(Item):
+
+    def size(self, position):
+        return 4
+
+
+class CompressedInstruction(Instruction):
+
+    def size(self, position):
+        return 2
+
+
+class RTypeInstruction(Instruction):
 
     def __init__(self, name, rd, rs1, rs2):
         self.name = name
@@ -984,13 +996,10 @@ class RTypeInstruction(Item):
         self.rs2 = rs2
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rd={!r}, rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
 
 
-class ITypeInstruction(Item):
+class ITypeInstruction(Instruction):
 
     def __init__(self, name, rd, rs1, expr):
         self.name = name
@@ -999,13 +1008,10 @@ class ITypeInstruction(Item):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.expr)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.expr)
 
 
-class STypeInstruction(Item):
+class STypeInstruction(Instruction):
 
     def __init__(self, name, rs1, rs2, expr):
         self.name = name
@@ -1014,13 +1020,10 @@ class STypeInstruction(Item):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
 
 
-class BTypeInstruction(Item):
+class BTypeInstruction(Instruction):
 
     def __init__(self, name, rs1, rs2, expr):
         self.name = name
@@ -1029,13 +1032,10 @@ class BTypeInstruction(Item):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
 
 
-class UTypeInstruction(Item):
+class UTypeInstruction(Instruction):
 
     def __init__(self, name, rd, expr):
         self.name = name
@@ -1043,13 +1043,10 @@ class UTypeInstruction(Item):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
 
 
-class JTypeInstruction(Item):
+class JTypeInstruction(Instruction):
 
     def __init__(self, name, rd, expr):
         self.name = name
@@ -1057,13 +1054,10 @@ class JTypeInstruction(Item):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
-
-    def size(self, position):
-        return 4
+        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
 
 
-class ATypeInstruction(Item):
+class ATypeInstruction(Instruction):
 
     def __init__(self, name, rd, rs1, rs2, aq=0, rl=0):
         self.name = name
@@ -1074,12 +1068,9 @@ class ATypeInstruction(Item):
         self.rl = rl
 
     def __repr__(self):
-        s = '{}({!r}, {!r}, {!r}, {!r}, aq={!r}, rl={!r})'
+        s = '{}({!r}, rd={!r}, rs1={!r}, rs2={!r}, aq={!r}, rl={!r})'
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2, self.aq, self.rl)
         return s
-
-    def size(self, position):
-        return 4
 
 
 # TODO: classes for compressed instruction types
