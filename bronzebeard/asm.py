@@ -803,8 +803,7 @@ class LineTokens:
         return str(self.tokens)
 
 
-# TODO: rename to Immediate? or ImmediateExpr?
-class Expr(abc.ABC):
+class Immediate(abc.ABC):
 
     @abc.abstractmethod
     def eval(self, position, env):
@@ -813,7 +812,7 @@ class Expr(abc.ABC):
 
 # arithmetic / lookup / combo of both
 # defers evaulation to Python's builtin eval
-class Arithmetic(Expr):
+class Arithmetic(Immediate):
 
     def __init__(self, expr):
         self.expr = expr
@@ -825,7 +824,7 @@ class Arithmetic(Expr):
         return eval(self.expr, env)
 
 
-class Position(Expr):
+class Position(Immediate):
 
     def __init__(self, reference, expr):
         self.reference = reference
@@ -840,7 +839,7 @@ class Position(Expr):
         return base + dest
 
 
-class Offset(Expr):
+class Offset(Immediate):
 
     def __init__(self, reference):
         self.reference = reference
@@ -853,7 +852,7 @@ class Offset(Expr):
         return dest - position
 
 
-class Hi(Expr):
+class Hi(Immediate):
 
     def __init__(self, expr):
         self.expr = expr
@@ -870,7 +869,7 @@ class Hi(Expr):
         return relocate_hi(value)
 
 
-class Lo(Expr):
+class Lo(Immediate):
 
     def __init__(self, expr) -> None:
         self.expr = expr
