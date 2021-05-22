@@ -14,7 +14,7 @@ def repl():
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
 
-    history_path = os.path.join(config_dir, '.bronzebeard_history')
+    history_path = os.path.join(config_dir, 'repl_history.txt')
     try:
         readline.read_history_file(history_path)
         readline.set_history_length(1000)
@@ -33,20 +33,17 @@ def repl():
     while True:
         try:
             line = input('RV32IMAC> ')
+            tokens = asm.lex_line(line)
+            item = asm.parse_tokens(tokens)
 
-            lines = asm.read_assembly(line)
-            line_tokens = asm.lex_assembly(lines)
-
-            items = asm.parse_assembly(line_tokens)
+            items = [item]
             items = asm.resolve_immediates(items, env)
-            item = items[0]
             items = asm.resolve_instructions(items)
 
             blob = items[0]
-            code = struct.unpack('<I', blob.data)[0]
-            tokens = line_tokens[0].tokens
+            code, = struct.unpack('<I', blob.data)
 
-            print('tokens: {}'.format(tokens))
+            print('tokens: {}'.format(tokens.tokens))
             print('item:   {}'.format(item))
             print('binary: {:032b}'.format(code))
         except (EOFError, KeyboardInterrupt):

@@ -553,7 +553,7 @@ REM        = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000001)
 REMU       = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000001)
 
 # RV32A Standard Extension for Atomic Instructions
-LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010)
+LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax
 SC_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00011)
 AMOSWAP_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00001)
 AMOADD_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00000)
@@ -569,7 +569,7 @@ AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
 C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
 C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
-C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # c.nop syntax will be special
+C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # special syntax
 C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000)
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
 C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010)
@@ -777,6 +777,9 @@ class Line:
         self.number = number
         self.contents = contents
 
+    def __len__(self):
+        return len(self.contents)
+
     def __repr__(self):
         return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.file, self.number, self.contents)
 
@@ -790,7 +793,17 @@ class LineTokens:
         self.line = line
         self.tokens = tokens
 
+    def __len__(self):
+        return len(self.tokens)
 
+    def __repr__(self):
+        return '{}({!r}, {!r})'.format(type(self).__name__, self.line, self.tokens)
+
+    def __str__(self):
+        return str(self.tokens)
+
+
+# TODO: rename to Immediate? or ImmediateExpr?
 class Expr(abc.ABC):
 
     @abc.abstractmethod
@@ -1076,7 +1089,7 @@ class ATypeInstruction(Instruction):
 # TODO: classes for compressed instruction types
 
 
-def read_assembly(path_or_source):
+def read_lines(path_or_source):
     if os.path.exists(path_or_source):
         path = path_or_source
         with open(path) as f:
@@ -1095,30 +1108,29 @@ def read_assembly(path_or_source):
     return lines
 
 
-def lex_assembly(lines):
-    line_tokens = []
-
-    for line in lines:
-        # strip comments
-        contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
-        # strip whitespace
-        contents = contents.strip()
-        # skip empty lines
-        if len(contents) == 0:
-            continue
-        # split line into tokens
-        tokens = re.split(r'[\s,()\'"]+', contents)
-        # remove empty tokens
-        while '' in tokens:
-            tokens.remove('')
-        # carry the line and its tokens forward
-        line_tokens.append(LineTokens(line, tokens))
-
-    return line_tokens
+def lex_line(line):
+    # simpliy lexing a single string
+    if type(line) == str:
+        line = Line('<source>', 1, line)
+    # strip comments
+    contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
+    # strip whitespace
+    contents = contents.strip()
+    # skip empty lines
+    if len(contents) == 0:
+        return LineTokens(line, [])
+    # split line into tokens
+    tokens = re.split(r'[\s,()\'"]+', contents)
+    # remove empty tokens
+    while '' in tokens:
+        tokens.remove('')
+    # carry the line and its tokens forward
+    return LineTokens(line, tokens)
 
 
 # helper for parsing exprs since they occur in multiple places
 # TODO: catch invalid expr nesting here
+# TODO: rename to parse_immediate?
 def parse_expression(expr):
     head = expr[0].lower()
     if head == '%position':
@@ -1137,104 +1149,92 @@ def parse_expression(expr):
         return Arithmetic(' '.join(expr))
 
 
-def parse_assembly(line_tokens):
-    items = []
-    for lt in line_tokens:
-        line = lt.line
-        tokens = lt.tokens
+def parse_tokens(line_tokens):
+    print(line_tokens)
+    line = line_tokens.line
+    tokens = line_tokens.tokens
+    head = tokens[0].lower()
 
-        head = tokens[0].lower()
-
-        # labels
-        if len(tokens) == 1 and tokens[0].endswith(':'):
-            name = tokens[0].rstrip(':')
-            label = Label(name)
-            items.append(label)
-        # constants
-        elif len(tokens) >= 3 and tokens[1] == '=':
-            name, _, *expr = tokens
-            constant = Constant(name, parse_expression(expr))
-            items.append(constant)
-        # aligns
-        elif head == 'align':
-            _, alignment = tokens
-            align = Align(int(alignment))
-            items.append(align)
-        # packs
-        elif head == 'pack':
-            _, fmt, *expr = tokens
-            pack = Pack(fmt, parse_expression(expr))
-            items.append(pack)
-        # bytes
-        elif head == 'bytes':
-            # TODO: ensure bytes are valid here?
-            _, *values = tokens
-            bytes = Bytes(values)
-            items.append(bytes)
-        # strings
-        elif head == 'string':
-            _, *values = tokens
-            string = String(values)
-            items.append(string)
-        # r-type instructions
-        elif head in R_TYPE_INSTRUCTIONS:
-            name, rd, rs1, rs2 = tokens
-            name = name.lower()
-            inst = RTypeInstruction(name, rd, rs1, rs2)
-            items.append(inst)
-        # i-type instructions
-        elif head in I_TYPE_INSTRUCTIONS:
-            name, rd, rs1, *expr = tokens
-            name = name.lower()
-            inst = ITypeInstruction(name, rd, rs1, parse_expression(expr))
-            items.append(inst)
-        # s-type instructions
-        elif head in S_TYPE_INSTRUCTIONS:
-            name, rs1, rs2, *expr = tokens
-            name = name.lower()
-            inst = STypeInstruction(name, rs1, rs2, parse_expression(expr))
-            items.append(inst)
-        # b-type instructions
-        elif head in B_TYPE_INSTRUCTIONS:
-            name, rs1, rs2, *expr = tokens
-            name = name.lower()
-            # ensure behavior is "offset" for branch instructions
-            if expr[0] != '%offset':
-                expr.insert(0, '%offset')
-            inst = BTypeInstruction(name, rs1, rs2, parse_expression(expr))
-            items.append(inst)
-        # u-type instructions
-        elif head in U_TYPE_INSTRUCTIONS:
-            name, rd, *expr = tokens
-            name = name.lower()
-            inst = UTypeInstruction(name, rd, parse_expression(expr))
-            items.append(inst)
-        # j-type instructions
-        elif head in J_TYPE_INSTRUCTIONS:
-            name, rd, *expr = tokens
-            name = name.lower()
-            # ensure behavior is "offset" for branch instructions
-            if expr[0] != '%offset':
-                expr.insert(0, '%offset')
-            inst = JTypeInstruction(name, rd, parse_expression(expr))
-            items.append(inst)
-        # a-type instructions
-        elif head in A_TYPE_INSTRUCTIONS:
-            name, rd, rs1, rs2, *ordering = tokens
-            # check for specific ordering bits
-            if len(ordering) == 0:
-                aq, rl = 0, 0
-            elif len(ordering) == 2:
-                aq, rl = ordering
-            else:
-                raise ValueError('invalid ordering bits for atomic instruction:\n{}'.format(line))
-            inst = ATypeInstruction(name, rd, rs1, rs2, aq, rl)
-            items.append(inst)
-        # TODO: compressed instructions
+    # labels
+    if len(tokens) == 1 and tokens[0].endswith(':'):
+        name = tokens[0].rstrip(':')
+        return Label(name)
+    # constants
+    elif len(tokens) >= 3 and tokens[1] == '=':
+        name, _, *expr = tokens
+        return Constant(name, parse_expression(expr))
+    # aligns
+    elif head == 'align':
+        _, alignment = tokens
+        return Align(int(alignment))
+    # packs
+    elif head == 'pack':
+        _, fmt, *expr = tokens
+        return Pack(fmt, parse_expression(expr))
+    # bytes
+    elif head == 'bytes':
+        # TODO: ensure bytes are valid here?
+        _, *values = tokens
+        return Bytes(values)
+    # strings
+    elif head == 'string':
+        _, *values = tokens
+        return String(values)
+    # r-type instructions
+    elif head in R_TYPE_INSTRUCTIONS:
+        name, rd, rs1, rs2 = tokens
+        name = name.lower()
+        return RTypeInstruction(name, rd, rs1, rs2)
+    # i-type instructions
+    elif head in I_TYPE_INSTRUCTIONS:
+        name, rd, rs1, *expr = tokens
+        name = name.lower()
+        return ITypeInstruction(name, rd, rs1, parse_expression(expr))
+    # s-type instructions
+    elif head in S_TYPE_INSTRUCTIONS:
+        name, rs1, rs2, *expr = tokens
+        name = name.lower()
+        return STypeInstruction(name, rs1, rs2, parse_expression(expr))
+    # b-type instructions
+    elif head in B_TYPE_INSTRUCTIONS:
+        name, rs1, rs2, *expr = tokens
+        name = name.lower()
+        # ensure behavior is "offset" for branch instructions
+        if expr[0] != '%offset':
+            expr.insert(0, '%offset')
+        return BTypeInstruction(name, rs1, rs2, parse_expression(expr))
+    # u-type instructions
+    elif head in U_TYPE_INSTRUCTIONS:
+        name, rd, *expr = tokens
+        name = name.lower()
+        return UTypeInstruction(name, rd, parse_expression(expr))
+    # j-type instructions
+    elif head in J_TYPE_INSTRUCTIONS:
+        name, rd, *expr = tokens
+        name = name.lower()
+        # ensure behavior is "offset" for branch instructions
+        if expr[0] != '%offset':
+            expr.insert(0, '%offset')
+        return JTypeInstruction(name, rd, parse_expression(expr))
+    # a-type instructions
+    elif head in A_TYPE_INSTRUCTIONS:
+        # TODO: special syntax for lr.w (rs2 is always zero)
+        if head == 'lr.w':
+            name, rd, rs1, *ordering = tokens
+            rs2 = 0
         else:
-            raise ValueError('invalid syntax:\n{}'.format(line))
-
-    return items
+            name, rd, rs1, rs2, *ordering = tokens
+        # check for specific ordering bits
+        if len(ordering) == 0:
+            aq, rl = 0, 0
+        elif len(ordering) == 2:
+            aq, rl = ordering
+        else:
+            raise ValueError('invalid ordering bits for atomic instruction:\n{}'.format(line))
+        return ATypeInstruction(name, rd, rs1, rs2, aq, rl)
+    # TODO: compressed instructions
+    else:
+        raise ValueError('invalid syntax:\n{}'.format(line))
 
 
 def resolve_aligns(items):
@@ -1416,7 +1416,11 @@ def resolve_instructions(items):
             new_items.append(blob)
         elif isinstance(item, ATypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
-            code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
+            # TODO: how to do this nicer?
+            if item.name == 'lr.w':
+                code = encode_func(item.rd, item.rs1, aq=item.aq, rl=item.rl)
+            else:
+                code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
             code = struct.pack('<I', code)
             blob = Blob(code)
             new_items.append(blob)
@@ -1507,9 +1511,11 @@ def assemble(path_or_source, compress=False, verbose=False):
     env.update(REGISTERS)
 
     # read, lex, and parse the source
-    lines = read_assembly(path_or_source)
-    line_tokens = lex_assembly(lines)
-    items = parse_assembly(line_tokens)
+    lines = read_lines(path_or_source)
+    lines = [l for l in lines if len(l) > 0]
+    tokens = [lex_line(l) for l in lines]
+    tokens = [t for t in tokens if len(t) > 0]
+    items = [parse_tokens(t) for t in tokens]
 
     # run items through each pass
     items = resolve_aligns(items)

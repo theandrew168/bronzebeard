@@ -764,21 +764,21 @@ def test_remu(rd, rs1, rs2, code):
 
 
 @pytest.mark.parametrize(
-    'rd, rs1, rs2, aq, rl, code', [
-    (0,  0,   0,   0,  0,  0b00010000000000000010000000101111),
-    (0,  0,   0,   1,  0,  0b00010100000000000010000000101111),
-    (0,  0,   0,   0,  1,  0b00010010000000000010000000101111),
-    (0,  0,   0,   1,  1,  0b00010110000000000010000000101111),
-    (31, 0,   0,   0,  0,  0b00010000000000000010111110101111),
-    (0,  31,  0,   0,  0,  0b00010000000011111010000000101111),
-    (31, 31,  0,   0,  0,  0b00010000000011111010111110101111),
-    (0,  0,   31,  0,  0,  0b00010001111100000010000000101111),
-    (31, 0,   31,  0,  0,  0b00010001111100000010111110101111),
-    (0,  31,  31,  0,  0,  0b00010001111111111010000000101111),
-    (31, 31,  31,  0,  0,  0b00010001111111111010111110101111),
+    'rd, rs1, aq, rl, code', [
+    (0,  0,   0,  0,  0b00010000000000000010000000101111),
+    (0,  0,   1,  0,  0b00010100000000000010000000101111),
+    (0,  0,   0,  1,  0b00010010000000000010000000101111),
+    (0,  0,   1,  1,  0b00010110000000000010000000101111),
+    (31, 0,   0,  0,  0b00010000000000000010111110101111),
+    (0,  31,  0,  0,  0b00010000000011111010000000101111),
+    (31, 31,  0,  0,  0b00010000000011111010111110101111),
+    (0,  0,   0,  0,  0b00010000000000000010000000101111),
+    (31, 0,   0,  0,  0b00010000000000000010111110101111),
+    (0,  31,  0,  0,  0b00010000000011111010000000101111),
+    (31, 31,  0,  0,  0b00010000000011111010111110101111),
 ])
-def test_lr_w(rd, rs1, rs2, aq, rl, code):
-    assert asm.LR_W(rd, rs1, rs2, aq=aq, rl=rl) == code
+def test_lr_w(rd, rs1, aq, rl, code):
+    assert asm.LR_W(rd, rs1, aq=aq, rl=rl) == code
 
 
 @pytest.mark.parametrize(
@@ -1269,7 +1269,7 @@ def test_c_swsp(rs2, imm, code):
 
 def test_read_assembly():
     source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
-    lines = asm.read_assembly(source)
+    lines = asm.read_lines(source)
     assert len(lines) == 3
     assert lines[1].contents == 'addi t1, zero, 2'
     for i, line in enumerate(lines, start=1):
@@ -1278,25 +1278,20 @@ def test_read_assembly():
 
 
 def test_lex_assembly():
-    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
-    lines = asm.read_assembly(source)
-    tokens = asm.lex_assembly(lines)
-    assert len(tokens) == 3
-    assert tokens[1].tokens == ['addi', 't1', 'zero', '2']
+    line = 'addi t0 zero 1'
+    tokens = asm.lex_line(line)
+    assert len(tokens) == 4
+    assert tokens.tokens == ['addi', 't0', 'zero', '1']
 
 
 def test_parse_assembly():
-    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
-    lines = asm.read_assembly(source)
-    tokens = asm.lex_assembly(lines)
-    items = asm.parse_assembly(tokens)
-    assert len(items) == 3
-    assert isinstance(items[1], asm.ITypeInstruction)
-    assert items[1].name == 'addi'
-    assert items[1].rd == 't1'
-    assert items[1].rs1 == 'zero'
-    assert isinstance(items[1].expr, asm.Arithmetic)
-    assert items[1].expr.expr == '2'
+    line = 'addi t0 zero 1'
+    tokens = asm.lex_line(line)
+    item = asm.parse_tokens(tokens)
+    assert isinstance(item, asm.ITypeInstruction)
+    assert item.name == 'addi'
+    assert item.rd == 't0'
+    assert item.rs1 == 'zero'
 
 
 def test_assembler_basic():
@@ -1463,20 +1458,20 @@ def test_assembler_modifiers():
 
 def test_assembler_atomics():
     source = """
-    lr.w zero zero zero
-    lr.w zero zero zero 0 0
-    lr.w zero zero zero 1 0
-    lr.w zero zero zero 0 1
-    lr.w zero zero zero 1 1
+    lr.w zero zero
+    sc.w zero zero zero 0 0
+    sc.w zero zero zero 1 0
+    sc.w zero zero zero 0 1
+    sc.w zero zero zero 1 1
     amomaxu.w t0 t1 t2
     """
     binary = asm.assemble(source)
     target = b''.join(struct.pack('<I', inst) for inst in [
-        asm.LR_W(0, 0, 0),
-        asm.LR_W(0, 0, 0, aq=0, rl=0),
-        asm.LR_W(0, 0, 0, aq=1, rl=0),
-        asm.LR_W(0, 0, 0, aq=0, rl=1),
-        asm.LR_W(0, 0, 0, aq=1, rl=1),
+        asm.LR_W(0, 0),
+        asm.SC_W(0, 0, 0, aq=0, rl=0),
+        asm.SC_W(0, 0, 0, aq=1, rl=0),
+        asm.SC_W(0, 0, 0, aq=0, rl=1),
+        asm.SC_W(0, 0, 0, aq=1, rl=1),
         asm.AMOMAXU_W('t0', 't1', 't2'),
     ])
     assert binary == target
