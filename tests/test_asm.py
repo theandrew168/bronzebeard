@@ -1273,21 +1273,21 @@ def test_read_assembly():
     assert len(lines) == 3
     assert lines[1].contents == 'addi t1, zero, 2'
     for i, line in enumerate(lines, start=1):
-        assert line.file == '<source>'
+        assert line.file == '<string>'
         assert line.number == i
 
 
 def test_lex_assembly():
     line = 'addi t0 zero 1'
-    tokens = asm.lex_line(line)
+    tokens = asm.lex_tokens(line)
     assert len(tokens) == 4
     assert tokens.tokens == ['addi', 't0', 'zero', '1']
 
 
 def test_parse_assembly():
     line = 'addi t0 zero 1'
-    tokens = asm.lex_line(line)
-    item = asm.parse_tokens(tokens)
+    tokens = asm.lex_tokens(line)
+    item = asm.parse_item(tokens)
     assert isinstance(item, asm.ITypeInstruction)
     assert item.name == 'addi'
     assert item.rd == 't0'

@@ -1,6 +1,5 @@
 import atexit
 import os
-from pprint import pprint
 import readline
 import struct
 
@@ -33,8 +32,8 @@ def repl():
     while True:
         try:
             line = input('RV32IMAC> ')
-            tokens = asm.lex_line(line)
-            item = asm.parse_tokens(tokens)
+            tokens = asm.lex_tokens(line)
+            item = asm.parse_item(tokens)
 
             items = [item]
             items = asm.resolve_immediates(items, env)
