@@ -206,24 +206,21 @@ def j_type(rd, imm, *, opcode):
     return code
 
 
-def fence(succ, pred, fm, *, opcode, funct3, rd, rs1):
-    succ = int(succ)
-    pred = int(pred)
-    fm = int(fm)
+def fence(succ, pred, *, opcode, funct3, rd, rs1, fm):
+    succ = succ if type(succ) == int else int(succ, base=0)
+    pred = pred if type(pred) == int else int(pred, base=0)
     if succ < 0b0000 or succ > 0b1111:
         raise ValueError('invalid successor value for FENCE instruction: {}'.format(succ))
     if pred < 0b0000 or pred > 0b1111:
         raise ValueError('invalid predecessor value for FENCE instruction: {}'.format(pred))
-    if fm not in [0b0000, 0b0001]:
-        raise ValueError('invalid FM value for FENCE instruction: {}'.format(fm))
 
     imm = (fm << 8) | (pred << 4) | succ
     return i_type(rd, rs1, imm, opcode=opcode, funct3=funct3)
 
 
 def a_type(rd, rs1, rs2, *, opcode, funct3, funct5, aq=0, rl=0):
-    aq = int(aq)
-    rl = int(rl)
+    aq = aq if type(aq) == int else int(aq, base=0)
+    rl = rl if type(rl) == int else int(rl, base=0)
     if aq not in [0, 1]:
         raise ValueError('aq must be either 0 or 1')
     if rl not in [0, 1]:
@@ -568,8 +565,7 @@ SRL        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0000000)
 SRA        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR         = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND        = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000000)
-FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0)  # special syntax (unique)
-# TODO: special ie_type inst for these?
+FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax (unique)
 ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax (arity)
 EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax (arity)
 
@@ -584,7 +580,6 @@ REM        = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000001)
 REMU       = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000001)
 
 # RV32A Standard Extension for Atomic Instructions
-# TODO: special al_type for this inst?
 LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax (arity)
 SC_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00011)
 AMOSWAP_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00001)
@@ -600,6 +595,7 @@ AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
 # RV32C Standard Extension for Compressed Instructions
 # TODO: custom logic for these is diff because the dev still specifies _something_
 # TODO: it isn't a "value MUST be foo" like the other special cases
+# TODO: maybe just do it as a separate pass? validate_compressed() or something like that
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
 C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
 C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
@@ -665,6 +661,9 @@ I_TYPE_INSTRUCTIONS = {
     'xori':       XORI,
     'ori':        ORI,
     'andi':       ANDI,
+}
+
+IE_TYPE_INSTRUCTIONS = {
     'ecall':      ECALL,
     'ebreak':     EBREAK,
 }
@@ -698,7 +697,6 @@ FENCE_INSTRUCTIONS = {
 }
 
 A_TYPE_INSTRUCTIONS = {
-    'lr.w':       LR_W,
     'sc.w':       SC_W,
     'amoswap.w':  AMOSWAP_W,
     'amoadd.w':   AMOADD_W,
@@ -709,6 +707,10 @@ A_TYPE_INSTRUCTIONS = {
     'amomax.w':   AMOMAX_W,
     'amominu.w':  AMOMINU_W,
     'amomaxu.w':  AMOMAXU_W,
+}
+
+AL_TYPE_INSTRUCTIONS = {
+    'lr.w':       LR_W,
 }
 
 CR_TYPE_INSTRUCTIONS = {
@@ -776,12 +778,14 @@ CJ_TYPE_INSTRUCTIONS = {
 INSTRUCTIONS = {}
 INSTRUCTIONS.update(R_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(I_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(IE_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(S_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(U_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(J_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(FENCE_INSTRUCTIONS)
 INSTRUCTIONS.update(A_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(AL_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CR_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CI_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CIS_TYPE_INSTRUCTIONS)
@@ -794,6 +798,42 @@ INSTRUCTIONS.update(CA_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CBI_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
+
+PSEUDO_INSTRUCTIONS = {
+    'nop',
+    'li',
+    'mv',
+    'not',
+    'neg',
+    'negw',
+    'sext.w',
+    'seqz',
+    'snez',
+    'sltz',
+    'sgtz',
+
+    'beqz',
+    'bnez',
+    'blez',
+    'bgez',
+    'bltz',
+    'bgtz',
+
+    'bgt',
+    'ble',
+    'bgtu',
+    'bleu',
+
+    'j',
+    'jal',
+    'jr',
+    'jalr',
+    'ret',
+    'call',
+    'tail',
+
+    'fence',
+}
 
 
 def sign_extend(value, bits):
@@ -970,13 +1010,13 @@ class Label(Item):
 
 class Constant(Item):
 
-    def __init__(self, line, name, expr):
+    def __init__(self, line, name, imm):
         super().__init__(line)
         self.name = name
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, {!r})'.format(type(self).__name__, self.name, self.expr)
+        return '{}(name={!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
 
     def size(self, position):
         return 0
@@ -1011,13 +1051,13 @@ class String(Item):
 
 class Pack(Item):
 
-    def __init__(self, line, fmt, expr):
+    def __init__(self, line, fmt, imm):
         super().__init__(line)
         self.fmt = fmt
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, {!r})'.format(type(self).__name__, self.fmt, self.expr)
+        return '{}(fmt={!r}, imm={!r})'.format(type(self).__name__, self.fmt, self.imm)
 
     def size(self, position):
         return struct.calcsize(self.fmt)
@@ -1065,78 +1105,87 @@ class RTypeInstruction(Instruction):
 
 class ITypeInstruction(Instruction):
 
-    def __init__(self, line, name, rd, rs1, expr):
+    def __init__(self, line, name, rd, rs1, imm):
         super().__init__(line)
         self.name = name
         self.rd = rd
         self.rs1 = rs1
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.expr)
+        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+
+
+class IETypeInstruction(Instruction):
+
+    def __init__(self, line, name):
+        super().__init__(line)
+        self.name = name
+
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, self.name)
 
 
 class STypeInstruction(Instruction):
 
-    def __init__(self, line, name, rs1, rs2, expr):
+    def __init__(self, line, name, rs1, rs2, imm):
         super().__init__(line)
         self.name = name
         self.rs1 = rs1
         self.rs2 = rs2
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
+        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
 
 
 class BTypeInstruction(Instruction):
 
-    def __init__(self, line, name, rs1, rs2, expr):
+    def __init__(self, line, name, rs1, rs2, imm):
         super().__init__(line)
         self.name = name
         self.rs1 = rs1
         self.rs2 = rs2
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.expr)
+        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
 
 
 class UTypeInstruction(Instruction):
 
-    def __init__(self, line, name, rd, expr):
+    def __init__(self, line, name, rd, imm):
         super().__init__(line)
         self.name = name
         self.rd = rd
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
+        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
 
 
 class JTypeInstruction(Instruction):
 
-    def __init__(self, line, name, rd, expr):
+    def __init__(self, line, name, rd, imm):
         super().__init__(line)
         self.name = name
         self.rd = rd
-        self.expr = expr
+        self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.expr)
+        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
 
 
 class FenceInstruction(Instruction):
 
-    def __init__(self, line, name, succ, pred, fm):
+    def __init__(self, line, name, succ, pred):
         super().__init__(line)
         self.name = name
         self.succ = succ
         self.pred = pred
-        self.fm = fm
 
     def __repr__(self):
-        return '{}({!r}, succ={!r}, pred={!r}, fm={!r}`)'.format(type(self).__name__, self.name, self.succ, self.pred, self.fm)
+        return '{}({!r}, succ={!r}, pred={!r})'.format(type(self).__name__, self.name, self.succ, self.pred)
 
 
 class ATypeInstruction(Instruction):
@@ -1156,7 +1205,38 @@ class ATypeInstruction(Instruction):
         return s
 
 
+class ALTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd, rs1, aq=0, rl=0):
+        super().__init__(line)
+        self.name = name
+        self.rd = rd
+        self.rs1 = rs1
+        self.aq = aq
+        self.rl = rl
+
+    def __repr__(self):
+        s = '{}({!r}, rd={!r}, rs1={!r}, aq={!r}, rl={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.aq, self.rl)
+        return s
+
+
 # TODO: classes for compressed instruction types
+
+
+class PseudoInstruction(Instruction):
+
+    def __init__(self, line, name, args):
+        super().__init__(line)
+        self.name = name
+        self.args = args
+
+    def size(self, position):
+        # some pseudo-instructions expand into 2 regular ones
+        if self.name in ['li', 'call', 'tail']:
+            return 8
+        else:
+            return 4
 
 
 def read_lines(path_or_source):
@@ -1235,7 +1315,7 @@ def parse_item(line_tokens):
     elif head == 'align':
         _, alignment = tokens
         try:
-            alignment = int(alignment)
+            alignment = int(alignment, base=0)
         except ValueError:
             raise AssemblerError('alignment must be an integer', line)
         return Align(line, alignment)
@@ -1254,16 +1334,23 @@ def parse_item(line_tokens):
         return String(line, values)
     # r-type instructions
     elif head in R_TYPE_INSTRUCTIONS:
-        # TODO: ensure len(tokens) == 4
+        if len(tokens) != 4:
+            raise AssemblerError('r-type instructions require exactly 3 args', line)
         name, rd, rs1, rs2 = tokens
         name = name.lower()
         return RTypeInstruction(line, name, rd, rs1, rs2)
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
+        # TODO: check for jalr PI
         name, rd, rs1, *imm = tokens
         name = name.lower()
         imm = parse_immediate(imm)
         return ITypeInstruction(line, name, rd, rs1, imm)
+    # ie-type instructions
+    elif head in IE_TYPE_INSTRUCTIONS:
+        name, = tokens
+        name = name.lower()
+        return IETypeInstruction(line, name)
     # s-type instructions
     elif head in S_TYPE_INSTRUCTIONS:
         name, rs1, rs2, *imm = tokens
@@ -1287,6 +1374,7 @@ def parse_item(line_tokens):
         return UTypeInstruction(line, name, rd, imm)
     # j-type instructions
     elif head in J_TYPE_INSTRUCTIONS:
+        # TODO: check for jal PI
         name, rd, *imm = tokens
         name = name.lower()
         # ensure behavior is "offset" for branch instructions
@@ -1296,18 +1384,14 @@ def parse_item(line_tokens):
         return JTypeInstruction(line, name, rd, imm)
     # fence instructions
     elif head in FENCE_INSTRUCTIONS:
-        # TODO: ensure len(tokens) == 4
-        name, succ, pred, fm = tokens
+        if len(tokens) != 4:
+            raise AssemblerError('fence instructions require exactly 2 args', line)
+        name, succ, pred = tokens
         name = name.lower()
-        return FenceInstruction(line, name, succ, pred, fm)
+        return FenceInstruction(line, name, succ, pred)
     # a-type instructions
     elif head in A_TYPE_INSTRUCTIONS:
-        # special syntax for lr.w (rs2 is 0)
-        if head.lower() == 'lr.w':
-            name, rd, rs1, *ordering = tokens
-            rs2 = 0
-        else:
-            name, rd, rs1, rs2, *ordering = tokens
+        name, rd, rs1, rs2, *ordering = tokens
         name = name.lower()
         # check for specific ordering bits
         if len(ordering) == 0:
@@ -1315,11 +1399,31 @@ def parse_item(line_tokens):
         elif len(ordering) == 2:
             aq, rl = ordering
         else:
-            raise AssemblerError('invalid ordering bits for atomic instruction', line)
+            raise AssemblerError('invalid syntax for atomic instruction', line)
         return ATypeInstruction(line, name, rd, rs1, rs2, aq, rl)
+    # al-type instructions
+    elif head in AL_TYPE_INSTRUCTIONS:
+        name, rd, rs1, *ordering = tokens
+        name = name.lower()
+        # check for specific ordering bits
+        if len(ordering) == 0:
+            aq, rl = 0, 0
+        elif len(ordering) == 2:
+            aq, rl = ordering
+        else:
+            raise AssemblerError('invalid syntax for atomic instruction', line)
+        return ALTypeInstruction(line, name, rd, rs1, aq, rl)
     # TODO: compressed instructions
+    elif head in PSEUDO_INSTRUCTIONS:
+        name, *args = tokens
+        name = name.lower()
+        return PseudoInstruction(name, args)
     else:
         raise AssemblerError('invalid syntax', line)
+
+
+def resolve_pseudo_instructions(items):
+    return items
 
 
 def resolve_aligns(items):
@@ -1362,7 +1466,7 @@ def resolve_constants(items, env):
         if isinstance(item, Constant):
             if item.name in REGISTERS:
                 raise AssemblerError('constant name shadows register name "{}"'.format(item.name), item.line)
-            new_env[item.name] = item.expr.eval(position, new_env, item.line)
+            new_env[item.name] = item.imm.eval(position, new_env, item.line)
         else:
             position += item.size(position)
             new_items.append(item)
@@ -1382,25 +1486,25 @@ def resolve_registers(items, env):
         elif isinstance(item, ITypeInstruction):
             rd = env.get(item.rd, item.rd)
             rs1 = env.get(item.rs1, item.rs1)
-            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.expr)
+            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
             rs1 = env.get(item.rs1, item.rs1)
             rs2 = env.get(item.rs2, item.rs2)
-            inst = STypeInstruction(item.line, item.name, rs1, rs2, item.expr)
+            inst = STypeInstruction(item.line, item.name, rs1, rs2, item.imm)
             new_items.append(inst)
         elif isinstance(item, BTypeInstruction):
             rs1 = env.get(item.rs1, item.rs1)
             rs2 = env.get(item.rs2, item.rs2)
-            inst = BTypeInstruction(item.line, item.name, rs1, rs2, item.expr)
+            inst = BTypeInstruction(item.line, item.name, rs1, rs2, item.imm)
             new_items.append(inst)
         elif isinstance(item, UTypeInstruction):
             rd = env.get(item.rd, item.rd)
-            inst = UTypeInstruction(item.line, item.name, rd, item.expr)
+            inst = UTypeInstruction(item.line, item.name, rd, item.imm)
             new_items.append(inst)
         elif isinstance(item, JTypeInstruction):
             rd = env.get(item.rd, item.rd)
-            inst = JTypeInstruction(item.line, item.name, rd, item.expr)
+            inst = JTypeInstruction(item.line, item.name, rd, item.imm)
             new_items.append(inst)
         elif isinstance(item, ATypeInstruction):
             rd = env.get(item.rd, item.rd)
@@ -1408,6 +1512,12 @@ def resolve_registers(items, env):
             rs2 = env.get(item.rs2, item.rs2)
             inst = ATypeInstruction(item.line, item.name, rd, rs1, rs2, item.aq, item.rl)
             new_items.append(inst)
+        elif isinstance(item, ALTypeInstruction):
+            rd = env.get(item.rd, item.rd)
+            rs1 = env.get(item.rs1, item.rs1)
+            inst = ALTypeInstruction(item.line, item.name, rd, rs1, item.aq, item.rl)
+            new_items.append(inst)
+        # TODO: compressed instructions
         else:
             new_items.append(item)
 
@@ -1419,32 +1529,33 @@ def resolve_immediates(items, env):
     new_items = []
     for item in items:
         if isinstance(item, ITypeInstruction):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             inst = STypeInstruction(item.line, item.name, item.rs1, item.rs2, imm)
             new_items.append(inst)
         elif isinstance(item, BTypeInstruction):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             inst = BTypeInstruction(item.line, item.name, item.rs1, item.rs2, imm)
             new_items.append(inst)
         elif isinstance(item, UTypeInstruction):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             inst = UTypeInstruction(item.line, item.name, item.rd, imm)
             new_items.append(inst)
         elif isinstance(item, JTypeInstruction):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             inst = JTypeInstruction(item.line, item.name, item.rd, imm)
             new_items.append(inst)
+        # TODO: compressed instructions
         elif isinstance(item, Pack):
-            imm = item.expr.eval(position, env, item.line)
+            imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             pack = Pack(item.line, item.fmt, imm)
             new_items.append(pack)
@@ -1457,6 +1568,23 @@ def resolve_immediates(items, env):
 
 def resolve_compressible(items):
     # TODO: check if any instructions meet the criteria for a compressed equivalent
+    return items
+
+
+def resolve_compressed(items):
+    # TODO: ensure compressed inst regs / imms are valid
+    # c.addi:     rd/rs1 != 0, nzimm
+    # c.li:       rd != 0
+    # c.addi16sp: nzimm
+    # c.lui:      rd != {0,2}
+    # c.srli:     nzimm
+    # c.srai:     nzimm
+    # c.slli:     rd/rs1 != 0, nzimm
+    # c.lwsp:     rd != 0
+    # c.jr:       rs1 != 0
+    # c.mv:       rd != 0, rs2 != 0
+    # c.jalr:     rs1 != 0
+    # c.add:      rd/rs1 != 0, rs2 != 0
     return items
 
 
@@ -1475,7 +1603,16 @@ def resolve_instructions(items):
         elif isinstance(item, ITypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.rd, item.rs1, item.expr)
+                code = encode_func(item.rd, item.rs1, item.imm)
+            except ValueError as e:
+                raise AssemblerError(str(e), item.line)
+            code = struct.pack('<I', code)
+            blob = Blob(item.line, code)
+            new_items.append(blob)
+        elif isinstance(item, IETypeInstruction):
+            encode_func = INSTRUCTIONS[item.name]
+            try:
+                code = encode_func()
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1484,7 +1621,7 @@ def resolve_instructions(items):
         elif isinstance(item, STypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.rs1, item.rs2, item.expr)
+                code = encode_func(item.rs1, item.rs2, item.imm)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1493,7 +1630,7 @@ def resolve_instructions(items):
         elif isinstance(item, BTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.rs1, item.rs2, item.expr)
+                code = encode_func(item.rs1, item.rs2, item.imm)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1502,7 +1639,7 @@ def resolve_instructions(items):
         elif isinstance(item, UTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.rd, item.expr)
+                code = encode_func(item.rd, item.imm)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1511,7 +1648,7 @@ def resolve_instructions(items):
         elif isinstance(item, JTypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.rd, item.expr)
+                code = encode_func(item.rd, item.imm)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1520,7 +1657,7 @@ def resolve_instructions(items):
         elif isinstance(item, FenceInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                code = encode_func(item.succ, item.pred, item.fm)
+                code = encode_func(item.succ, item.pred)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
@@ -1529,16 +1666,22 @@ def resolve_instructions(items):
         elif isinstance(item, ATypeInstruction):
             encode_func = INSTRUCTIONS[item.name]
             try:
-                # TODO: how to do this nicer?
-                if item.name == 'lr.w':
-                    code = encode_func(item.rd, item.rs1, aq=item.aq, rl=item.rl)
-                else:
-                    code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
+                code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
             except ValueError as e:
                 raise AssemblerError(str(e), item.line)
             code = struct.pack('<I', code)
             blob = Blob(item.line, code)
             new_items.append(blob)
+        elif isinstance(item, ALTypeInstruction):
+            encode_func = INSTRUCTIONS[item.name]
+            try:
+                code = encode_func(item.rd, item.rs1, aq=item.aq, rl=item.rl)
+            except ValueError as e:
+                raise AssemblerError(str(e), item.line)
+            code = struct.pack('<I', code)
+            blob = Blob(item.line, code)
+            new_items.append(blob)
+        # TODO: compressed instructions
         else:
             new_items.append(item)
 
@@ -1549,7 +1692,7 @@ def resolve_packs(items):
     new_items = []
     for item in items:
         if isinstance(item, Pack):
-            data = struct.pack(item.fmt, item.expr)
+            data = struct.pack(item.fmt, item.imm)
             blob = Blob(item.line, data)
             new_items.append(blob)
         else:
@@ -1597,18 +1740,20 @@ def resolve_blobs(items):
 
 
 # Passes:
-#  0. Read -> Lex -> Parse source
-#  1. Resolve aligns  (convert aligns to blobs based on position)
-#  2. Resolve labels  (store label locations into env)
-#  3. Resolve constants  (eval expr and update env)
-#  4. Resolve registers  (could be constants for readability)
-#  5. Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
-#  6. Resolve compressible  (identify and compress eligible instructions)
-#  7. Resolve instructions  (convert xTypeInstruction to Blob)
-#  8. Resolve bytes  (convert Bytes to Blob)
-#  9. Resolve strings  (convert String to Blob)
-# 10. Resolve packs  (convert Pack to Blob)
-# 11. Resolve blobs  (merge all Blobs into a single binary)
+#   - Read -> Lex -> Parse source
+#   - Resolve pseudo-instructions (expand PIs into regular instructions)
+#   - Resolve aligns  (convert aligns to blobs based on position)
+#   - Resolve labels  (store label locations into env)
+#   - Resolve constants  (eval expr and update env)
+#   - Resolve registers  (could be constants for readability)
+#   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
+#   - Resolve compressible  (identify and compress eligible instructions)
+#   - Resolve compressed  (validate compressed inst reg / imm values)
+#   - Resolve instructions  (convert xTypeInstruction to Blob)
+#   - Resolve bytes  (convert Bytes to Blob)
+#   - Resolve strings  (convert String to Blob)
+#   - Resolve packs  (convert Pack to Blob)
+#   - Resolve blobs  (merge all Blobs into a single binary)
 
 def assemble(path_or_source, compress=False, verbose=False):
     """
@@ -1633,6 +1778,7 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = [parse_item(t) for t in tokens]
 
     # run items through each pass
+    items = resolve_pseudo_instructions(items)
     items = resolve_aligns(items)
     items, env = resolve_labels(items, env)
     items, env = resolve_constants(items, env)
@@ -1640,6 +1786,7 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = resolve_immediates(items, env)
     if compress:
         items = resolve_compressible(items)
+    items = resolve_compressed(items)
     items = resolve_instructions(items)
     items = resolve_bytes(items)
     items = resolve_strings(items)

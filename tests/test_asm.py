@@ -644,6 +644,25 @@ def test_and(rd, rs1, rs2, code):
 
 
 @pytest.mark.parametrize(
+    'succ,   pred,   code', [
+    (0b0000, 0b0000, 0b00000000000000000000000000001111),
+    (0b0000, 0b1111, 0b00001111000000000000000000001111),
+    (0b1111, 0b0000, 0b00000000111100000000000000001111),
+    (0b1111, 0b1111, 0b00001111111100000000000000001111),
+])
+def test_fence(succ, pred, code):
+    assert asm.FENCE(succ, pred) == code
+
+
+def test_ecall():
+    assert asm.ECALL() == 0b00000000000000000000000001110011
+
+
+def test_ebreak():
+    assert asm.EBREAK() == 0b00000000000100000000000001110011
+
+
+@pytest.mark.parametrize(
     'rd, rs1, rs2, code', [
     (0,  0,   0,   0b00000010000000000000000000110011),
     (31, 0,   0,   0b00000010000000000000111110110011),

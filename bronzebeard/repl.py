@@ -3,17 +3,11 @@ import os
 import readline
 import struct
 
-import appdirs
-
 from bronzebeard import asm
 
 
 def repl():
-    config_dir = appdirs.user_cache_dir('bronzebeard')
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-
-    history_path = os.path.join(config_dir, 'repl_history.txt')
+    history_path = os.path.join(os.path.expanduser("~"), ".bronzebeard_history")
     try:
         readline.read_history_file(history_path)
         readline.set_history_length(1000)
@@ -36,6 +30,7 @@ def repl():
             item = asm.parse_item(tokens)
 
             items = [item]
+            items = asm.resolve_pseudo_instructions(items)
             items = asm.resolve_immediates(items, env)
             items = asm.resolve_instructions(items)
 
