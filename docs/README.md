@@ -350,6 +350,6 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.swsp`     | rs2, uimm         | TODO        |
 
 ## Pseudo Instructions
-| Instruction | Expansion |
-| ----------- | --------- |
-| `nop`       | `addi x0, x0, 0` |
+| Name  | Parameters | Expansion | Description |
+| ----- | ---------- | --------- | ----------- |
+| `nop` | \<none\>   | `addi x0, x0, 0` | No operation |
