@@ -348,3 +348,8 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.jalr`     | rs1!=0            | TODO        |
 | `c.add`      | rd/rs1!=0, rs2!=0 | TODO        |
 | `c.swsp`     | rs2, uimm         | TODO        |
+
+## Pseudo Instructions
+| Instruction | Expansion |
+| ----------- | --------- |
+| `nop`       | `addi x0, x0, 0` |
