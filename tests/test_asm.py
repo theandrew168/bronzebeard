@@ -139,9 +139,9 @@ def test_jal(rd, imm, code):
     (31, 0,   0,      0b00000000000000000000111111100111),
     (0,  31,  0,      0b00000000000011111000000001100111),
     (31, 31,  0,      0b00000000000011111000111111100111),
-    (0,  0,   1,      0b00000000000100000000000001100111),
-    (0,  0,   0x7ff,  0b01111111111100000000000001100111),
-    (0,  0,   -1,     0b11111111111100000000000001100111),
+    (0,  0,   2,      0b00000000001000000000000001100111),
+    (0,  0,   0x7fe,  0b01111111111000000000000001100111),
+    (0,  0,   -2,     0b11111111111000000000000001100111),
     (0,  0,   -0x800, 0b10000000000000000000000001100111),
 ])
 def test_jalr(rd, rs1, imm, code):
@@ -1347,8 +1347,38 @@ def test_assembler_basic_uppercase():
 
 @pytest.mark.parametrize(
     'pseudo,             translated', [
-    ('nop',              'addi x0 x0 0'),
-    ('li t0 0x20000000', 'lui t0 %hi(0x20000000)\naddi t0 t0 %lo(0x20000000)'),
+
+#    ('nop',              'addi x0 x0 0'),
+#    ('li t0 0x20000000', 'lui t0 %hi(0x20000000)\n addi t0 t0 %lo(0x20000000)'),
+#    ('mv t0 t1',         'addi t0 t1 0'),
+#    ('not t0 t1',        'xori t0 t1 -1'),
+#    ('neg t0 t1',        'sub t0 x0 t1'),
+#    ('seqz t0 t1',       'sltiu t0 t1 1'),
+#    ('snez t0 t1',       'sltu t0 x0 t1'),
+#    ('sltz t0 t1',       'slt t0 t1 x0'),
+#    ('sgtz t0 t1',       'slt t0 x0 t1'),
+#
+#    ('beqz t0 16',       'beq t0 x0 16'),
+#    ('bnez t0 16',       'bne t0 x0 16'),
+#    ('blez t0 16',       'bge x0 t0 16'),
+#    ('bgez t0 16',       'bge t0 x0 16'),
+#    ('bltz t0 16',       'blt t0 x0 16'),
+#    ('bgtz t0 16',       'blt x0 t0 16'),
+#
+#    ('bgt t0 t1 16',     'blt t1 t0 16'),
+#    ('ble t0 t1 16',     'bge t1 t0 16'),
+#    ('bgtu t0 t1 16',    'bltu t1 t0 16'),
+#    ('bleu t0 t1 16',    'bgeu t1 t0 16'),
+#
+#    ('j 16',             'jal x0 16'),
+#    ('jal 16',           'jal x1 16'),
+#    ('jr t0',            'jalr x0 0(t0)'),
+#    ('jalr t0',          'jalr x1 0(t0)'),
+#    ('ret',              'jalr x0 0(x1)'),
+#    ('call 0x20000000',  'auipc x1 %hi(0x20000000)\n jalr x1 x1 %lo(0x20000000)'),
+#    ('tail 0x20000000',  'auipc x6 %hi(0x20000000)\n jalr x0 x6 %lo(0x20000000)'),
+
+    ('fence',            'fence 0b1111 0b1111'),
 ])
 def test_pseudo_instructions(pseudo, translated):
     pseudo_bin = asm.assemble(pseudo)
@@ -1404,7 +1434,7 @@ def test_assembler_labels_and_jumps():
         beq t0 zero main
         addi t0 t0 -1
     end:
-        jal zero %offset middle
+        jal zero middle
     main:
         addi zero zero 0
     """

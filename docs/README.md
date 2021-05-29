@@ -46,6 +46,7 @@ A constant in Bronzebeard is the named result of an integer expression.
 Floating point numbers or any other non-integer expression results aren't supported at this time.
 Numbers can be represented as decimal, binary, or hex.
 Simple math operations such as addition, multiplication, shifting, and binary ops all work (mostly) as expected.
+The actual precedence rules and evaluation of arithmetic expressions is handled by the Python lauguage itself (via the [eval](https://docs.python.org/3/library/functions.html#eval) builtin).
 
 Here are a few examples:
 ```
@@ -59,20 +60,15 @@ GPIO_CTL_OUT_PUSH_PULL = 0b00
 
 FOO = 42
 BAR = FOO * 2
-BAZ = BAR >> 1 & 0b11111
+BAZ = (BAR >> 1) & 0b11111
 ```
-**NOTE:** Since parentheses are treated as whitespace by the lexer, any precedence grouping within an expression disappears.
-Be careful with this!
-If you have a calculation that requires a specific order of operations, break it up into smaller, separate definitions.
-The actual precedence rules and evaluation of arithmetic expressions is handled by the Python lauguage itself (via the [eval](https://docs.python.org/3/library/functions.html#eval) builtin).
 
 ### Modifiers
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
 You can think of these like simple, builtin functions:
-* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
-* **%offset(label)** - Calculate the relative offset of a label from the current instruction's address
 * **%hi(value)** - Calculate the sign-adjusted top 20 bits of a value
 * **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
+* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
 
 ### String Literals
 String literals allow you to embed UTF-8 strings into your binary.

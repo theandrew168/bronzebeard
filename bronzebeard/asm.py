@@ -110,6 +110,28 @@ def i_type(rd, rs1, imm, *, opcode, funct3):
     return code
 
 
+# i-type variation for JALR
+def ij_type(rd, rs1, imm, *, opcode, funct3):
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
+
+    if imm < -0x800 or imm > 0x7ff:
+        raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
+    if imm % 2 != 0:
+        raise ValueError('12-bit immediate must be a muliple of 2: {}'.format(imm))
+
+    imm = c_uint32(imm).value & 0b111111111111
+
+    code = 0
+    code |= opcode
+    code |= rd << 7
+    code |= funct3 << 12
+    code |= rs1 << 15
+    code |= imm << 20
+
+    return code
+
+
 def s_type(rs1, rs2, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1)
     rs2 = lookup_register(rs2)
@@ -272,8 +294,8 @@ def ci_type(rd_rs1, imm, *, opcode, funct3):
 def cis_type(rd_rs1, imm, *, opcode, funct3):
     rd_rs1 = lookup_register(rd_rs1)
 
-    if imm < -512 or imm > 496:
-        raise ValueError('6-bit MO16 immediate must be between -512 (-0x200) and 496 (0x1f0): {}'.format(imm))
+    if imm < -512 or imm > 511:
+        raise ValueError('6-bit MO16 immediate must be between -512 (-0x200) and 511 (0x1ff): {}'.format(imm))
     if imm % 16 != 0:
         raise ValueError('6-bit MO16 immediate must be a multiple of 16: {}'.format(imm))
 
@@ -298,8 +320,8 @@ def cis_type(rd_rs1, imm, *, opcode, funct3):
 def cls_type(rd, imm, *, opcode, funct3):
     rd = lookup_register(rd)
 
-    if imm < 0 or imm > 252:
-        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xfc (252): {}'.format(imm))
+    if imm < 0 or imm > 255:
+        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -323,8 +345,8 @@ def cls_type(rd, imm, *, opcode, funct3):
 def css_type(rs2, imm, *, opcode, funct3):
     rs2 = lookup_register(rs2)
 
-    if imm < 0 or imm > 252:
-        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xfc (252): {}'.format(imm))
+    if imm < 0 or imm > 255:
+        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -348,8 +370,8 @@ def css_type(rs2, imm, *, opcode, funct3):
 def ciw_type(rd, imm, *, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
 
-    if imm < 0 or imm > 1020:
-        raise ValueError('8-bit MO4 unsigned immediate must be between 0 (0x00) and 0x3fc (1020): {}'.format(imm))
+    if imm < 0 or imm > 1023:
+        raise ValueError('8-bit MO4 unsigned immediate must be between 0 (0x00) and 0x3ff (1023): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('8-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -378,8 +400,8 @@ def cl_type(rd, rs1, imm, *, opcode, funct3):
     rd = lookup_register(rd, compressed=True)
     rs1 = lookup_register(rs1, compressed=True)
 
-    if imm < 0 or imm > 124:
-        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7c (124): {}'.format(imm))
+    if imm < 0 or imm > 127:
+        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -407,8 +429,8 @@ def cs_type(rs1, rs2, imm, *, opcode, funct3):
     rs1 = lookup_register(rs1, compressed=True)
     rs2 = lookup_register(rs2, compressed=True)
 
-    if imm < 0 or imm > 124:
-        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7c (124): {}'.format(imm))
+    if imm < 0 or imm > 127:
+        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -495,8 +517,8 @@ def cbi_type(rd_rs1, imm, *, opcode, funct2, funct3):
 
 # c.jal, c.j
 def cj_type(imm, *, opcode, funct3):
-    if imm < -2048 or imm > 2046:
-        raise ValueError('11-bit MO2 immediate must be between -0x800 (-2048) and 0x7fe (2046): {}'.format(imm))
+    if imm < -2048 or imm > 2047:
+        raise ValueError('11-bit MO2 immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
     if imm % 2 != 0:
         raise ValueError('11-bit MO2 immediate must be a muliple of 2: {}'.format(imm))
 
@@ -531,7 +553,7 @@ def cj_type(imm, *, opcode, funct3):
 LUI        = partial(u_type,   opcode=0b0110111)
 AUIPC      = partial(u_type,   opcode=0b0010111)
 JAL        = partial(j_type,   opcode=0b1101111)
-JALR       = partial(i_type,   opcode=0b1100111, funct3=0b000)
+JALR       = partial(ij_type,  opcode=0b1100111, funct3=0b000)
 BEQ        = partial(b_type,   opcode=0b1100011, funct3=0b000)
 BNE        = partial(b_type,   opcode=0b1100011, funct3=0b001)
 BLT        = partial(b_type,   opcode=0b1100011, funct3=0b100)
@@ -818,8 +840,6 @@ PSEUDO_INSTRUCTIONS = {
     'mv',
     'not',
     'neg',
-    'negw',
-    'sext.w',
     'seqz',
     'snez',
     'sltz',
@@ -1376,7 +1396,11 @@ def parse_item(line_tokens):
         return RTypeInstruction(line, name, rd, rs1, rs2)
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
-        # TODO: check for jalr PI
+        # check for jalr PI
+        if len(tokens) == 2:
+            name, *args = tokens
+            name = name.lower()
+            return PseudoInstruction(name, *args)
         if tokens[0].lower() in BASE_OFFSET_INSTRUCTIONS:
             if tokens[3] == '(':
                 name, rd, offset, _, rs1, _ = tokens
@@ -1405,11 +1429,12 @@ def parse_item(line_tokens):
         return STypeInstruction(line, name, rs1, rs2, imm)
     # b-type instructions
     elif head in B_TYPE_INSTRUCTIONS:
-        name, rs1, rs2, *imm = tokens
+        if len(tokens) != 4:
+            raise AssemblerError('b-type instructions require 3 args', line)
+        name, rs1, rs2, reference = tokens
         name = name.lower()
-        # ensure behavior is "offset" for branch instructions
-        if imm[0] != '%offset':
-            imm.insert(0, '%offset')
+        # behavior is "offset" for branch instructions
+        imm = ['%offset', reference]
         imm = parse_immediate(imm)
         return BTypeInstruction(line, name, rs1, rs2, imm)
     # u-type instructions
@@ -1420,19 +1445,28 @@ def parse_item(line_tokens):
         return UTypeInstruction(line, name, rd, imm)
     # j-type instructions
     elif head in J_TYPE_INSTRUCTIONS:
-        # TODO: check for jal PI
-        name, rd, *imm = tokens
+        # check for jal PI
+        if len(tokens) == 2:
+            name, *args = tokens
+            name = name.lower()
+            return PseudoInstruction(line, name, *args)
+        if len(tokens) != 3:
+            raise AssemblerError('j-type instructions require 1 or 2 args', line)
+        name, rd, reference = tokens
         name = name.lower()
         # ensure behavior is "offset" for branch instructions
-        if imm[0] != '%offset':
-            imm.insert(0, '%offset')
+        imm = ['%offset', reference]
         imm = parse_immediate(imm)
         return JTypeInstruction(line, name, rd, imm)
     # fence instructions
     elif head in FENCE_INSTRUCTIONS:
-        # TODO: check for fence PI
+        # check for fence PI
+        if len(tokens) == 1:
+            name, *args = tokens
+            name = name.lower()
+            return PseudoInstruction(line, name, *args)
         if len(tokens) != 3:
-            raise AssemblerError('fence instructions require exactly 2 args', line)
+            raise AssemblerError('fence instructions require 0 or 2 args', line)
         name, succ, pred = tokens
         name = name.lower()
         return FenceInstruction(line, name, succ, pred)
@@ -1482,6 +1516,14 @@ def translate_pseudo_instructions(items):
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 new_items.append(inst)
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
+                new_items.append(inst)
+            elif item.name == 'jal':
+                imm = item.args
+                imm = parse_immediate(imm)
+                inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
+                new_items.append(inst)
+            elif item.name == 'fence':
+                inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
                 new_items.append(inst)
             else:
                 raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)

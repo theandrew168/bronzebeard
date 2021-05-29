@@ -14,7 +14,7 @@ middle:
     beq t0, zero, main
     addi t0, t0, -1
 end:
-    jal zero, %offset(middle)
+    jal zero, middle
 
 # string literals
 string hello
