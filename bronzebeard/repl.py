@@ -30,7 +30,7 @@ def repl():
             item = asm.parse_item(tokens)
 
             items = [item]
-            items = asm.resolve_pseudo_instructions(items)
+            items = asm.translate_pseudo_instructions(items)
             items = asm.resolve_immediates(items, env)
             items = asm.resolve_instructions(items)
 
@@ -42,9 +42,9 @@ def repl():
             print('binary: {:032b}'.format(code))
         except (EOFError, KeyboardInterrupt):
             break
-        except Exception as e:
-            print(e)
-            continue
+#        except Exception as e:
+#            print(e)
+#            continue
 
 
 if __name__ == '__main__':

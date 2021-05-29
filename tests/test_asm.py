@@ -1317,7 +1317,7 @@ def test_assembler_basic():
     source = """
     addi t0 zero 1
     addi t1, zero, 2
-    addi(t2, zero, 3)
+    addi t2, zero, 3
     """
     binary = asm.assemble(source)
     target = b''.join(struct.pack('<I', inst) for inst in [
@@ -1333,7 +1333,7 @@ def test_assembler_basic_uppercase():
     source = """
     ADDI t0 zero 1
     ADDI t1, zero, 2
-    ADDI(t2, zero, 3)
+    ADDI t2, zero, 3
     """
     binary = asm.assemble(source)
     target = b''.join(struct.pack('<I', inst) for inst in [
@@ -1341,6 +1341,38 @@ def test_assembler_basic_uppercase():
         asm.ADDI(5, 0, 1),
         asm.ADDI('t1', 'zero', 2),
         asm.ADDI('t2', 'zero', 3),
+    ])
+    assert binary == target
+
+
+@pytest.mark.parametrize(
+    'pseudo,             translated', [
+    ('nop',              'addi x0 x0 0'),
+    ('li t0 0x20000000', 'lui t0 %hi(0x20000000)\naddi t0 t0 %lo(0x20000000)'),
+])
+def test_pseudo_instructions(pseudo, translated):
+    pseudo_bin = asm.assemble(pseudo)
+    translated_bin = asm.assemble(translated)
+    assert pseudo_bin == translated_bin
+
+
+def test_alternate_offset_syntax():
+    source = """
+    jalr x0, x1, 0
+    jalr x0, 0(x1)
+    lw t3, sp, 8
+    lw t3, 8(sp)
+    sb a0, t3, 0
+    sb t3, 0(a0)
+    """
+    binary = asm.assemble(source)
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.JALR('x0', 'x1', 0),
+        asm.JALR('x0', 'x1', 0),
+        asm.LW('t3', 'sp', 8),
+        asm.LW('t3', 'sp', 8),
+        asm.SB('a0', 't3', 0),
+        asm.SB('a0', 't3', 0),
     ])
     assert binary == target
 

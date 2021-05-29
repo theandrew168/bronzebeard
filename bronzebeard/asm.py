@@ -799,6 +799,19 @@ INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CBI_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
 
+# alternate offset syntax applies to insts w/ base reg + offset imm
+BASE_OFFSET_INSTRUCTIONS = {
+    'jalr',
+    'lb',
+    'lh',
+    'lw',
+    'lbu',
+    'lhu',
+    'sb',
+    'sh',
+    'sw',
+}
+
 PSEUDO_INSTRUCTIONS = {
     'nop',
     'li',
@@ -892,7 +905,7 @@ class Immediate(abc.ABC):
 
 
 # arithmetic / lookup / combo of both
-# defers evaulation to Python's builtin eval
+# defers evaulation to Python's builtin eval (RIP double-slash comments)
 class Arithmetic(Immediate):
 
     def __init__(self, expr):
@@ -1116,6 +1129,7 @@ class ITypeInstruction(Instruction):
         return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
 
 
+# custom syntax for ecall / ebreak insts
 class IETypeInstruction(Instruction):
 
     def __init__(self, line, name):
@@ -1176,6 +1190,7 @@ class JTypeInstruction(Instruction):
         return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
 
 
+# custom syntax for fence inst
 class FenceInstruction(Instruction):
 
     def __init__(self, line, name, succ, pred):
@@ -1205,6 +1220,7 @@ class ATypeInstruction(Instruction):
         return s
 
 
+# custom syntax for lr.w inst
 class ALTypeInstruction(Instruction):
 
     def __init__(self, line, name, rd, rs1, aq=0, rl=0):
@@ -1226,10 +1242,15 @@ class ALTypeInstruction(Instruction):
 
 class PseudoInstruction(Instruction):
 
-    def __init__(self, line, name, args):
+    def __init__(self, line, name, *args):
         super().__init__(line)
         self.name = name
         self.args = args
+
+    def __repr__(self):
+        s = '{}({!r}, args={!r})'
+        s = s.format(type(self).__name__, self.name, self.args)
+        return s
 
     def size(self, position):
         # some pseudo-instructions expand into 2 regular ones
@@ -1264,13 +1285,15 @@ def lex_tokens(line):
         line = Line('<string>', 1, line)
     # strip comments
     contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
+    # pad parens before split
+    contents = contents.replace('(', ' ( ').replace(')', ' ) ')
     # strip whitespace
     contents = contents.strip()
     # skip empty lines
     if len(contents) == 0:
         return LineTokens(line, [])
     # split line into tokens
-    tokens = re.split(r'[\s,()\'"]+', contents)
+    tokens = re.split(r'[\s,\'"]+', contents)
     # remove empty tokens
     while '' in tokens:
         tokens.remove('')
@@ -1282,16 +1305,28 @@ def lex_tokens(line):
 def parse_immediate(imm):
     head = imm[0].lower()
     if head == '%position':
-        _, reference, *imm = imm
+        if imm[1] == '(':
+            _, _, reference, *imm, _ = imm
+        else:
+            _, reference, *imm = imm
         return Position(reference, Arithmetic(' '.join(imm)))
     elif head == '%offset':
-        _, reference = imm
+        if imm[1] == '(':
+            _, _, reference, _ = imm
+        else:
+            _, reference = imm
         return Offset(reference)
     elif head == '%hi':
-        _, *imm = imm
+        if imm[1] == '(':
+            _, _, *imm, _ = imm
+        else:
+            _, *imm = imm
         return Hi(parse_immediate(imm))
     elif head == '%lo':
-        _, *imm = imm
+        if imm[1] == '(':
+            _, _, *imm, _ = imm
+        else:
+            _, *imm = imm
         return Lo(parse_immediate(imm))
     else:
         return Arithmetic(' '.join(imm))
@@ -1342,7 +1377,14 @@ def parse_item(line_tokens):
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
         # TODO: check for jalr PI
-        name, rd, rs1, *imm = tokens
+        if tokens[0].lower() in BASE_OFFSET_INSTRUCTIONS:
+            if tokens[3] == '(':
+                name, rd, offset, _, rs1, _ = tokens
+            else:
+                name, rd, rs1, offset = tokens
+            imm = [offset]
+        else:
+            name, rd, rs1, *imm = tokens
         name = name.lower()
         imm = parse_immediate(imm)
         return ITypeInstruction(line, name, rd, rs1, imm)
@@ -1351,10 +1393,14 @@ def parse_item(line_tokens):
         name, = tokens
         name = name.lower()
         return IETypeInstruction(line, name)
-    # s-type instructions
+    # s-type instructions (all are base offset insts)
     elif head in S_TYPE_INSTRUCTIONS:
-        name, rs1, rs2, *imm = tokens
+        if tokens[3] == '(':
+            name, rs2, offset, _, rs1, _ = tokens
+        else:
+            name, rs1, rs2, offset = tokens
         name = name.lower()
+        imm = [offset]
         imm = parse_immediate(imm)
         return STypeInstruction(line, name, rs1, rs2, imm)
     # b-type instructions
@@ -1384,7 +1430,8 @@ def parse_item(line_tokens):
         return JTypeInstruction(line, name, rd, imm)
     # fence instructions
     elif head in FENCE_INSTRUCTIONS:
-        if len(tokens) != 4:
+        # TODO: check for fence PI
+        if len(tokens) != 3:
             raise AssemblerError('fence instructions require exactly 2 args', line)
         name, succ, pred = tokens
         name = name.lower()
@@ -1417,13 +1464,30 @@ def parse_item(line_tokens):
     elif head in PSEUDO_INSTRUCTIONS:
         name, *args = tokens
         name = name.lower()
-        return PseudoInstruction(name, args)
+        return PseudoInstruction(line, name, *args)
     else:
         raise AssemblerError('invalid syntax', line)
 
 
-def resolve_pseudo_instructions(items):
-    return items
+def translate_pseudo_instructions(items):
+    new_items = []
+    for item in items:
+        if isinstance(item, PseudoInstruction):
+            if item.name == 'nop':
+                inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
+                new_items.append(inst)
+            elif item.name == 'li':
+                rd, *imm = item.args
+                imm = parse_immediate(imm)
+                inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
+                new_items.append(inst)
+                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
+                new_items.append(inst)
+            else:
+                raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
+        else:
+            new_items.append(item)
+    return new_items
 
 
 def resolve_aligns(items):
@@ -1566,12 +1630,12 @@ def resolve_immediates(items, env):
     return new_items
 
 
-def resolve_compressible(items):
+def check_compressible(items):
     # TODO: check if any instructions meet the criteria for a compressed equivalent
     return items
 
 
-def resolve_compressed(items):
+def validate_compressed(items):
     # TODO: ensure compressed inst regs / imms are valid
     # c.addi:     rd/rs1 != 0, nzimm
     # c.li:       rd != 0
@@ -1741,14 +1805,14 @@ def resolve_blobs(items):
 
 # Passes:
 #   - Read -> Lex -> Parse source
-#   - Resolve pseudo-instructions (expand PIs into regular instructions)
+#   - Translate pseudo-instructions (expand PIs into regular instructions)
 #   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve labels  (store label locations into env)
 #   - Resolve constants  (eval expr and update env)
 #   - Resolve registers  (could be constants for readability)
 #   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
-#   - Resolve compressible  (identify and compress eligible instructions)
-#   - Resolve compressed  (validate compressed inst reg / imm values)
+#   - Check compressible  (identify and compress eligible instructions)
+#   - Valitate compressed  (validate compressed inst reg / imm values)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
 #   - Resolve bytes  (convert Bytes to Blob)
 #   - Resolve strings  (convert String to Blob)
@@ -1778,15 +1842,15 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = [parse_item(t) for t in tokens]
 
     # run items through each pass
-    items = resolve_pseudo_instructions(items)
+    items = translate_pseudo_instructions(items)
     items = resolve_aligns(items)
     items, env = resolve_labels(items, env)
     items, env = resolve_constants(items, env)
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
     if compress:
-        items = resolve_compressible(items)
-    items = resolve_compressed(items)
+        items = check_compressible(items)
+    items = validate_compressed(items)
     items = resolve_instructions(items)
     items = resolve_bytes(items)
     items = resolve_strings(items)
