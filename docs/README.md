@@ -28,7 +28,7 @@ This is necessary to distinguish label definitions from other keywords.
 
 ### Instructions
 An instruction is the basic building block of any CPU.
-At a bare minimum, RISC-V supports [37 instructions](https://github.com/theandrew168/bronzebeard/tree/master/docs#instructions-1).
+At a bare minimum, RISC-V supports [37 instructions](https://github.com/theandrew168/bronzebeard/tree/master/docs#rv32i-base-instruction-set).
 An instruction tells the CPU to do something with a given set of registers and/or immediate values.
 Registers are named 32-bit "slots" that the CPU can use to store information at runtime.
 Immediate values are typically integers of varying sizes (depending on the specific instruction at hand).
