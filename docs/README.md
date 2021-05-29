@@ -226,6 +226,11 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 | `18-27` | `x18-27` | `s2-11` | Saved registers |
 | `28-31` | `x28-31` | `t3-6`  | Temporary registers |
 
+## Pseudo Instructions
+| Name  | Parameters | Expansion | Description |
+| ----- | ---------- | --------- | ----------- |
+| `nop` | \<none\>   | `addi x0, x0, 0` | No operation |
+
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
 Full [specifications](https://riscv.org/technical/specifications/) be found on the RISC-V website.
@@ -348,8 +353,3 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.jalr`     | rs1!=0            | TODO        |
 | `c.add`      | rd/rs1!=0, rs2!=0 | TODO        |
 | `c.swsp`     | rs2, uimm         | TODO        |
-
-## Pseudo Instructions
-| Name  | Parameters | Expansion | Description |
-| ----- | ---------- | --------- | ----------- |
-| `nop` | \<none\>   | `addi x0, x0, 0` | No operation |
