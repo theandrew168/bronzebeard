@@ -1506,29 +1506,67 @@ def parse_item(line_tokens):
 def translate_pseudo_instructions(items):
     new_items = []
     for item in items:
-        if isinstance(item, PseudoInstruction):
-            if item.name == 'nop':
-                inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
-                new_items.append(inst)
-            elif item.name == 'li':
-                rd, *imm = item.args
-                imm = parse_immediate(imm)
-                inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
-                new_items.append(inst)
-                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
-                new_items.append(inst)
-            elif item.name == 'jal':
-                imm = item.args
-                imm = parse_immediate(imm)
-                inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
-                new_items.append(inst)
-            elif item.name == 'fence':
-                inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
-                new_items.append(inst)
-            else:
-                raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
-        else:
+        # save an indent by early-exiting non PIs
+        if not isinstance(item, PseudoInstruction):
             new_items.append(item)
+            continue
+
+        if item.name == 'nop':
+            inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
+            new_items.append(inst)
+        elif item.name == 'li':
+            rd, *imm = item.args
+            imm = parse_immediate(imm)
+            inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
+            new_items.append(inst)
+            inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
+            new_items.append(inst)
+        elif item.name == 'mv':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rs, imm=Arithmetic('0'))
+            new_items.append(inst)
+        elif item.name == 'not':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'xori', rd=rd, rs1=rs, imm=Arithmetic('-1'))
+            new_items.append(inst)
+        elif item.name == 'neg':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'sub', rd=rd, rs1='x0', rs2=rs)
+            new_items.append(inst)
+        elif item.name == 'seqz':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'sltiu', rd=rd, rs1=rs, imm=Arithmetic('1'))
+            new_items.append(inst)
+        elif item.name == 'snez':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'sltu', rd=rd, rs1='x0', rs2=rs)
+            new_items.append(inst)
+        elif item.name == 'sltz':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1=rs, rs2='x0')
+            new_items.append(inst)
+        elif item.name == 'sgtz':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1='x0', rs2=rs)
+            new_items.append(inst)
+        elif item.name == 'beqz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'beq', rs1=rs, rs2='x0', imm=imm)
+            new_items.append(inst)
+
+        elif item.name == 'jal':
+            imm = item.args
+            imm = parse_immediate(imm)
+            inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
+            new_items.append(inst)
+        elif item.name == 'fence':
+            inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
+            new_items.append(inst)
+        else:
+            raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
+
     return new_items
 
 

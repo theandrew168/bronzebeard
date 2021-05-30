@@ -168,37 +168,6 @@ This would be the case IF your device's flash ROM happened to start at address z
 Flash ROM is more likely to be mapped to a higher location in memory (such as `0x08000000` on GD32 devices).
 This means that in order to obtain the actual, absolute position of `data` in memory, we need to add its position to the ROM address.
 
-## Common Patterns
-Given that the RISC-V ISA is so minimal, you end up developing small "recipes" for common operations.
-
-### Load Immediate
-Loading an integer that is outside of the range [-2048, 2047] requires two instructions.
-The first instruction loads the upper 20 bits of the value and the second loads the bottom 12.
-
-This pattern loads the hex value `0x20000000` into register `x1`.
-```
-lui x1, %hi(0x20000000)
-addi x1, x1, %lo(0x20000000)
-```
-
-### Copy Register
-This pattern copies a value from register `x1` to `x2`.
-```
-addi x2, x1, 0
-```
-
-### Bitwise Negation
-This pattern flips all 1s to 0s and 0s to 1s for register `x1`.
-```
-xori x1, x1, -1
-```
-
-### No Operation
-This pattern intentionally does nothing.
-```
-addi zero, zero, 0
-```
-
 ## Registers
 The RISC-V ISA specifies 32 general purpose registers.
 Each register is cable of a holding a single 32-bit value (or 64 bits on a 64-bit system).
@@ -227,6 +196,9 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 | `28-31` | `x28-31` | `t3-6`  | Temporary registers |
 
 ## Pseudo Instructions
+These pseudo-instructions represent additional actions and can be used like regular instructions.
+One of the early passes in the assembler will automatically expand them as described in this table.
+
 | Name  | Parameters | Expansion | Description |
 | ----- | ---------- | --------- | ----------- |
 | `nop` | \<none\>   | `addi x0, x0, 0` | No operation |
