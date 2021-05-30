@@ -23,6 +23,7 @@ def repl():
     }
     env.update(asm.REGISTERS)
 
+    # TODO: make this better when it comes to PIs (one to many, etc)
     while True:
         try:
             line = input('RV32IMAC> ')
@@ -30,7 +31,7 @@ def repl():
             item = asm.parse_item(tokens)
 
             items = [item]
-            items = asm.translate_pseudo_instructions(items)
+            items = asm.transform_pseudo_instructions(items)
             items = asm.resolve_immediates(items, env)
             items = asm.resolve_instructions(items)
 

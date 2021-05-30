@@ -970,7 +970,13 @@ class Offset(Immediate):
         return '{}({!r})'.format(type(self).__name__, self.reference)
 
     def eval(self, position, env, line):
-        dest = env[self.reference]
+        try:
+            dest = int(self.reference, base=0)
+        except ValueError:
+            if self.reference not in env:
+                raise ValueError('offset reference must be an integer or a label: {}'.format(self.reference))
+            dest = env[self.reference]
+
         return dest - position
 
 
@@ -1396,11 +1402,12 @@ def parse_item(line_tokens):
         return RTypeInstruction(line, name, rd, rs1, rs2)
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
+        print(tokens)
         # check for jalr PI
         if len(tokens) == 2:
             name, *args = tokens
             name = name.lower()
-            return PseudoInstruction(name, *args)
+            return PseudoInstruction(line, name, *args)
         if tokens[0].lower() in BASE_OFFSET_INSTRUCTIONS:
             if tokens[3] == '(':
                 name, rd, offset, _, rs1, _ = tokens
@@ -1503,7 +1510,7 @@ def parse_item(line_tokens):
         raise AssemblerError('invalid syntax', line)
 
 
-def translate_pseudo_instructions(items):
+def transform_pseudo_instructions(items):
     new_items = []
     for item in items:
         # save an indent by early-exiting non PIs
@@ -1549,25 +1556,121 @@ def translate_pseudo_instructions(items):
             rd, rs = item.args
             inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1='x0', rs2=rs)
             new_items.append(inst)
+
         elif item.name == 'beqz':
             rs, reference = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = BTypeInstruction(item.line, 'beq', rs1=rs, rs2='x0', imm=imm)
             new_items.append(inst)
+        elif item.name == 'bnez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bne', rs1=rs, rs2='x0', imm=imm)
+            new_items.append(inst)
+        elif item.name == 'blez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1='x0', rs2=rs, imm=imm)
+            new_items.append(inst)
+        elif item.name == 'bgez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1=rs, rs2='x0', imm=imm)
+            new_items.append(inst)
+        elif item.name == 'bltz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1=rs, rs2='x0', imm=imm)
+            new_items.append(inst)
+        elif item.name == 'bgtz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1='x0', rs2=rs, imm=imm)
+            new_items.append(inst)
 
+        elif item.name == 'bgt':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1=rt, rs2=rs, imm=imm)
+            new_items.append(inst)
+        elif item.name == 'ble':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1=rt, rs2=rs, imm=imm)
+            new_items.append(inst)
+        elif item.name == 'bgtu':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bltu', rs1=rt, rs2=rs, imm=imm)
+            new_items.append(inst)
+        elif item.name == 'bleu':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bgeu', rs1=rt, rs2=rs, imm=imm)
+            new_items.append(inst)
+
+        elif item.name == 'j':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=imm)
+            new_items.append(inst)
         elif item.name == 'jal':
-            imm = item.args
+            reference, = item.args
+            imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
             new_items.append(inst)
+        elif item.name == 'jr':
+            rs, = item.args
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1=rs, imm=Arithmetic('0'))
+            new_items.append(inst)
+        elif item.name == 'jalr':
+            rs, = item.args
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1=rs, imm=Arithmetic('0'))
+            new_items.append(inst)
+        elif item.name == 'ret':
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
+            new_items.append(inst)
+        elif item.name == 'call':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
+            new_items.append(inst)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm))
+            new_items.append(inst)
+        elif item.name == 'tail':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
+            new_items.append(inst)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm))
+            new_items.append(inst)
+
         elif item.name == 'fence':
             inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
             new_items.append(inst)
+
         else:
             raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
 
     return new_items
+
+
+def transform_shorthand_packs(items):
+    return items
 
 
 def resolve_aligns(items):
@@ -1885,7 +1988,8 @@ def resolve_blobs(items):
 
 # Passes:
 #   - Read -> Lex -> Parse source
-#   - Translate pseudo-instructions (expand PIs into regular instructions)
+#   - Transform pseudo-instructions (expand PIs into regular instructions)
+#   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve labels  (store label locations into env)
 #   - Resolve constants  (eval expr and update env)
@@ -1922,7 +2026,8 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = [parse_item(t) for t in tokens]
 
     # run items through each pass
-    items = translate_pseudo_instructions(items)
+    items = transform_pseudo_instructions(items)
+    items = transform_shorthand_packs(items)
     items = resolve_aligns(items)
     items, env = resolve_labels(items, env)
     items, env = resolve_constants(items, env)

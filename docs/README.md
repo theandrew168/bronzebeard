@@ -93,7 +93,7 @@ bytes 1 2 0x03 0b100 5 0x06 0b111 8
 ```
 
 ### Packed Literals
-Packed literals allow you embed packed integer / float values into your binary.
+Packed literals allow you embed packed integer values into your binary.
 They start with the `pack` keyword and are followed by a format specifier and a value.
 The format specifier is based on Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
 The value can be a literal or another expression (such as a constant or result of a modifier).
@@ -101,10 +101,20 @@ As with all other items, commas are optional.
 ```
 pack <B, 0
 pack <B, 255
+pack >h, -1234
 pack <I ADDR
-pack <f 3.14159
 pack <I %position(foo, ADDR)
 ```
+
+#### Shorthand Syntax
+In addition to the above `pack` keyword, a small set of shorthand keywords are available for embedding integer of specific widths.
+Internally, these are implemented as AST transformations to the more general `pack` syntax. 
+
+| Keyword | Width (Bytes) | Example |
+| ------- | ------------- | ------- |
+| `db`    | 1             | db 42   |
+| `dh`    | 2             | dh 4242 |
+| `dw`    | 4             | dw 0x20000000\ndw ADDR |
 
 ### Alignment
 The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.
@@ -197,7 +207,7 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 
 ## Pseudo Instructions
 These pseudo-instructions represent additional actions and can be used like regular instructions.
-One of the early passes in the assembler will automatically expand them as described in this table.
+One of the early passes in the assembler will transform them as described in this table.
 
 | Name  | Parameters | Expansion | Description |
 | ----- | ---------- | --------- | ----------- |
