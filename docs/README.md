@@ -227,6 +227,7 @@ One of the early passes in the assembler will transform them as described in thi
 | `ret`              | `jalr x0, 0(x1)`   | Return from subroutine |
 | `call imm`         | `auipc x1, %hi(imm)`<br/>`jalr x1, x1, %lo(imm)` | Call far-away subroutine |
 | `tail imm`         | `auipc x6, %hi(imm)`<br/>`jalr x0, x6, %lo(imm)` | Tail call fair-away subroutine |
+| `fence`            | `fence iorw, iorw` | Fence on all memory and I/O |
 
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
