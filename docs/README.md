@@ -202,7 +202,7 @@ One of the early passes in the assembler will transform them as described in thi
 | Instruction        | Expansion          | Description |
 | ------------------ | ------------------ | ----------- |
 | `nop`              | `addi x0, x0, 0`   | No operation |
-| `li rd, imm`       | `lui rd %hi(imm)`<br/>`addi rd rd %lo(imm)` | Load immediate |
+| `li rd, imm`       | `lui rd, %hi(imm)`<br/>`addi rd, rd, %lo(imm)` | Load immediate |
 | `mv rd, rs`        | `addi rd, rs, 0`   | Copy register |
 | `not rd, rs`       | `xori rd, rs, -1`  | One's complement |
 | `neg rd, rs`       | `sub rd, x0, rs`   | Two's complement |
@@ -225,8 +225,8 @@ One of the early passes in the assembler will transform them as described in thi
 | `jr rs`            | `jalr x0, 0(rs)`   | Jump register |
 | `jalr rs`          | `jalr x1, 0(rs)`   | Jump and link register |
 | `ret`              | `jalr x0, 0(x1)`   | Return from subroutine |
-| `call imm`         | TODO               | Call far-away subroutine |
-| `tail imm`         | TODO               | Tail call fair-away subroutine |
+| `call imm`         | `auipc x1, %hi(imm)`<br/>`jalr x1, x1, %lo(imm)` | Call far-away subroutine |
+| `tail imm`         | `auipc x6, %hi(imm)`<br/>`jalr x0, x6, %lo(imm)` | Tail call fair-away subroutine |
 
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
