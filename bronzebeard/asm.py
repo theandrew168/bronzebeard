@@ -1669,10 +1669,6 @@ def transform_pseudo_instructions(items):
     return new_items
 
 
-def transform_shorthand_packs(items):
-    return items
-
-
 def resolve_aligns(items):
     position = 0
     new_items = []
@@ -1989,7 +1985,6 @@ def resolve_blobs(items):
 # Passes:
 #   - Read -> Lex -> Parse source
 #   - Transform pseudo-instructions (expand PIs into regular instructions)
-#   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve labels  (store label locations into env)
 #   - Resolve constants  (eval expr and update env)
@@ -2027,7 +2022,6 @@ def assemble(path_or_source, compress=False, verbose=False):
 
     # run items through each pass
     items = transform_pseudo_instructions(items)
-    items = transform_shorthand_packs(items)
     items = resolve_aligns(items)
     items, env = resolve_labels(items, env)
     items, env = resolve_constants(items, env)

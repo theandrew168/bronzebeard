@@ -1387,24 +1387,6 @@ def test_pseudo_instructions(pseudo, transformed):
     assert pseudo_bin == transformed_bin
 
 
-#@pytest.mark.parametrize(
-#    'shorthand,        transformed', [
-#    ('db  0',          'pack <B 0'),
-#    ('db  255',        'pack <B 255'),
-#    ('db -128',        'pack <b -128'),
-#    ('dh  0',          'pack <H 0'),
-#    ('dh  0xffff',     'pack <H 0xffff'),
-#    ('dh -0x7fff',     'pack <h -0x7fff'),
-#    ('dw  0',          'pack <I 0'),
-#    ('dw  0xffffffff', 'pack <I 0xffffffff'),
-#    ('dw -0x7fffffff', 'pack <i 0x7fffffff'),
-#])
-#def test_shorthand_packs(shorthand, transformed):
-#    shorthand_bin = asm.assemble(shorthand)
-#    transformed_bin = asm.assemble(transformed)
-#    assert shorthand_bin == transformed_bin
-
-
 def test_alternate_offset_syntax():
     source = """
     jalr x0, x1, 0

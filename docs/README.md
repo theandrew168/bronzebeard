@@ -106,16 +106,6 @@ pack <I ADDR
 pack <I %position(foo, ADDR)
 ```
 
-#### Shorthand Syntax
-In addition to the above `pack` keyword, a small set of shorthand keywords are available for embedding integer of specific widths.
-Internally, these are implemented as AST transformations to the more general `pack` syntax. 
-
-| Keyword | Width (Bytes) | Example         |
-| ------- | ------------- | --------------- |
-| `db`    | 1             | `db 0x20`       |
-| `dh`    | 2             | `dh 0x2000`     |
-| `dw`    | 4             | `dw 0x20000000` |
-
 ### Alignment
 The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.
 This alignment is achieved by padding the binary with `0x00` bytes until it aligns with the bounary.
