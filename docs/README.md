@@ -112,9 +112,9 @@ Internally, these are implemented as AST transformations to the more general `pa
 
 | Keyword | Width (Bytes) | Example |
 | ------- | ------------- | ------- |
-| `db`    | 1             | db 42   |
-| `dh`    | 2             | dh 4242 |
-| `dw`    | 4             | dw 0x20000000\ndw ADDR |
+| `db`    | 1             | db 0x20 |
+| `dh`    | 2             | dh 0x2000 |
+| `dw`    | 4             | dw 0x20000000 |
 
 ### Alignment
 The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.
@@ -209,69 +209,94 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 These pseudo-instructions represent additional actions and can be used like regular instructions.
 One of the early passes in the assembler will transform them as described in this table.
 
-| Name  | Parameters | Expansion | Description |
-| ----- | ---------- | --------- | ----------- |
-| `nop` | \<none\>   | `addi x0, x0, 0` | No operation |
+| Instruction        | Expansion          | Description |
+| ------------------ | ------------------ | ----------- |
+| `nop`              | `addi x0, x0, 0`   | No operation |
+| `li rd, imm`       | TODO               | Load immediate |
+| `mv rd, rs`        | `addi rd, rs, 0`   | Copy register |
+| `not rd, rs`       | `xori rd, rs, -1`  | One's complement |
+| `neg rd, rs`       | `sub rd, x0, rs`   | Two's complement |
+| `seqz rd, rs`      | `sltiu rd, rs, 1`  | Set if == zero |
+| `snez rd, rs`      | `sltu rd, x0, rs`  | Set if != zero |
+| `sltz rd, rs`      | `slt rd, rs, x0`   | Set if < zero |
+| `sgtz rd, rs`      | `slt rd, x0, rs`   | Set if > zero |
+| `beqz rs, imm`     | `beq rs, x0, imm`  | Branch if == zero |
+| `bnez rs, imm`     | `bne rs, x0, imm`  | Branch if != zero |
+| `blez rs, imm`     | `bge x0, rs, imm`  | Branch if <= zero |
+| `bgez rs, imm`     | `bge rs, x0, imm`  | Branch if >= zero |
+| `bltz rs, imm`     | `blt rs, x0, imm`  | Branch if < zero |
+| `bgtz rs, imm`     | `blt x0, rs, imm`  | Branch if > zero |
+| `bgt rs, rt, imm`  | `blt rt, rs, imm`  | Branch if > |
+| `ble rs, rt, imm`  | `bge rt, rs, imm`  | Branch if <= |
+| `bgtu rs, rt, imm` | `bltu rt, rs, imm` | Branch if >, unsigned |
+| `bleu rs, rt, imm` | `bgeu rt, rs, imm` | Branch if <=, unsigned |
+| `j imm`            | `jal x0, imm`      | Jump |
+| `jal imm`          | `jal x1, imm`      | Jump and link |
+| `jr rs`            | `jalr x0, 0(rs)`   | Jump register |
+| `jalr rs`          | `jalr x1, 0(rs)`   | Jump and link register |
+| `ret`              | `jalr x0, 0(x1)`   | Return from subroutine |
+| `call imm`         | TODO               | Call far-away subroutine |
+| `tail imm`         | TODO               | Tail call fair-away subroutine |
 
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
 Full [specifications](https://riscv.org/technical/specifications/) be found on the RISC-V website.
 
 ### RV32I Base Instruction Set
-| Name     | Parameters    | Description |
-| -------- | ------------- | ----------- |
-| `lui`    | rd, imm       | load upper 20 bits of `rd` with 20-bit `imm`, fill lower 12 bits with zeroes |
-| `auipc`  | rd, imm       | load upper 20 bits of `pc` with 20-bit `imm`, fill lower 12 bits with zeroes, add this offset to address of this instruction and store into `rd` |
-| `jal`    | rd, imm       | jump offset 20-bit `imm` and store return address into `rd` |
-| `jalr`   | rd, rs1, imm  | jump offset 12-bit `imm` plus `rs1` and store return addres into `rd` |
-| `beq`    | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is equal to `rs2` |
-| `bne`    | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is not equal to `rs2` |
-| `blt`    | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is less than `rs2` |
-| `bge`    | rs1, rs2, imm | jump offset 12-bit `imm` if `rs1` is greater than or equal to `rs2` |
-| `bltu`   | rs1, rs2, imm | same as `blt` but treat values as unsigned numbers |
-| `bgeu`   | rs1, rs2, imm | same as `bge` but treat values as unsigned numbers |
-| `lb`     | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
-| `lh`     | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
-| `lw`     | rd, rs1, imm  | load 32-bit value from addr in `rs1` plus 12-bit `imm` into `rd` |
-| `lbu`    | rd, rs1, imm  | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
-| `lhu`    | rd, rs1, imm  | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
-| `sb`     | rs1, rs2, imm | store 8-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
-| `sh`     | rs1, rs2, imm | store 16-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
-| `sw`     | rs1, rs2, imm | store 32-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
-| `addi`   | rd, rs1, imm  | add 12-bit `imm` to `rs1` and store into `rd` |
-| `slti`   | rd, rs1, imm  | store 1 into `rd` if `rs1` is less than 12-bit `imm` else store 0|
-| `sltiu`  | rd, rs1, imm  | same as `slti` but treat values as unsigned numbers |
-| `xori`   | rd, rs1, imm  | bitwise XOR 12-bit `imm` with `rs1` and store into `rd` |
-| `ori`    | rd, rs1, imm  | bitwise OR 12-bit `imm` with `rs1` and store into `rd` |
-| `andi`   | rd, rs1, imm  | bitwise AND 12-bit `imm` with `rs1` and store into `rd` |
-| `slli`   | rd, rs1, amt  | shift `rs1` left by `amt` bits and store into `rd` |
-| `srli`   | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd` (shift in zeroes) |
-| `srai`   | rd, rs1, amt  | shift `rs1` right by `amt` bits and store into `rd` (shift in sign bit) |
-| `add`    | rd, rs1, rs2  | add `rs2` to `rs1` and store into `rd` |
-| `sub`    | rd, rs1, rs2  | subtract `rs2` from `rs1` and store into `rd` |
-| `sll`    | rd, rs1, rs2  | shift `rs1` left by `rs2` bits and store into `rd` |
-| `slt`    | rd, rs1, rs2  | store 1 into `rd` if `rs1` is less than `rs2` else store 0 |
-| `sltu`   | rd, rs1, rs2  | same as `slt` but treat values as unsigned numbers |
-| `xor`    | rd, rs1, rs2  | bitwise XOR `rs2` with `rs1` and store into `rd` |
-| `srl`    | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in zeroes) |
-| `sra`    | rd, rs1, rs2  | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
-| `or`     | rd, rs1, rs2  | bitwise OR `rs2` with `rs1` and store into `rd` |
-| `and`    | rd, rs1, rs2  | bitwise AND `rs2` with `rs1` and store into `rd` |
-| `fence`  | succ, pred    | TODO |
-| `ecall`  | \<none\>      | TODO |
-| `ebreak` | \<none\>      | TODO |
+| Instruction          | Description |
+| -------------------- | ----------- |
+| `lui rd, imm`        | load upper 20 bits of `rd` with 20-bit `imm`, fill lower 12 bits with zeroes |
+| `auipc rd, imm`      | load upper 20 bits of `pc` with 20-bit `imm`, fill lower 12 bits with zeroes, add this offset to address of this instruction and store into `rd` |
+| `jal rd, imm`        | jump offset 20-bit `imm` and store return address into `rd` |
+| `jalr rd, rs1, imm`  | jump offset 12-bit `imm` plus `rs1` and store return addres into `rd` |
+| `beq rs1, rs2, imm`  | jump offset 12-bit `imm` if `rs1` is equal to `rs2` |
+| `bne rs1, rs2, imm`  | jump offset 12-bit `imm` if `rs1` is not equal to `rs2` |
+| `blt rs1, rs2, imm`  | jump offset 12-bit `imm` if `rs1` is less than `rs2` |
+| `bge rs1, rs2, imm`  | jump offset 12-bit `imm` if `rs1` is greater than or equal to `rs2` |
+| `bltu rs1, rs2, imm` | same as `blt` but treat values as unsigned numbers |
+| `bgeu rs1, rs2, imm` | same as `bge` but treat values as unsigned numbers |
+| `lb rd, rs1, imm`    | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
+| `lh rd, rs1, imm`    | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (sign extend) |
+| `lw rd, rs1, imm`    | load 32-bit value from addr in `rs1` plus 12-bit `imm` into `rd` |
+| `lbu rd, rs1, imm`   | load 8-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
+| `lhu rd, rs1, imm`   | load 16-bit value from addr in `rs1` plus 12-bit `imm` into `rd` (zero extend) |
+| `sb rs1, rs2, imm`   | store 8-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
+| `sh rs1, rs2, imm`   | store 16-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
+| `sw rs1, rs2, imm`   | store 32-bit value from `rs2` into addr in `rs1` plus 12-bit `imm` |
+| `addi rd, rs1, imm`  | add 12-bit `imm` to `rs1` and store into `rd` |
+| `slti rd, rs1, imm`  | store 1 into `rd` if `rs1` is less than 12-bit `imm` else store 0|
+| `sltiu rd, rs1, imm` | same as `slti` but treat values as unsigned numbers |
+| `xori rd, rs1, imm`  | bitwise XOR 12-bit `imm` with `rs1` and store into `rd` |
+| `ori rd, rs1, imm`   | bitwise OR 12-bit `imm` with `rs1` and store into `rd` |
+| `andi rd, rs1, imm`  | bitwise AND 12-bit `imm` with `rs1` and store into `rd` |
+| `slli rd, rs1, amt`  | shift `rs1` left by `amt` bits and store into `rd` |
+| `srli rd, rs1, amt`  | shift `rs1` right by `amt` bits and store into `rd` (shift in zeroes) |
+| `srai rd, rs1, amt`  | shift `rs1` right by `amt` bits and store into `rd` (shift in sign bit) |
+| `add rd, rs1, rs2`   | add `rs2` to `rs1` and store into `rd` |
+| `sub rd, rs1, rs2`   | subtract `rs2` from `rs1` and store into `rd` |
+| `sll rd, rs1, rs2`   | shift `rs1` left by `rs2` bits and store into `rd` |
+| `slt rd, rs1, rs2`   | store 1 into `rd` if `rs1` is less than `rs2` else store 0 |
+| `sltu rd, rs1, rs2`  | same as `slt` but treat values as unsigned numbers |
+| `xor rd, rs1, rs2`   | bitwise XOR `rs2` with `rs1` and store into `rd` |
+| `srl rd, rs1, rs2`   | shift `rs1` right by `rs2` bits and store into `rd` (shift in zeroes) |
+| `sra rd, rs1, rs2`   | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
+| `or rd, rs1, rs2`    | bitwise OR `rs2` with `rs1` and store into `rd` |
+| `and rd, rs1, rs2`   | bitwise AND `rs2` with `rs1` and store into `rd` |
+| `fence succ, pred`   | TODO |
+| `ecall`              | TODO |
+| `ebreak`             | TODO |
 
 ### RV32M Standard Extension
-| Name     | Parameters   | Description |
-| -------- | ------------ | ----------- |
-| `mul`    | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (signed) and store lower 32 bits into `rd` |
-| `mulh`   | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (signed) and store upper 32 bits into `rd` |
-| `mulhsu` | rd, rs1, rs2 | multiply `rs1` (signed) by `rs2` (unsigned) and store upper 32 bits into `rd` |
-| `mulhu`  | rd, rs1, rs2 | multiply `rs1` (unsigned) by `rs2` (unsigned) and store upper 32 bits into `rd` |
-| `div`    | rd, rs1, rs2 | divide (signed) `rs1` by `rs2` and store into `rd` |
-| `divu`   | rd, rs1, rs2 | divide (unsigned) `rs1` by `rs2` and store into `rd` |
-| `rem`    | rd, rs1, rs2 | remainder (signed) of `rs1` divided by `rs2` and store into `rd` |
-| `remu`   | rd, rs1, rs2 | remainder (unsigned) of `rs1` divided by `rs2` and store into `rd` |
+| Instruction           | Description |
+| --------------------- | ----------- |
+| `mul rd, rs1, rs2`    | multiply `rs1` (signed) by `rs2` (signed) and store lower 32 bits into `rd` |
+| `mulh rd, rs1, rs2`   | multiply `rs1` (signed) by `rs2` (signed) and store upper 32 bits into `rd` |
+| `mulhsu rd, rs1, rs2` | multiply `rs1` (signed) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `mulhu rd, rs1, rs2`  | multiply `rs1` (unsigned) by `rs2` (unsigned) and store upper 32 bits into `rd` |
+| `div rd, rs1, rs2`    | divide (signed) `rs1` by `rs2` and store into `rd` |
+| `divu rd, rs1, rs2`   | divide (unsigned) `rs1` by `rs2` and store into `rd` |
+| `rem rd, rs1, rs2`    | remainder (signed) of `rs1` divided by `rs2` and store into `rd` |
+| `remu rd, rs1, rs2`   | remainder (unsigned) of `rs1` divided by `rs2` and store into `rd` |
 
 ### RV32A Standard Extension
 All of the following atomic instructions also accept two additional parameters: `aq` and `rl`.
@@ -292,46 +317,46 @@ lr.w t0 t1 0 1  # aq=0, rl=1
 lr.w t0 t1 1 0  # aq=1, rl=0
 ```
  
-| Name        | Parameters   | Description |
-| ----------- | ------------ | ----------- |
-| `lr.w`      | rd, rs1      | TODO        |
-| `sc.w`      | rd, rs1, rs2 | TODO        |
-| `amoswap.w` | rd, rs1, rs2 | TODO        |
-| `amoadd.w`  | rd, rs1, rs2 | TODO        |
-| `amoxor.w`  | rd, rs1, rs2 | TODO        |
-| `amoand.w`  | rd, rs1, rs2 | TODO        |
-| `amoor.w`   | rd, rs1, rs2 | TODO        |
-| `amomin.w`  | rd, rs1, rs2 | TODO        |
-| `amomax.w`  | rd, rs1, rs2 | TODO        |
-| `amominu.w` | rd, rs1, rs2 | TODO        |
-| `amomaxu.w` | rd, rs1, rs2 | TODO        |
+| Instruction              | Description |
+| ------------------------ | ----------- |
+| `lr.w rd, rs1`           | TODO        |
+| `sc.w rd, rs1, rs2`      | TODO        |
+| `amoswap.w rd, rs1, rs2` | TODO        |
+| `amoadd.w rd, rs1, rs2`  | TODO        |
+| `amoxor.w rd, rs1, rs2`  | TODO        |
+| `amoand.w rd, rs1, rs2`  | TODO        |
+| `amoor.w rd, rs1, rs2`   | TODO        |
+| `amomin.w rd, rs1, rs2`  | TODO        |
+| `amomax.w rd, rs1, rs2`  | TODO        |
+| `amominu.w rd, rs1, rs2` | TODO        |
+| `amomaxu.w rd, rs1, rs2` | TODO        |
 
 ### RV32C Standard Extension
-| Name         | Parameters        | Description |
-| ------------ | ----------------- | ----------- |
-| `c.addi4spn` | rd', nzuimm       | TODO        |
-| `c.lw`       | rd', rs1', uimm   | TODO        |
-| `c.sw`       | rs1', rs2', uimm  | TODO        |
-| `c.nop`      | \<none\>          | TODO        |
-| `c.addi`     | rd/rs1!=0, nzimm  | TODO        |
-| `c.jal`      | imm               | TODO        |
-| `c.li`       | rd!=0, imm        | TODO        |
-| `c.addi16sp` | nzimm             | TODO        |
-| `c.lui`      | rd!={0,2}, nzimm  | TODO        |
-| `c.srli`     | rd'/rs1', nzuimm  | TODO        |
-| `c.srai`     | rd'/rs1', nzuimm  | TODO        |
-| `c.andi`     | rd'/rs1', imm     | TODO        |
-| `c.sub`      | rd'/rs1', rs2'    | TODO        |
-| `c.xor`      | rd'/rs1', rs2'    | TODO        |
-| `c.or`       | rd'/rs1', rs2'    | TODO        |
-| `c.and`      | rd'/rs1', rs2'    | TODO        |
-| `c.j`        | imm               | TODO        |
-| `c.beqz`     | rs1', imm         | TODO        |
-| `c.bnez`     | rs1', imm         | TODO        |
-| `c.slli`     | rd/rs1!=0, nzuimm | TODO        |
-| `c.lwsp`     | rd!=0, uimm       | TODO        |
-| `c.jr`       | rs1!=0            | TODO        |
-| `c.mv`       | rd!=0, rs2!=0     | TODO        |
-| `c.jalr`     | rs1!=0            | TODO        |
-| `c.add`      | rd/rs1!=0, rs2!=0 | TODO        |
-| `c.swsp`     | rs2, uimm         | TODO        |
+| Instruction                | Description |
+| -------------------------- | ----------- |
+| `c.addi4spn rd', nzuimm`   | TODO        |
+| `c.lw rd', rs1', uimm`     | TODO        |
+| `c.sw rs1', rs2', uimm`    | TODO        |
+| `c.nop`                    | TODO        |
+| `c.addi rd/rs1!=0, nzimm`  | TODO        |
+| `c.jal imm`                | TODO        |
+| `c.li rd!=0, imm`          | TODO        |
+| `c.addi16sp nzimm`         | TODO        |
+| `c.lui rd!={0,2}, nzimm`   | TODO        |
+| `c.srli rd'/rs1', nzuimm`  | TODO        |
+| `c.srai rd'/rs1', nzuimm`  | TODO        |
+| `c.andi rd'/rs1', imm`     | TODO        |
+| `c.sub rd'/rs1', rs2'`     | TODO        |
+| `c.xor rd'/rs1', rs2'`     | TODO        |
+| `c.or rd'/rs1', rs2'`      | TODO        |
+| `c.and rd'/rs1', rs2'`     | TODO        |
+| `c.j imm`                  | TODO        |
+| `c.beqz rs1', imm`         | TODO        |
+| `c.bnez rs1', imm`         | TODO        |
+| `c.slli rd/rs1!=0, nzuimm` | TODO        |
+| `c.lwsp rd!=0, uimm`       | TODO        |
+| `c.jr rs1!=0`              | TODO        |
+| `c.mv rd!=0, rs2!=0`       | TODO        |
+| `c.jalr rs1!=0`            | TODO        |
+| `c.add rd/rs1!=0, rs2!=0`  | TODO        |
+| `c.swsp rs2, uimm`         | TODO        |
