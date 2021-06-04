@@ -1375,9 +1375,8 @@ def test_assembler_basic_uppercase():
     ('jr t0',            'jalr x0 0(t0)'),
     ('jalr t0',          'jalr x1 0(t0)'),
     ('ret',              'jalr x0 0(x1)'),
-# TODO: fix refs, they can have Hi/Lo mods! how will that work?
-#    ('call 0x20000000',  'auipc x1 %hi(0x20000000)\n jalr x1 x1 %lo(0x20000000)'),
-#    ('tail 0x20000000',  'auipc x6 %hi(0x20000000)\n jalr x0 x6 %lo(0x20000000)'),
+    ('call 0x20000000',  'auipc x1 %hi(0x20000000)\n jalr x1 x1 %lo(0x20000000)'),
+    ('tail 0x20000000',  'auipc x6 %hi(0x20000000)\n jalr x0 x6 %lo(0x20000000)'),
 
     ('fence',            'fence 0b1111 0b1111'),
 ])

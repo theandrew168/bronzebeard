@@ -821,19 +821,6 @@ INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CBI_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
 
-# alternate offset syntax applies to insts w/ base reg + offset imm
-BASE_OFFSET_INSTRUCTIONS = {
-    'jalr',
-    'lb',
-    'lh',
-    'lw',
-    'lbu',
-    'lhu',
-    'sb',
-    'sh',
-    'sw',
-}
-
 PSEUDO_INSTRUCTIONS = {
     'nop',
     'li',
@@ -867,6 +854,36 @@ PSEUDO_INSTRUCTIONS = {
 
     'fence',
 }
+
+# alternate offset syntax applies to insts w/ base reg + offset imm
+BASE_OFFSET_INSTRUCTIONS = {
+    'jalr',
+    'lb',
+    'lh',
+    'lw',
+    'lbu',
+    'lhu',
+    'sb',
+    'sh',
+    'sw',
+}
+
+KEYWORDS = {
+    'string',
+    'bytes',
+    'pack',
+    'align',
+}
+KEYWORDS.update(INSTRUCTIONS.keys())
+KEYWORDS.update(PSEUDO_INSTRUCTIONS)
+
+
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except:
+        return False
 
 
 def sign_extend(value, bits):
@@ -970,13 +987,7 @@ class Offset(Immediate):
         return '{}({!r})'.format(type(self).__name__, self.reference)
 
     def eval(self, position, env, line):
-        try:
-            dest = int(self.reference, base=0)
-        except ValueError:
-            if self.reference not in env:
-                raise ValueError('offset reference must be an integer or a label: {}'.format(self.reference))
-            dest = env[self.reference]
-
+        dest = env[self.reference]
         return dest - position
 
 
@@ -1402,17 +1413,13 @@ def parse_item(line_tokens):
         return RTypeInstruction(line, name, rd, rs1, rs2)
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
-        print(tokens)
         # check for jalr PI
         if len(tokens) == 2:
             name, *args = tokens
             name = name.lower()
             return PseudoInstruction(line, name, *args)
-        if tokens[0].lower() in BASE_OFFSET_INSTRUCTIONS:
-            if tokens[3] == '(':
-                name, rd, offset, _, rs1, _ = tokens
-            else:
-                name, rd, rs1, offset = tokens
+        if tokens[0].lower() in BASE_OFFSET_INSTRUCTIONS and tokens[3] == '(':
+            name, rd, offset, _, rs1, _ = tokens
             imm = [offset]
         else:
             name, rd, rs1, *imm = tokens
@@ -1428,10 +1435,10 @@ def parse_item(line_tokens):
     elif head in S_TYPE_INSTRUCTIONS:
         if tokens[3] == '(':
             name, rs2, offset, _, rs1, _ = tokens
+            imm = [offset]
         else:
-            name, rs1, rs2, offset = tokens
+            name, rs1, rs2, *imm = tokens
         name = name.lower()
-        imm = [offset]
         imm = parse_immediate(imm)
         return STypeInstruction(line, name, rs1, rs2, imm)
     # b-type instructions
@@ -1440,8 +1447,11 @@ def parse_item(line_tokens):
             raise AssemblerError('b-type instructions require 3 args', line)
         name, rs1, rs2, reference = tokens
         name = name.lower()
-        # behavior is "offset" for branch instructions
-        imm = ['%offset', reference]
+        if is_int(reference):
+            imm = [reference]
+        else:
+            # behavior is "offset" for branches to labels
+            imm = ['%offset', reference]
         imm = parse_immediate(imm)
         return BTypeInstruction(line, name, rs1, rs2, imm)
     # u-type instructions
@@ -1461,8 +1471,11 @@ def parse_item(line_tokens):
             raise AssemblerError('j-type instructions require 1 or 2 args', line)
         name, rd, reference = tokens
         name = name.lower()
-        # ensure behavior is "offset" for branch instructions
-        imm = ['%offset', reference]
+        if is_int(reference):
+            imm = [reference]
+        else:
+            # behavior is "offset" for jumps to labels
+            imm = ['%offset', reference]
         imm = parse_immediate(imm)
         return JTypeInstruction(line, name, rd, imm)
     # fence instructions
@@ -1643,17 +1656,13 @@ def transform_pseudo_instructions(items):
             inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
             new_items.append(inst)
         elif item.name == 'call':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(item.args)
             inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
             new_items.append(inst)
             inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm))
             new_items.append(inst)
         elif item.name == 'tail':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(item.args)
             inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
             new_items.append(inst)
             inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm))
