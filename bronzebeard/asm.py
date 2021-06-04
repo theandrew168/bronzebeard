@@ -1316,10 +1316,23 @@ def read_lines(path_or_source):
     return lines
 
 
+RE_STRING = re.compile(r'\s*(string) (.*)')
+
 def lex_tokens(line):
-    # simpliy lexing a single string
+    # simplify lexing a single string
     if type(line) == str:
         line = Line('<string>', 1, line)
+
+    # check for string literals (needs custom lexing)
+    match = RE_STRING.match(line.contents)
+    if match is not None:
+        name = match.group(1)
+        string = match.group(2)
+        string = string.encode('utf-8').decode('unicode_escape')
+        tokens = [name, string]
+        print(tokens)
+        return LineTokens(line, tokens)
+
     # strip comments
     contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
     # pad parens before split

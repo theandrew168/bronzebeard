@@ -72,17 +72,19 @@ You can think of these like simple, builtin functions:
 
 ### String Literals
 String literals allow you to embed UTF-8 strings into your binary.
-They start with the `string` keyword and are followed by one or words.
+They start with the `string` keyword (then a single space) and are followed by any number of characters (til end of line).
+This item is lexed in a special way such that the literal string content remains unchanged.
+This means that spaces, newlines, quotes, and comments are all preserved within literal value.
+The regex used for this is roughly: `string (.*)`.
 ```
+# note that any comments after these lines would be included in the string
 string hello
-string world
-string hello world
-string hello   world  # same as above
+string "world"
+string "hello world"
+string hello  ##  world
+string hello\nworld
+string   hello\\nworld
 ```
-**NOTE:** Since the lexer compresses whitespace, any gap between words will be reduced to a single space.
-The lexer also strips any leading or trailing whitespace from the sequence of words.
-Be careful with this!
-If you have a need for leading / trailing / duplicate whitespace, consider using a `bytes` literal instead.
 
 ### Bytes Literals
 Bytes literals allow you to embed arbitrary byte sequences into your binary.

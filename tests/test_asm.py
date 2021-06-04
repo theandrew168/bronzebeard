@@ -1287,24 +1287,24 @@ def test_c_swsp(rs2, imm, code):
 
 
 def test_read_assembly():
-    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi(t2, zero, 3)\n\n\n'
+    source = 'addi t0 zero 1\naddi t1, zero, 2\naddi t2, zero, 3'
     lines = asm.read_lines(source)
     assert len(lines) == 3
-    assert lines[1].contents == 'addi t1, zero, 2'
+    assert lines[1].contents.strip() == 'addi t1, zero, 2'
     for i, line in enumerate(lines, start=1):
         assert line.file == '<string>'
         assert line.number == i
 
 
 def test_lex_assembly():
-    line = 'addi t0 zero 1'
+    line = r'addi t0 zero 1'
     tokens = asm.lex_tokens(line)
     assert len(tokens) == 4
     assert tokens.tokens == ['addi', 't0', 'zero', '1']
 
 
 def test_parse_assembly():
-    line = 'addi t0 zero 1'
+    line = r'addi t0 zero 1'
     tokens = asm.lex_tokens(line)
     item = asm.parse_item(tokens)
     assert isinstance(item, asm.ITypeInstruction)
@@ -1314,7 +1314,7 @@ def test_parse_assembly():
 
 
 def test_assembler_basic():
-    source = """
+    source = r"""
     addi t0 zero 1
     addi t1, zero, 2
     addi t2, zero, 3
@@ -1330,7 +1330,7 @@ def test_assembler_basic():
 
 
 def test_assembler_basic_uppercase():
-    source = """
+    source = r"""
     ADDI t0 zero 1
     ADDI t1, zero, 2
     ADDI t2, zero, 3
@@ -1387,7 +1387,7 @@ def test_pseudo_instructions(pseudo, transformed):
 
 
 def test_alternate_offset_syntax():
-    source = """
+    source = r"""
     jalr x0, x1, 0
     jalr x0, 0(x1)
     lw t3, sp, 8
@@ -1408,7 +1408,7 @@ def test_alternate_offset_syntax():
 
 
 def test_assembler_constants():
-    source = """
+    source = r"""
     FOO = 42
     BAR = FOO * 2
     BAZ = BAR >> 1 & 0b11111
@@ -1426,7 +1426,7 @@ def test_assembler_constants():
 
 
 def test_assembler_labels_and_jumps():
-    source = """
+    source = r"""
     start:
         addi t0 zero 42
         jal zero end
@@ -1451,19 +1451,21 @@ def test_assembler_labels_and_jumps():
 
 
 def test_assembler_string():
-    source = """
+    source = r"""
     string hello
-    string world
-    string hello world
-    string hello   world
+    string "world"
+    string "hello world"
+    string hello  ##  world
+    string hello\nworld
+    string   hello\\nworld
     """
     binary = asm.assemble(source)
-    target = b'helloworldhello worldhello world'
+    target = b'hello"world""hello world"hello  ##  worldhello\nworld  hello\\nworld'
     assert binary == target
 
 
 def test_assembler_bytes():
-    source = """
+    source = r"""
     bytes 1 2 0x03 0b100 5 0x06 0b111 8
     """
     binary = asm.assemble(source)
@@ -1472,7 +1474,7 @@ def test_assembler_bytes():
 
 
 def test_assembler_pack():
-    source = """
+    source = r"""
     ADDR = 0x20000000
     pack <B 0
     pack <B 255
@@ -1490,7 +1492,7 @@ def test_assembler_pack():
 
 
 def test_assembler_align():
-    source = """
+    source = r"""
     addi zero zero 0
     pack <B 42
     align 4
@@ -1506,7 +1508,7 @@ def test_assembler_align():
 
 
 def test_assembler_modifiers():
-    source = """
+    source = r"""
     ADDR = 0x20000000
 
     addi zero zero 0
@@ -1538,7 +1540,7 @@ def test_assembler_modifiers():
 
 
 def test_assembler_atomics():
-    source = """
+    source = r"""
     lr.w zero zero
     sc.w zero zero zero 0 0
     sc.w zero zero zero 1 0
