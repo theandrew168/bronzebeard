@@ -75,7 +75,8 @@ String literals allow you to embed UTF-8 strings into your binary.
 They start with the `string` keyword (then a single space) and are followed by any number of characters (til end of line).
 This item is lexed in a special way such that the literal string content remains unchanged.
 This means that spaces, newlines, quotes, and comments are all preserved within literal value.
-The regex used for this is roughly: `string (.*)`.
+
+The regex used for lexing these items is roughly: `string (.*)`.
 ```
 # note that any comments after these lines would be included in the string
 string hello
