@@ -43,9 +43,9 @@ def repl():
             print('binary: {:032b}'.format(code))
         except (EOFError, KeyboardInterrupt):
             break
-#        except Exception as e:
-#            print(e)
-#            continue
+        except Exception as e:
+            print(e)
+            continue
 
 
 if __name__ == '__main__':

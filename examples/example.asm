@@ -16,11 +16,13 @@ middle:
 end:
     jal zero, middle
 
-# string literals
+# string literals (regex: "string (.*)")
 string hello
-string world
-string hello world
-string hello   world  # same as above, whitespace gets compressed by the lexer
+string "world"
+string "hello world"
+string hello  ##  world
+string hello\nworld
+string   hello\\nworld
 
 # bytes literals
 bytes 1 2 0x03 0b100 5 0x06 0b111 8

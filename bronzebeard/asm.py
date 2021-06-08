@@ -868,6 +868,12 @@ BASE_OFFSET_INSTRUCTIONS = {
     'sw',
 }
 
+SHORTHAND_PACK_NAMES = {
+    'db',
+    'dh',
+    'dw',
+}
+
 KEYWORDS = {
     'string',
     'bytes',
@@ -876,6 +882,7 @@ KEYWORDS = {
 }
 KEYWORDS.update(INSTRUCTIONS.keys())
 KEYWORDS.update(PSEUDO_INSTRUCTIONS)
+KEYWORDS.update(SHORTHAND_PACK_NAMES)
 
 
 def is_int(value):
@@ -1088,15 +1095,15 @@ class Bytes(Item):
 
 class String(Item):
 
-    def __init__(self, line, values):
+    def __init__(self, line, value):
         super().__init__(line)
-        self.values = values
+        self.value = value
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.values)
+        return '{}({!r})'.format(type(self).__name__, self.value)
 
     def size(self, position):
-        return len(' '.join(self.values))
+        return len(self.value.encode('utf-8'))
 
 
 class Pack(Item):
@@ -1111,6 +1118,25 @@ class Pack(Item):
 
     def size(self, position):
         return struct.calcsize(self.fmt)
+
+
+class ShorthandPack(Item):
+
+    def __init__(self, line, name, imm):
+        super().__init__(line)
+        self.name = name
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}(name={!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
+
+    def size(self, position):
+        sizes = {
+            'db': 1,
+            'dh': 2,
+            'dw': 4,
+        }
+        return sizes[self.name]
 
 
 class Blob(Item):
@@ -1316,7 +1342,7 @@ def read_lines(path_or_source):
     return lines
 
 
-RE_STRING = re.compile(r'\s*(string) (.*)')
+RE_STRING = re.compile(r'\s*string (.*)')
 
 def lex_tokens(line):
     # simplify lexing a single string
@@ -1326,11 +1352,9 @@ def lex_tokens(line):
     # check for string literals (needs custom lexing)
     match = RE_STRING.match(line.contents)
     if match is not None:
-        name = match.group(1)
-        string = match.group(2)
-        string = string.encode('utf-8').decode('unicode_escape')
-        tokens = [name, string]
-        print(tokens)
+        value = match.group(1)
+        value = value.encode('utf-8').decode('unicode_escape')
+        tokens = ['string', value]
         return LineTokens(line, tokens)
 
     # strip comments
@@ -1409,14 +1433,19 @@ def parse_item(line_tokens):
         _, fmt, *imm = tokens
         imm = parse_immediate(imm)
         return Pack(line, fmt, imm)
+    # shorthand packs
+    elif head in SHORTHAND_PACK_NAMES:
+        name, *imm = tokens
+        imm = parse_immediate(imm)
+        return ShorthandPack(line, name, imm)
     # bytes
     elif head == 'bytes':
         _, *values = tokens
         return Bytes(line, values)
     # strings
     elif head == 'string':
-        _, *values = tokens
-        return String(line, values)
+        _, value = tokens
+        return String(line, value)
     # r-type instructions
     elif head in R_TYPE_INSTRUCTIONS:
         if len(tokens) != 4:
@@ -1534,6 +1563,7 @@ def parse_item(line_tokens):
         return PseudoInstruction(line, name, *args)
     else:
         raise AssemblerError('invalid syntax', line)
+        
 
 
 def transform_pseudo_instructions(items):
@@ -1695,14 +1725,15 @@ def resolve_aligns(items):
     position = 0
     new_items = []
     for item in items:
-        if isinstance(item, Align):
-            padding = item.size(position)
-            position += padding
-            blob = Blob(item.line, b'\x00' * padding)
-            new_items.append(blob)
-        else:
+        if not isinstance(item, Align):
             position += item.size(position)
             new_items.append(item)
+            continue
+
+        padding = item.size(position)
+        position += padding
+        blob = Blob(item.line, b'\x00' * padding)
+        new_items.append(blob)
 
     return new_items
 
@@ -1713,11 +1744,12 @@ def resolve_labels(items, env):
     position = 0
     new_items = []
     for item in items:
-        if isinstance(item, Label):
-            new_env[item.name] = position
-        else:
+        if not isinstance(item, Label):
             position += item.size(position)
             new_items.append(item)
+            continue
+
+        new_env[item.name] = position
 
     return new_items, new_env
 
@@ -1728,13 +1760,14 @@ def resolve_constants(items, env):
     position = 0
     new_items = []
     for item in items:
-        if isinstance(item, Constant):
-            if item.name in REGISTERS:
-                raise AssemblerError('constant name shadows register name "{}"'.format(item.name), item.line)
-            new_env[item.name] = item.imm.eval(position, new_env, item.line)
-        else:
+        if not isinstance(item, Constant):
             position += item.size(position)
             new_items.append(item)
+            continue
+
+        if item.name in REGISTERS:
+            raise AssemblerError('constant name shadows register name "{}"'.format(item.name), item.line)
+        new_env[item.name] = item.imm.eval(position, new_env, item.line)
 
     return new_items, new_env
 
@@ -1823,6 +1856,11 @@ def resolve_immediates(items, env):
             imm = item.imm.eval(position, env, item.line)
             position += item.size(position)
             pack = Pack(item.line, item.fmt, imm)
+            new_items.append(pack)
+        elif isinstance(item, ShorthandPack):
+            imm = item.imm.eval(position, env, item.line)
+            position += item.size(position)
+            pack = ShorthandPack(item.line, item.name, imm)
             new_items.append(pack)
         else:
             position += item.size(position)
@@ -1953,15 +1991,40 @@ def resolve_instructions(items):
     return new_items
 
 
+def transform_shorthand_packs(items):
+    endianness = '<'
+    formats = {
+        'db': 'B',
+        'dh': 'H',
+        'dw': 'I',
+    }
+
+    new_items = []
+    for item in items:
+        if not isinstance(item, ShorthandPack):
+            new_items.append(item)
+            continue
+
+        fmt = endianness + formats[item.name]
+        if item.imm < 0:
+            fmt = fmt.lower()
+
+        pack = Pack(item.line, fmt, item.imm)
+        new_items.append(pack)
+
+    return new_items
+
+
 def resolve_packs(items):
     new_items = []
     for item in items:
-        if isinstance(item, Pack):
-            data = struct.pack(item.fmt, item.imm)
-            blob = Blob(item.line, data)
-            new_items.append(blob)
-        else:
+        if not isinstance(item, Pack):
             new_items.append(item)
+            continue
+
+        data = struct.pack(item.fmt, item.imm)
+        blob = Blob(item.line, data)
+        new_items.append(blob)
 
     return new_items
 
@@ -1969,15 +2032,16 @@ def resolve_packs(items):
 def resolve_bytes(items):
     new_items = []
     for item in items:
-        if isinstance(item, Bytes):
-            data = [int(byte, base=0) for byte in item.values]
-            for byte in data:
-                if byte < 0 or byte > 255:
-                    raise AssemblerError('bytes literal not in range [0, 255]', line)
-            blob = Blob(item.line, bytes(data))
-            new_items.append(blob)
-        else:
+        if not isinstance(item, Bytes):
             new_items.append(item)
+            continue
+
+        data = [int(byte, base=0) for byte in item.values]
+        for byte in data:
+            if byte < 0 or byte > 255:
+                raise AssemblerError('bytes literal not in range [0, 255]', line)
+        blob = Blob(item.line, bytes(data))
+        new_items.append(blob)
 
     return new_items
 
@@ -1985,12 +2049,12 @@ def resolve_bytes(items):
 def resolve_strings(items):
     new_items = []
     for item in items:
-        if isinstance(item, String):
-            text = ' '.join(item.values)
-            blob = Blob(item.line, text.encode())
-            new_items.append(blob)
-        else:
+        if not isinstance(item, String):
             new_items.append(item)
+            continue
+
+        blob = Blob(item.line, item.value.encode('utf-8'))
+        new_items.append(blob)
 
     return new_items
 
@@ -2000,7 +2064,9 @@ def resolve_blobs(items):
     for item in items:
         if not isinstance(item, Blob):
             raise ValueError('expected only blobs at this point')
+
         output.extend(item.data)
+
     return output
 
 
@@ -2017,6 +2083,7 @@ def resolve_blobs(items):
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
 #   - Resolve bytes  (convert Bytes to Blob)
 #   - Resolve strings  (convert String to Blob)
+#   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve packs  (convert Pack to Blob)
 #   - Resolve blobs  (merge all Blobs into a single binary)
 
@@ -2041,6 +2108,7 @@ def assemble(path_or_source, compress=False, verbose=False):
     tokens = [lex_tokens(l) for l in lines]
     tokens = [t for t in tokens if len(t) > 0]
     items = [parse_item(t) for t in tokens]
+    items = [i for i in items if i is not None]
 
     # run items through each pass
     items = transform_pseudo_instructions(items)
@@ -2055,6 +2123,7 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = resolve_instructions(items)
     items = resolve_bytes(items)
     items = resolve_strings(items)
+    items = transform_shorthand_packs(items)
     items = resolve_packs(items)
     program = resolve_blobs(items)
 
