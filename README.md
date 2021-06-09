@@ -82,7 +82,7 @@ After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
 ## Usage
 ```
-usage: python -m bronzebeard.asm [-h] [--verbose] input_asm output_bin
+usage: python -m bronzebeard.asm [-h] [--compress] [--verbose] [--version] input_asm output_bin
 
 Assemble RISC-V source code
 
@@ -92,7 +92,9 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
+  --compress  identify and compress eligible instructions
   --verbose   verbose assembler output
+  --version   print assembler version and exit
 ```
 
 ## Assemble

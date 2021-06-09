@@ -6,6 +6,7 @@ from functools import partial
 import os
 import re
 import struct
+import sys
 
 
 REGISTERS = {
@@ -2138,14 +2139,21 @@ def assemble(path_or_source, compress=False, verbose=False):
 
 
 if __name__ == '__main__':
+    # TODO: better way to handle this?
+    if sys.argv[1] == '--version':
+        from bronzebeard import __version__
+        version = 'bronzebeard {}'.format(__version__)
+        raise SystemExit(version)
+
     parser = argparse.ArgumentParser(
         description='Assemble RISC-V source code',
         prog='python -m bronzebeard.asm',
     )
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('output_bin', type=str, help='output binary file')
-    parser.add_argument('--compress', action='store_true', help='identify and compress instructions')
+    parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions')
     parser.add_argument('--verbose', action='store_true', help='verbose assembler output')
+    parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
 
     try:

@@ -1,3 +1,4 @@
+from importlib import import_module
 from setuptools import setup
 
 with open('README.md') as f:
@@ -5,7 +6,7 @@ with open('README.md') as f:
 
 setup(
     name='bronzebeard',
-    version='0.0.14',
+    version=import_module('bronzebeard').__version__,
     author='Andrew Dailey',
     description='Minimal ecosystem for bare-metal RISC-V development',
     long_description=readme,
