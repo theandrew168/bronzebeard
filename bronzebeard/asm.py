@@ -60,6 +60,12 @@ class AssemblerError(Exception):
 
 
 def lookup_register(reg, compressed=False):
+    # reg might be a hex / octal value
+    try:
+        reg = int(reg, base=0)
+    except:
+        pass
+
     if reg not in REGISTERS:
         raise ValueError('register must be a valid integer, name, or alias: {}'.format(reg))
 
@@ -74,6 +80,29 @@ def lookup_register(reg, compressed=False):
         reg -= 8
 
     return reg
+
+
+def is_int(value):
+    try:
+        int(value)
+        return True
+    except:
+        return False
+
+
+def sign_extend(value, bits):
+    sign_bit = 1 << (bits - 1)
+    return (value & (sign_bit - 1)) - (value & sign_bit)
+
+
+def relocate_hi(imm):
+    if imm & 0x800:
+        imm += 2**12
+    return sign_extend((imm >> 12) & 0x000fffff, 20)
+
+
+def relocate_lo(imm):
+    return sign_extend(imm & 0x00000fff, 12)
 
 
 def r_type(rd, rs1, rs2, *, opcode, funct3, funct7):
@@ -884,29 +913,6 @@ KEYWORDS = {
 KEYWORDS.update(INSTRUCTIONS.keys())
 KEYWORDS.update(PSEUDO_INSTRUCTIONS)
 KEYWORDS.update(SHORTHAND_PACK_NAMES)
-
-
-def is_int(value):
-    try:
-        int(value)
-        return True
-    except:
-        return False
-
-
-def sign_extend(value, bits):
-    sign_bit = 1 << (bits - 1)
-    return (value & (sign_bit - 1)) - (value & sign_bit)
-
-
-def relocate_hi(imm):
-    if imm & 0x800:
-        imm += 2**12
-    return sign_extend((imm >> 12) & 0x000fffff, 20)
-
-
-def relocate_lo(imm):
-    return sign_extend(imm & 0x00000fff, 12)
 
 
 class Line:

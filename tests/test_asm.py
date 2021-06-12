@@ -1577,3 +1577,14 @@ def test_assembler_atomics():
         asm.AMOMAXU_W('t0', 't1', 't2'),
     ])
     assert binary == target
+
+
+def test_assembler_hex_register():
+    source = r"""
+    slli a4,a4,0xa
+    """
+    binary = asm.assemble(source)
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.SLLI('a4', 'a4', 10),
+    ])
+    assert binary == target
