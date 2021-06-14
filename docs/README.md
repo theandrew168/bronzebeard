@@ -101,8 +101,8 @@ Integers can be positive or negative and expressed in decimal, binary, or hex.
 | `longs`     | 4                |
 | `longlongs` | 8                |
 
-#### Float Sequences
-Floats can be positive or negative.
+#### Floating-point Sequences
+Floating-point numbers can be positive or negative.
 
 | Keyword     | Bytes per Number |
 | ----------- | ---------------- |
@@ -334,9 +334,9 @@ Full [specifications](https://riscv.org/technical/specifications/) be found on t
 | `sra rd, rs1, rs2`   | shift `rs1` right by `rs2` bits and store into `rd` (shift in sign bit) |
 | `or rd, rs1, rs2`    | bitwise OR `rs2` with `rs1` and store into `rd` |
 | `and rd, rs1, rs2`   | bitwise AND `rs2` with `rs1` and store into `rd` |
-| `fence succ, pred`   | TODO |
-| `ecall`              | TODO |
-| `ebreak`             | TODO |
+| `fence succ, pred`   | order device I/O and memory accesses |
+| `ecall`              | make a service request to the execution environment |
+| `ebreak`             | return control to a debugging environment |
 
 ### RV32M Standard Extension
 | Instruction           | Description |
@@ -371,17 +371,17 @@ lr.w t0 t1 1 0  # aq=1, rl=0
  
 | Instruction              | Description |
 | ------------------------ | ----------- |
-| `lr.w rd, rs1`           | TODO        |
-| `sc.w rd, rs1, rs2`      | TODO        |
-| `amoswap.w rd, rs1, rs2` | TODO        |
-| `amoadd.w rd, rs1, rs2`  | TODO        |
-| `amoxor.w rd, rs1, rs2`  | TODO        |
-| `amoand.w rd, rs1, rs2`  | TODO        |
-| `amoor.w rd, rs1, rs2`   | TODO        |
-| `amomin.w rd, rs1, rs2`  | TODO        |
-| `amomax.w rd, rs1, rs2`  | TODO        |
-| `amominu.w rd, rs1, rs2` | TODO        |
-| `amomaxu.w rd, rs1, rs2` | TODO        |
+| `lr.w rd, rs1`           | load (reserved) 32-bit value from addr in `rs1` into `rd` and register a reservation set |
+| `sc.w rd, rs1, rs2`      | store (conditional) 32-bit value from `rs2` into addr in `rs1` and write status to `rd` |
+| `amoswap.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, swap with value in `rs2`, store back to addr `rs1` |
+| `amoadd.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, add to value in `rs2`, store back to addr `rs1` |
+| `amoxor.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, xor with value in `rs2`, store back to addr `rs1` |
+| `amoand.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, and with value in `rs2`, store back to addr `rs1` |
+| `amoor.w rd, rs1, rs2`   | atomically load value from addr `rs1` into `rd`, or with value in `rs2`, store back to addr `rs1` |
+| `amomin.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, min with value in `rs2`, store back to addr `rs1` |
+| `amomax.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, max with value in `rs2`, store back to addr `rs1` |
+| `amominu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, min (unsigned) with value in `rs2`, store back to addr `rs1` |
+| `amomaxu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, max (unsigned) with value in `rs2`, store back to addr `rs1` |
 
 ### RV32C Standard Extension
 | Instruction                | Description |
