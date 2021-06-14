@@ -89,17 +89,25 @@ string   hello\\nworld
 
 ### Numeric Sequence Literals
 Numeric sequence literals allow you to embed homogeneous sequences of numbers into your binary.
+
+#### Integer Sequences
 Integers can be positive or negative and expressed in decimal, binary, or hex.
 
-| Keyword     | Size per Number (Bytes) |
-| ----------- | ----------------------- |
-| `bytes`     | 1                       |
-| `shorts`    | 2                       |
-| `ints`      | 4                       |
-| `longs`     | 4                       |
-| `longlongs` | 8                       |
-| `floats`    | 4                       |
-| `doubles`   | 8                       |
+| Keyword     | Bytes per Number |
+| ----------- | ---------------- |
+| `bytes`     | 1                |
+| `shorts`    | 2                |
+| `ints`      | 4                |
+| `longs`     | 4                |
+| `longlongs` | 8                |
+
+#### Float Sequences
+Floats can be positive or negative.
+
+| Keyword     | Bytes per Number |
+| ----------- | ---------------- |
+| `floats`    | 4                |
+| `doubles`   | 8                |
 
 #### Examples
 ```
@@ -117,22 +125,22 @@ They start with the `pack` keyword and are followed by a format specifier and a 
 The format specifier is a subset of the format outlined in Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
 
 The pack format is composed of two characters: the first specifies endianness and the second details the numeric size and type:
-| Character | Size (Bytes) | Meaning |
-| --------- | ------------ | ------- |
-| `<`       | N/A          | Little endian |
-| `>`       | N/A          | Big endian |
-| `b`       | 1            | Signed char |
-| `B`       | 1            | Unsigned char |
-| `h`       | 2            | Signed short |
-| `H`       | 2            | Unsigned short |
-| `i`       | 4            | Signed int |
-| `I`       | 4            | Unsigned int |
-| `l`       | 4            | Signed long |
-| `L`       | 4            | Unsigned long |
-| `q`       | 8            | Signed long long |
-| `Q`       | 8            | Unsigned long long |
-| `f`       | 4            | IEEE 754 single-precision floating-point number |
-| `d`       | 8            | IEEE 754 double-precision floating-point number |
+| Character | Bytes | Meaning |
+| --------- | ----- | ------- |
+| `<`       | N/A   | Little endian |
+| `>`       | N/A   | Big endian |
+| `b`       | 1     | Signed char |
+| `B`       | 1     | Unsigned char |
+| `h`       | 2     | Signed short |
+| `H`       | 2     | Unsigned short |
+| `i`       | 4     | Signed int |
+| `I`       | 4     | Unsigned int |
+| `l`       | 4     | Signed long |
+| `L`       | 4     | Unsigned long |
+| `q`       | 8     | Signed long long |
+| `Q`       | 8     | Unsigned long long |
+| `f`       | 4     | IEEE 754 single-precision floating-point number |
+| `d`       | 8     | IEEE 754 double-precision floating-point number |
 
 Here are a few examples:
 ```
