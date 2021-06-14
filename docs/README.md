@@ -392,7 +392,7 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.sw rs1', rs2', uimm`    | store 32-bit value from `rs2'` into addr in `rs1'` plus 5-bit MO4 `uimm` |
 | `c.nop`                    | TODO        |
 | `c.addi rd/rs1!=0, nzimm`  | TODO        |
-| `c.jal imm`                | TODO        |
+| `c.jal imm`                | jump offset 11-bit MO2 `imm` and store return address into `x1/ra` |
 | `c.li rd!=0, imm`          | TODO        |
 | `c.addi16sp nzimm`         | TODO        |
 | `c.lui rd!={0,2}, nzimm`   | TODO        |
@@ -403,13 +403,13 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.xor rd'/rs1', rs2'`     | TODO        |
 | `c.or rd'/rs1', rs2'`      | TODO        |
 | `c.and rd'/rs1', rs2'`     | TODO        |
-| `c.j imm`                  | TODO        |
+| `c.j imm`                  | jump offset 11-bit MO2 `imm` |
 | `c.beqz rs1', imm`         | TODO        |
 | `c.bnez rs1', imm`         | TODO        |
 | `c.slli rd/rs1!=0, nzuimm` | TODO        |
-| `c.lwsp rd!=0, uimm`       | load 32-bit value from addr in `sp` plus 6-bit MO4 `uimm` into `rd` |
+| `c.lwsp rd!=0, uimm`       | load 32-bit value from addr in `x2/sp` plus 6-bit MO4 `uimm` into `rd` |
 | `c.jr rs1!=0`              | TODO        |
 | `c.mv rd!=0, rs2!=0`       | TODO        |
 | `c.jalr rs1!=0`            | TODO        |
 | `c.add rd/rs1!=0, rs2!=0`  | TODO        |
-| `c.swsp rs2, uimm`         | store 32-bit value from `rs2` into addr in `sp` plus 6-bit MO4 `uimm` |
+| `c.swsp rs2, uimm`         | store 32-bit value from `rs2` into addr in `x2/sp` plus 6-bit MO4 `uimm` |
