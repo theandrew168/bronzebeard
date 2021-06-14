@@ -293,6 +293,7 @@ One of the early passes in the assembler will transform them as described in thi
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
 Full [specifications](https://riscv.org/technical/specifications/) be found on the RISC-V website.
+Additionally, more details about each instruction can be found [here](https://msyksphinz-self.github.io/riscv-isadoc/html/index.html).
 
 ### RV32I Base Instruction Set
 | Instruction          | Description |
@@ -373,22 +374,22 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | ------------------------ | ----------- |
 | `lr.w rd, rs1`           | load (reserved) 32-bit value from addr in `rs1` into `rd` and register a reservation set |
 | `sc.w rd, rs1, rs2`      | store (conditional) 32-bit value from `rs2` into addr in `rs1` and write status to `rd` |
-| `amoswap.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, swap with value in `rs2`, store back to addr `rs1` |
-| `amoadd.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, add to value in `rs2`, store back to addr `rs1` |
-| `amoxor.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, xor with value in `rs2`, store back to addr `rs1` |
-| `amoand.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, and with value in `rs2`, store back to addr `rs1` |
-| `amoor.w rd, rs1, rs2`   | atomically load value from addr `rs1` into `rd`, or with value in `rs2`, store back to addr `rs1` |
-| `amomin.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, min with value in `rs2`, store back to addr `rs1` |
-| `amomax.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, max with value in `rs2`, store back to addr `rs1` |
-| `amominu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, min (unsigned) with value in `rs2`, store back to addr `rs1` |
-| `amomaxu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, max (unsigned) with value in `rs2`, store back to addr `rs1` |
+| `amoswap.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, SWAP with value in `rs2`, store back to addr `rs1` |
+| `amoadd.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, ADD to value in `rs2`, store back to addr `rs1` |
+| `amoxor.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, XOR with value in `rs2`, store back to addr `rs1` |
+| `amoand.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, AND with value in `rs2`, store back to addr `rs1` |
+| `amoor.w rd, rs1, rs2`   | atomically load value from addr `rs1` into `rd`, OR with value in `rs2`, store back to addr `rs1` |
+| `amomin.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, MIN with value in `rs2`, store back to addr `rs1` |
+| `amomax.w rd, rs1, rs2`  | atomically load value from addr `rs1` into `rd`, MAX with value in `rs2`, store back to addr `rs1` |
+| `amominu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, MIN (unsigned) with value in `rs2`, store back to addr `rs1` |
+| `amomaxu.w rd, rs1, rs2` | atomically load value from addr `rs1` into `rd`, MAX (unsigned) with value in `rs2`, store back to addr `rs1` |
 
 ### RV32C Standard Extension
 | Instruction                | Description |
 | -------------------------- | ----------- |
 | `c.addi4spn rd', nzuimm`   | TODO        |
-| `c.lw rd', rs1', uimm`     | TODO        |
-| `c.sw rs1', rs2', uimm`    | TODO        |
+| `c.lw rd', rs1', uimm`     | load 32-bit value from addr in `rs1'` plus 5-bit MO4 `uimm` into `rd'` |
+| `c.sw rs1', rs2', uimm`    | store 32-bit value from `rs2'` into addr in `rs1'` plus 5-bit MO4 `uimm` |
 | `c.nop`                    | TODO        |
 | `c.addi rd/rs1!=0, nzimm`  | TODO        |
 | `c.jal imm`                | TODO        |
@@ -406,9 +407,9 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.beqz rs1', imm`         | TODO        |
 | `c.bnez rs1', imm`         | TODO        |
 | `c.slli rd/rs1!=0, nzuimm` | TODO        |
-| `c.lwsp rd!=0, uimm`       | TODO        |
+| `c.lwsp rd!=0, uimm`       | load 32-bit value from addr in `sp` plus 6-bit MO4 `uimm` into `rd` |
 | `c.jr rs1!=0`              | TODO        |
 | `c.mv rd!=0, rs2!=0`       | TODO        |
 | `c.jalr rs1!=0`            | TODO        |
 | `c.add rd/rs1!=0, rs2!=0`  | TODO        |
-| `c.swsp rs2, uimm`         | TODO        |
+| `c.swsp rs2, uimm`         | store 32-bit value from `rs2` into addr in `sp` plus 6-bit MO4 `uimm` |
