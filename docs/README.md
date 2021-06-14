@@ -87,41 +87,77 @@ string hello\nworld
 string   hello\\nworld
 ```
 
-### Bytes Literals
-Bytes literals allow you to embed arbitrary byte sequences into your binary.
-They start with the `bytes` keyword and followed by one or more integers between 0 and 255.
-The integers can be expressed in decimal, binary, or hex.
+### Numeric Sequence Literals
+Numeric sequence literals allow you to embed homogeneous sequences of numbers into your binary.
+Integers can be positive or negative and expressed in decimal, binary, or hex.
+
+| Keyword     | Size per Number (Bytes) |
+| ----------- | ----------------------- |
+| `bytes`     | 1                       |
+| `shorts`    | 2                       |
+| `ints`      | 4                       |
+| `longs`     | 4                       |
+| `longlongs` | 8                       |
+| `floats`    | 4                       |
+| `doubles`   | 8                       |
+
+#### Examples
 ```
 bytes 1 2 0x03 0b100 5 0x06 0b111 8
+bytes -1 0xff  # same value once encoded as 2's comp integers
+shorts 0x1234 0x5678
+ints  1 2 3 4
+longs 1 2 3 4  # same as above (both 4 bytes each)
+floats 3.141 2.3455
 ```
 
-### Packed Literals
-Packed literals allow you embed packed integer values into your binary.
+### Packed Values
+Packed values allow you embed packed numeric literals, expressions, or references into your binary.
 They start with the `pack` keyword and are followed by a format specifier and a value.
-The format specifier is based on Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
-The value can be a literal or another expression (such as a constant or result of a modifier).
-As with all other items, commas are optional.
+The format specifier is a subset of the format outlined in Python's builtin [struct module](https://docs.python.org/3/library/struct.html#format-characters).
+
+The pack format is composed of two characters: the first specifies endianness and the second details the numeric size and type:
+| Character | Size (Bytes) | Meaning |
+| --------- | ------------ | ------- |
+| `<`       | N/A          | Little endian |
+| `>`       | N/A          | Big endian |
+| `b`       | 1            | Signed char |
+| `B`       | 1            | Unsigned char |
+| `h`       | 2            | Signed short |
+| `H`       | 2            | Unsigned short |
+| `i`       | 4            | Signed int |
+| `I`       | 4            | Unsigned int |
+| `l`       | 4            | Signed long |
+| `L`       | 4            | Unsigned long |
+| `q`       | 8            | Signed long long |
+| `Q`       | 8            | Unsigned long long |
+| `f`       | 4            | IEEE 754 single-precision floating-point number |
+| `d`       | 8            | IEEE 754 double-precision floating-point number |
+
+Here are a few examples:
 ```
 pack <B, 0
 pack <B, 255
-pack >h, -1234
+pack <h, -1234
 pack <I ADDR
 pack <I %position(foo, ADDR)
 ```
 
 #### Shorthand Syntax
-In addition to the above `pack` keyword, a small set of shorthand keywords (loosely based on NASM syntax) are available for embedding integer of specific widths.
+In addition to the above `pack` keyword, a small set of shorthand keywords (loosely based on NASM syntax) are available for embedding integers of specific widths.
 The specific endianness and signedness will be inferred by the assembler's configuration and resolved integer value, respectively.
 Internally, these are implemented as AST transformations to the more general `pack` syntax.
 
-| Keyword | Width (Bytes) | Example         |
-| ------- | ------------- | --------------- |
-| `db`    | 1             | `db -1`         |
-| `db`    | 1             | `db 0xff`       |
-| `db`    | 1             | `db 0x20`       |
-| `dh`    | 2             | `dh 0x2000`     |
-| `dw`    | 4             | `dw 0x20000000` |
-| `dw`    | 4             | `dw some_label` |
+| Keyword | Width (Bytes) | Example                 |
+| ------- | ------------- | ----------------------- |
+| `db`    | 1             | `db -1`                 |
+| `db`    | 1             | `db 0xff`               |
+| `db`    | 1             | `db 0x20`               |
+| `dh`    | 2             | `dh 0x2000`             |
+| `dw`    | 4             | `dw 0x20000000`         |
+| `dw`    | 4             | `dw some_label`         |
+| `dw`    | 4             | `dw RAM_ADDR`           |
+| `dd`    | 8             | `dd 0x2000000000000000` |
 
 ### Alignment
 The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.

@@ -902,17 +902,28 @@ SHORTHAND_PACK_NAMES = {
     'db',
     'dh',
     'dw',
+    'dd',
+}
+
+NUMERIC_SEQUENCE_NAMES = {
+    'bytes',
+    'shorts',
+    'ints',
+    'longs',
+    'longlongs',
+    'floats',
+    'doubles',
 }
 
 KEYWORDS = {
-    'string',
-    'bytes',
-    'pack',
     'align',
+    'string',
+    'pack',
 }
 KEYWORDS.update(INSTRUCTIONS.keys())
 KEYWORDS.update(PSEUDO_INSTRUCTIONS)
 KEYWORDS.update(SHORTHAND_PACK_NAMES)
+KEYWORDS.update(NUMERIC_SEQUENCE_NAMES)
 
 
 class Line:
@@ -1042,23 +1053,6 @@ class Item(abc.ABC):
         """Check the size of this item at the given position in a program"""
 
 
-class Align(Item):
-
-    def __init__(self, line, alignment):
-        super().__init__(line)
-        self.alignment = alignment
-
-    def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.alignment)
-
-    def size(self, position):
-        padding = self.alignment - (position % self.alignment)
-        if padding == self.alignment:
-            return 0
-        else:
-            return padding
-
-
 class Label(Item):
 
     def __init__(self, line, name):
@@ -1086,18 +1080,21 @@ class Constant(Item):
         return 0
 
 
-class Bytes(Item):
+class Align(Item):
 
-    def __init__(self, line, values):
+    def __init__(self, line, alignment):
         super().__init__(line)
-        self.values = values
+        self.alignment = alignment
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.values)
+        return '{}({!r})'.format(type(self).__name__, self.alignment)
 
     def size(self, position):
-        # this works because each byte occupies 1 byte
-        return len(self.values)
+        padding = self.alignment - (position % self.alignment)
+        if padding == self.alignment:
+            return 0
+        else:
+            return padding
 
 
 class String(Item):
@@ -1142,8 +1139,32 @@ class ShorthandPack(Item):
             'db': 1,
             'dh': 2,
             'dw': 4,
+            'dd': 8,
         }
         return sizes[self.name]
+
+
+class Sequence(Item):
+
+    def __init__(self, line, name, values):
+        super().__init__(line)
+        self.name = name
+        self.values = values
+
+    def __repr__(self):
+        return '{}(name={!r}, {!r})'.format(type(self).__name__, self.name, self.values)
+
+    def size(self, position):
+        sizes = {
+            'bytes': 1,
+            'shorts': 2,
+            'ints': 4,
+            'longs': 4,
+            'longlongs': 8,
+            'floats': 4,
+            'doubles': 8,
+        }
+        return sizes[self.name] * len(self.values)
 
 
 class Blob(Item):
@@ -1435,6 +1456,10 @@ def parse_item(line_tokens):
         except ValueError:
             raise AssemblerError('alignment must be an integer', line)
         return Align(line, alignment)
+    # strings
+    elif head == 'string':
+        _, value = tokens
+        return String(line, value)
     # packs
     elif head == 'pack':
         _, fmt, *imm = tokens
@@ -1445,14 +1470,11 @@ def parse_item(line_tokens):
         name, *imm = tokens
         imm = parse_immediate(imm)
         return ShorthandPack(line, name, imm)
-    # bytes
-    elif head == 'bytes':
-        _, *values = tokens
-        return Bytes(line, values)
-    # strings
-    elif head == 'string':
-        _, value = tokens
-        return String(line, value)
+    # sequences
+    elif head in NUMERIC_SEQUENCE_NAMES:
+        name, *values = tokens
+        name = name.lower()
+        return Sequence(line, name, values)
     # r-type instructions
     elif head in R_TYPE_INSTRUCTIONS:
         if len(tokens) != 4:
@@ -2004,6 +2026,7 @@ def transform_shorthand_packs(items):
         'db': 'B',
         'dh': 'H',
         'dw': 'I',
+        'dd': 'Q',
     }
 
     new_items = []
@@ -2036,17 +2059,36 @@ def resolve_packs(items):
     return new_items
 
 
-def resolve_bytes(items):
+def resolve_sequences(items):
+    endianness = '<'
+    formats = {
+        'bytes': 'B',
+        'shorts': 'H',
+        'ints': 'I',
+        'longs': 'L',
+        'longlongs': 'Q',
+        'floats': 'f',
+        'doubles': 'd',
+    }
+
     new_items = []
     for item in items:
-        if not isinstance(item, Bytes):
+        if not isinstance(item, Sequence):
             new_items.append(item)
             continue
 
-        data = [int(byte, base=0) for byte in item.values]
-        for byte in data:
-            if byte < 0 or byte > 255:
-                raise AssemblerError('bytes literal not in range [0, 255]', line)
+        if item.name in ['floats', 'doubles']:
+            values = [float(value) for value in item.values]
+        else:
+            values = [int(value, base=0) for value in item.values]
+
+        data = bytearray()
+        for value in values:
+            fmt = endianness + formats[item.name]
+            if value < 0:
+                fmt = fmt.lower()
+            value = struct.pack(fmt, value)
+            data.extend(value)
         blob = Blob(item.line, bytes(data))
         new_items.append(blob)
 
@@ -2088,7 +2130,7 @@ def resolve_blobs(items):
 #   - Check compressible  (identify and compress eligible instructions)
 #   - Valitate compressed  (validate compressed inst reg / imm values)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
-#   - Resolve bytes  (convert Bytes to Blob)
+#   - Resolve sequences (convert Sequence to Blob)
 #   - Resolve strings  (convert String to Blob)
 #   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve packs  (convert Pack to Blob)
@@ -2128,7 +2170,7 @@ def assemble(path_or_source, compress=False, verbose=False):
         items = check_compressible(items)
     items = validate_compressed(items)
     items = resolve_instructions(items)
-    items = resolve_bytes(items)
+    items = resolve_sequences(items)
     items = resolve_strings(items)
     items = transform_shorthand_packs(items)
     items = resolve_packs(items)
