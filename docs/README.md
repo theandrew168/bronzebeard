@@ -68,7 +68,7 @@ In addition to basic arithmetic operations, Bronzebeard assembly supports a smal
 You can think of these like simple, builtin functions:
 * **%hi(value)** - Calculate the sign-adjusted top 20 bits of a value
 * **%lo(value)** - Calculate the sign-adjusted bottom 12 bits of a value
-* **%position(label, addr)** - Calculate the absolute position of a label from a given base address
+* **%position(label, addr)** - Calculate the position of a label relative to given base address
 
 ### String Literals
 String literals allow you to embed UTF-8 strings into your binary.
