@@ -65,7 +65,8 @@ optional arguments:
 ```
 
 ## DFU Setup
-All major operating system platforms are supported: Windows, macOS, and Linux.
+[DFU (Device Firmware Upgrade)](https://en.wikipedia.org/wiki/USB#Device_Firmware_Upgrade_mechanism) is a USB-based protocol for updating the firmware on certain embedded devices.
+At the moment, the DFU implemention included with Bronzebeard only supports the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
 
 ### Windows
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.
@@ -105,8 +106,6 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
 ## Flash the Program (via DFU)
-NOTE: The DFU implemention included with Bronzebeard only supports the Longan Nano and Wio Lite at this time.
-
 With the target device in DFU mode:
 ```
 python3 -m bronzebeard.dfu <device_id> example.bin
