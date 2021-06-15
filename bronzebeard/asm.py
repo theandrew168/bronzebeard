@@ -2190,7 +2190,7 @@ def assemble(path_or_source, compress=False, verbose=False):
 
 def cli_main():
     # TODO: better way to handle this?
-    if sys.argv[1] == '--version':
+    if len(sys.argv) >= 2 and sys.argv[1] == '--version':
         from bronzebeard import __version__
         version = 'bronzebeard {}'.format(__version__)
         raise SystemExit(version)

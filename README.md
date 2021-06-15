@@ -48,7 +48,7 @@ By default, the assembled output binary will be placed in a file named "bb.out".
 
 ### Command Line Interface
 ```
-usage: python -m bronzebeard.asm [-h] [-o OUTPUT] [--compress] [--verbose] [--version] input_asm
+usage: bronzebeard [-h] [-o OUTPUT] [--compress] [--verbose] [--version] input_asm
 
 Assemble RISC-V source code
 
