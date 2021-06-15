@@ -38,10 +38,34 @@ Bronzebeard can be installed via pip:
 pip install bronzebeard
 ```
 
-## Setup
+## Assemble!
+With Bronzebeard installed:
+```
+bronzebeard examples/example.asm
+```
+
+By default, the assembled output binary will be placed in a file named "bb.out".
+
+### Command Line Interface
+```
+usage: python -m bronzebeard.asm [-h] [-o OUTPUT] [--compress] [--verbose] [--version] input_asm
+
+Assemble RISC-V source code
+
+positional arguments:
+  input_asm             input source file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        output binary file (default "bb.asm")
+  --compress            identify and compress eligible instructions (TODO)
+  --verbose             verbose assembler output (TODO)
+  --version             print assembler version and exit
+```
+
+## DFU Setup
 All major operating system platforms are supported: Windows, macOS, and Linux.
-In order to utilize Bronzebeard, you need to download and install a recent version of [Python](https://www.python.org/downloads/).
-For more info, [Real Python](https://realpython.com/) has a great [installation and setup guide](https://realpython.com/installing-python/) that I recommend following.
 
 ### Windows
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.
@@ -80,30 +104,7 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
-## Usage
-```
-usage: python -m bronzebeard.asm [-h] [--compress] [--verbose] [--version] input_asm output_bin
-
-Assemble RISC-V source code
-
-positional arguments:
-  input_asm   input source file
-  output_bin  output binary file
-
-optional arguments:
-  -h, --help  show this help message and exit
-  --compress  identify and compress eligible instructions
-  --verbose   verbose assembler output
-  --version   print assembler version and exit
-```
-
-## Assemble
-With Bronzebeard installed:
-```
-python3 -m bronzebeard.asm examples/example.asm example.bin
-```
-
-## Program (via DFU)
+## Flash the Program (via DFU)
 NOTE: The DFU implemention included with Bronzebeard only supports the Longan Nano and Wio Lite at this time.
 
 With the target device in DFU mode:

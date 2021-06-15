@@ -23,4 +23,9 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     python_requires='>=3.0',
+    entry_points={
+        'console_scripts': [
+            'bronzebeard = bronzebeard.asm:cli_main',
+        ],
+    },
 )
