@@ -283,7 +283,7 @@ def a_type(rd, rs1, rs2, *, opcode, funct3, funct5, aq=0, rl=0):
     return r_type(rd, rs1, rs2, opcode=opcode, funct3=funct3, funct7=funct7)
 
 
-# c.jr, c.mv, c.jalr, c.add
+# c.jr, c.mv, c.ebreak, c.jalr, c.add
 def cr_type(rd_rs1, rs2, *, opcode, funct4):
     rd_rs1 = lookup_register(rd_rs1)
     rs2 = lookup_register(rs2)
@@ -617,9 +617,9 @@ SRL        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0000000)
 SRA        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR         = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND        = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000000)
-FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax (unique)
-ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax (arity)
-EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax (arity)
+FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax
+ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
+EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
 
 # RV32M Standard Extension for Integer Multiplication and Division
 MUL        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0000001)
@@ -632,7 +632,7 @@ REM        = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000001)
 REMU       = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000001)
 
 # RV32A Standard Extension for Atomic Instructions
-LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax (arity)
+LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax
 SC_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00011)
 AMOSWAP_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00001)
 AMOADD_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00000)
@@ -648,10 +648,11 @@ AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
 # TODO: custom logic for these is diff because the dev still specifies _something_
 # TODO: it isn't a "value MUST be foo" like the other special cases
 # TODO: maybe just do it as a separate pass? validate_compressed() or something like that
+# TODO: but what about the low-level API? Shouldn't those fail, too?
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
 C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
 C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
-C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # special syntax (arity)
+C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # special syntax
 C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000)
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
 C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010)
@@ -671,6 +672,7 @@ C_SLLI     = partial(ci_type,  opcode=0b10, funct3=0b000)
 C_LWSP     = partial(cls_type, opcode=0b10, funct3=0b010)
 C_JR       = partial(cr_type,  opcode=0b10, funct4=0b1000)
 C_MV       = partial(cr_type,  opcode=0b10, funct4=0b1000)
+C_EBREAK   = partial(cr_type,  opcode=0b10, funct4=0b1001, rd_rs1=0, rs2=0)  # special syntax
 C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001)
 C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001)
 C_SWSP     = partial(css_type, opcode=0b10, funct3=0b110)

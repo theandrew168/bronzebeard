@@ -64,6 +64,27 @@ def test_c_addi(rd_rs1, imm, code):
 
 
 @pytest.mark.parametrize(
+    'imm,   code', [
+    (0,     0b0010000000000001),
+    (2,     0b0010000000001001),
+    (4,     0b0010000000010001),
+    (8,     0b0010000000100001),
+    (16,    0b0010100000000001),
+    (32,    0b0010000000000101),
+    (64,    0b0010000010000001),
+    (128,   0b0010000001000001),
+    (256,   0b0010001000000001),
+    (512,   0b0010010000000001),
+    (1024,  0b0010000100000001),
+    (2046,  0b0010111111111101),
+    (-2,    0b0011111111111101),
+    (-2048, 0b0011000000000001),
+])
+def test_c_jal(imm, code):
+    assert asm.C_JAL(imm) == code
+
+
+@pytest.mark.parametrize(
     'rd_rs1, imm, code', [
     (1,      1,   0b0100000010000101),
     (1 ,     31,  0b0100000011111101),
@@ -106,6 +127,17 @@ def test_c_lui(rd_rs1, imm, code):
 
 @pytest.mark.parametrize(
     'rd_rs1, imm, code', [
+    (8,      1,   0b1000000000000101),
+    (8 ,     31,  0b1000000001111101),
+    (15,     1 ,  0b1000001110000101),
+    (15,     31,  0b1000001111111101),
+])
+def test_c_srli(rd_rs1, imm, code):
+    assert asm.C_SRLI(rd_rs1, imm) == code
+
+
+@pytest.mark.parametrize(
+    'rd_rs1, imm, code', [
     (8,      1,   0b1000010000000101),
     (8 ,     31,  0b1000010001111101),
     (15,     1 ,  0b1000011110000101),
@@ -124,17 +156,6 @@ def test_c_srai(rd_rs1, imm, code):
 ])
 def test_c_andi(rd_rs1, imm, code):
     assert asm.C_ANDI(rd_rs1, imm) == code
-
-
-@pytest.mark.parametrize(
-    'rd_rs1, imm, code', [
-    (8,      1,   0b1000000000000101),
-    (8 ,     31,  0b1000000001111101),
-    (15,     1 ,  0b1000001110000101),
-    (15,     31,  0b1000001111111101),
-])
-def test_c_srli(rd_rs1, imm, code):
-    assert asm.C_SRLI(rd_rs1, imm) == code
 
 
 @pytest.mark.parametrize(
@@ -261,14 +282,14 @@ def test_c_lwsp(rd, imm, code):
 
 
 @pytest.mark.parametrize(
-    'rd_rs1, rs2, code', [
-    (1,      0,   0b1000000010000010),
-    (1 ,     0,   0b1000000010000010),
-    (31,     0 ,  0b1000111110000010),
-    (31,     0,   0b1000111110000010),
+    'rs1, rs2, code', [
+    (1,   0,   0b1000000010000010),
+    (1 ,  0,   0b1000000010000010),
+    (31,  0 ,  0b1000111110000010),
+    (31,  0,   0b1000111110000010),
 ])
-def test_c_jr(rd_rs1, rs2, code):
-    assert asm.C_JR(rd_rs1, rs2) == code
+def test_c_jr(rs1, rs2, code):
+    assert asm.C_JR(rs1, rs2) == code
 
 
 @pytest.mark.parametrize(
@@ -280,6 +301,21 @@ def test_c_jr(rd_rs1, rs2, code):
 ])
 def test_c_mv(rd_rs1, rs2, code):
     assert asm.C_MV(rd_rs1, rs2) == code
+
+
+def test_c_ebreak():
+    assert asm.C_EBREAK() == 0b1001000000000010
+
+
+@pytest.mark.parametrize(
+    'rs1, rs2, code', [
+    (1,   0,   0b1001000010000010),
+    (1 ,  0,   0b1001000010000010),
+    (31,  0 ,  0b1001111110000010),
+    (31,  0,   0b1001111110000010),
+])
+def test_c_jalr(rs1, rs2, code):
+    assert asm.C_JALR(rs1, rs2) == code
 
 
 @pytest.mark.parametrize(
