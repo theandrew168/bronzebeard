@@ -156,16 +156,31 @@ In addition to the above `pack` keyword, a small set of shorthand keywords (loos
 The specific endianness and signedness will be inferred by the assembler's configuration and resolved integer value, respectively.
 Internally, these are implemented as AST transformations to the more general `pack` syntax.
 
-| Keyword | Width (Bytes) | Example                 |
-| ------- | ------------- | ----------------------- |
-| `db`    | 1             | `db -1`                 |
-| `db`    | 1             | `db 0xff`               |
-| `db`    | 1             | `db 0x20`               |
-| `dh`    | 2             | `dh 0x2000`             |
-| `dw`    | 4             | `dw 0x20000000`         |
-| `dw`    | 4             | `dw some_label`         |
-| `dw`    | 4             | `dw RAM_ADDR`           |
-| `dd`    | 8             | `dd 0x2000000000000000` |
+| Keyword | Bytes |
+| ------- | ----- |
+| `db`    | 1     |
+| `dh`    | 2     |
+| `dw`    | 4     |
+| `dd`    | 8     |
+
+Here are some examples:
+```
+# 1-byte integers
+db -1  # 2's complement will end up as 0xff
+db 0xff
+db 0x20
+
+# 2-byte integers
+dh 0x2000
+
+# 4-byte integers
+dw 0x20000000
+dw some_label
+dw RAM_ADDR
+
+# 8-byte integers
+dd 0x2000000000000000
+```
 
 ### Alignment
 The `align` keyword tells the assembler to enforce alignment to a certain byte boundary.
@@ -396,8 +411,8 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.li rd!=0, imm`          | load 6-bit `imm` into `rd`, sign extend upper bits |
 | `c.addi16sp nzimm`         | add 6-bit MO16 `nzimm` to `x2/sp` and store into `x2/sp` |
 | `c.lui rd!={0,2}, nzimm`   | load 6-bit `imm` into middle bits [17:12] of `rd`, sign extend upper bits, clear lower bits |
-| `c.srli rd'/rs1', shamt`   | shift `rd'/rs1'` right by `shamt` bits and store into `rd'/rs1'` (shift in zeroes) |
-| `c.srai rd'/rs1', shamt`   | shift `rd'/rs1'` right by `shamt` bits and store into `rd'/rs1'` (shift in sign bit) |
+| `c.srli rd'/rs1', nzuimm`  | shift `rd'/rs1'` right by `nzuimm` bits and store into `rd'/rs1'` (shift in zeroes) |
+| `c.srai rd'/rs1', nzuimm`  | shift `rd'/rs1'` right by `nzuimm` bits and store into `rd'/rs1'` (shift in sign bit) |
 | `c.andi rd'/rs1', imm`     | bitwise AND 6-bit `imm` with `rd'/rs1'` and store into `rd'/rs1'` |
 | `c.sub rd'/rs1', rs2'`     | subtract `rs2'` from `rd'/rs1'` and store into `rd'/rs1'` |
 | `c.xor rd'/rs1', rs2'`     | bitwise XOR `rs2'` with `rd'/rs1'` and store into `rd'/rs1'` |
@@ -406,7 +421,7 @@ lr.w t0 t1 1 0  # aq=1, rl=0
 | `c.j imm`                  | jump offset 11-bit MO2 `imm` |
 | `c.beqz rs1', imm`         | jump offset 8-bit MO2 `imm` if `rs1'` is equal to zero |
 | `c.bnez rs1', imm`         | jump offset 8-bit MO2 `imm` if `rs1'` is not equal to zero |
-| `c.slli rd/rs1!=0, shamt`  | shift `rd/rs1` left by `shamt` bits and store into `rd/rs1` |
+| `c.slli rd/rs1!=0, nziumm` | shift `rd/rs1` left by `nzuimm` bits and store into `rd/rs1` |
 | `c.lwsp rd!=0, uimm`       | load 32-bit value from addr in `x2/sp` plus 6-bit MO4 `uimm` into `rd` |
 | `c.jr rs1!=0`              | jump to addr in `rs1` |
 | `c.mv rd!=0, rs2!=0`       | copy value from `rs2` into `rd` |

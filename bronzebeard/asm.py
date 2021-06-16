@@ -105,6 +105,30 @@ def relocate_lo(imm):
     return sign_extend(imm & 0x00000fff, 12)
 
 
+def constraint_not(field, value):
+    def inner(**kwargs):
+        if kwargs[field] == value:
+            raise ValueError('constraint failed: {} must not be {}'.format(field, value))
+    return inner
+
+
+def constraint_bit(field, bit, value):
+    def inner(**kwargs):
+        if (kwargs[field] & (1 << bit)) != value:
+            raise ValueError('constraint failed: bit {} of {} must be {}'.format(bit, field, value))
+    return inner
+
+
+# constraints used to validate compressed instruction fields
+RegRdNotZero = constraint_not('rd', 0)
+RegRs1NotZero = constraint_not('rs1', 0)
+RegRs2NotZero = constraint_not('rs2', 0)
+RegRdRs1NotZero = constraint_not('rd_rs1', 0)
+RegRdRs1NotTwo = constraint_not('rd_rs1', 2)
+ImmNotZero = constraint_not('imm', 0)
+ShamtBit5Zero = constraint_bit('imm', 5, 0)
+
+
 def r_type(rd, rs1, rs2, *, opcode, funct3, funct7):
     rd = lookup_register(rd)
     rs1 = lookup_register(rs1)
@@ -284,9 +308,13 @@ def a_type(rd, rs1, rs2, *, opcode, funct3, funct5, aq=0, rl=0):
 
 
 # c.jr, c.mv, c.ebreak, c.jalr, c.add
-def cr_type(rd_rs1, rs2, *, opcode, funct4):
+def cr_type(rd_rs1, rs2, *, opcode, funct4, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
     rs2 = lookup_register(rs2)
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, rs2=rs2)
 
     code = 0
     code |= opcode
@@ -298,11 +326,15 @@ def cr_type(rd_rs1, rs2, *, opcode, funct4):
 
 
 # c.nop, c.addi, c.li, c.lui, c.slli
-def ci_type(rd_rs1, imm, *, opcode, funct3):
+def ci_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < -32 or imm > 31:
         raise ValueError('6-bit immediate must be between -32 (-0x20) and 31 (0x1f): {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, imm=imm)
 
     imm = c_uint32(imm).value & 0b111111
 
@@ -321,13 +353,17 @@ def ci_type(rd_rs1, imm, *, opcode, funct3):
 
 # CI variation
 # c.addi16sp
-def cis_type(rd_rs1, imm, *, opcode, funct3):
+def cis_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < -512 or imm > 511:
         raise ValueError('6-bit MO16 immediate must be between -512 (-0x200) and 511 (0x1ff): {}'.format(imm))
     if imm % 16 != 0:
         raise ValueError('6-bit MO16 immediate must be a multiple of 16: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, imm=imm)
 
     imm = imm >> 4
     imm = c_uint32(imm).value & 0b111111
@@ -347,13 +383,17 @@ def cis_type(rd_rs1, imm, *, opcode, funct3):
 
 # CI variation
 # c.lwsp
-def cls_type(rd, imm, *, opcode, funct3):
-    rd = lookup_register(rd)
+def cls_type(rd_rs1, imm, *, opcode, funct3, cs=None):
+    rd_rs1 = lookup_register(rd_rs1)
 
     if imm < 0 or imm > 255:
         raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, imm=imm)
 
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b111111
@@ -364,7 +404,7 @@ def cls_type(rd, imm, *, opcode, funct3):
     code = 0
     code |= opcode
     code |= imm_6_2 << 2
-    code |= rd << 7
+    code |= rd_rs1 << 7
     code |= imm_7 << 12
     code |= funct3 << 13
 
@@ -372,13 +412,17 @@ def cls_type(rd, imm, *, opcode, funct3):
 
 
 # c.swsp
-def css_type(rs2, imm, *, opcode, funct3):
+def css_type(rs2, imm, *, opcode, funct3, cs=None):
     rs2 = lookup_register(rs2)
 
     if imm < 0 or imm > 255:
         raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rs2=rs2, imm=imm)
 
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b111111
@@ -397,13 +441,17 @@ def css_type(rs2, imm, *, opcode, funct3):
 
 
 # c.addi4spn
-def ciw_type(rd, imm, *, opcode, funct3):
+def ciw_type(rd, imm, *, opcode, funct3, cs=None):
     rd = lookup_register(rd, compressed=True)
 
     if imm < 0 or imm > 1023:
         raise ValueError('8-bit MO4 unsigned immediate must be between 0 (0x00) and 0x3ff (1023): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('8-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd=rd, imm=imm)
 
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b11111111
@@ -426,7 +474,7 @@ def ciw_type(rd, imm, *, opcode, funct3):
 
 
 # c.lw
-def cl_type(rd, rs1, imm, *, opcode, funct3):
+def cl_type(rd, rs1, imm, *, opcode, funct3, cs=None):
     rd = lookup_register(rd, compressed=True)
     rs1 = lookup_register(rs1, compressed=True)
 
@@ -434,6 +482,10 @@ def cl_type(rd, rs1, imm, *, opcode, funct3):
         raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd=rd, rs1=rs1, imm=imm)
 
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b11111
@@ -455,7 +507,7 @@ def cl_type(rd, rs1, imm, *, opcode, funct3):
 
 
 # c.sw
-def cs_type(rs1, rs2, imm, *, opcode, funct3):
+def cs_type(rs1, rs2, imm, *, opcode, funct3, cs=None):
     rs1 = lookup_register(rs1, compressed=True)
     rs2 = lookup_register(rs2, compressed=True)
 
@@ -463,6 +515,10 @@ def cs_type(rs1, rs2, imm, *, opcode, funct3):
         raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rs1=rs1, rs2=rs2, imm=imm)
 
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b11111
@@ -484,9 +540,13 @@ def cs_type(rs1, rs2, imm, *, opcode, funct3):
 
 
 # c.sub, c.xor, c.or, c.and
-def ca_type(rd_rs1, rs2, *, opcode, funct2, funct6):
+def ca_type(rd_rs1, rs2, *, opcode, funct2, funct6, cs=None):
     rd_rs1 = lookup_register(rd_rs1, compressed=True)
     rs2 = lookup_register(rs2, compressed=True)
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, rs2=rs2)
 
     code = 0
     code |= opcode
@@ -499,8 +559,12 @@ def ca_type(rd_rs1, rs2, *, opcode, funct2, funct6):
 
 
 # c.beqz, c.bnez
-def cb_type(rs1, imm, *, opcode, funct3):
+def cb_type(rs1, imm, *, opcode, funct3, cs=None):
     rs1 = lookup_register(rs1, compressed=True)
+
+    # validate constraints
+    for c in cs or []:
+        c(rs1=rs1, imm=imm)
 
     imm = imm >> 1
     imm = c_uint32(imm).value & 0b11111111
@@ -526,8 +590,12 @@ def cb_type(rs1, imm, *, opcode, funct3):
 
 # CB variation
 # c.srli, c.srai, c.andi
-def cbi_type(rd_rs1, imm, *, opcode, funct2, funct3):
+def cbi_type(rd_rs1, imm, *, opcode, funct2, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1, compressed=True)
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, imm=imm)
 
     imm = c_uint32(imm).value & 0b111111
 
@@ -546,11 +614,15 @@ def cbi_type(rd_rs1, imm, *, opcode, funct2, funct3):
 
 
 # c.jal, c.j
-def cj_type(imm, *, opcode, funct3):
+def cj_type(imm, *, opcode, funct3, cs=None):
     if imm < -2048 or imm > 2047:
         raise ValueError('11-bit MO2 immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
     if imm % 2 != 0:
         raise ValueError('11-bit MO2 immediate must be a muliple of 2: {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(imm=imm)
 
     imm = imm >> 1
     imm = c_uint32(imm).value & 0b11111111111
@@ -645,21 +717,17 @@ AMOMINU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11000)
 AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
 
 # RV32C Standard Extension for Compressed Instructions
-# TODO: custom logic for these is diff because the dev still specifies _something_
-# TODO: it isn't a "value MUST be foo" like the other special cases
-# TODO: maybe just do it as a separate pass? validate_compressed() or something like that
-# TODO: but what about the low-level API? Shouldn't those fail, too?
-C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000)
+C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000, cs=[ImmNotZero])
 C_LW       = partial(cl_type,  opcode=0b00, funct3=0b010)
 C_SW       = partial(cs_type,  opcode=0b00, funct3=0b110)
 C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # special syntax
-C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000)
+C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000, cs=[RegRdRs1NotZero, ImmNotZero])
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
-C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010)
-C_ADDI16SP = partial(cis_type, opcode=0b01, funct3=0b011)
-C_LUI      = partial(ci_type,  opcode=0b01, funct3=0b011)
-C_SRLI     = partial(cbi_type, opcode=0b01, funct2=0b00, funct3=0b100)
-C_SRAI     = partial(cbi_type, opcode=0b01, funct2=0b01, funct3=0b100)
+C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010, cs=[RegRdRs1NotZero])
+C_ADDI16SP = partial(cis_type, opcode=0b01, funct3=0b011, cs=[ImmNotZero])
+C_LUI      = partial(ci_type,  opcode=0b01, funct3=0b011, cs=[RegRdRs1NotZero, RegRdRs1NotTwo, ImmNotZero])
+C_SRLI     = partial(cbi_type, opcode=0b01, funct2=0b00, funct3=0b100, cs=[ImmNotZero])
+C_SRAI     = partial(cbi_type, opcode=0b01, funct2=0b01, funct3=0b100, cs=[ImmNotZero])
 C_ANDI     = partial(cbi_type, opcode=0b01, funct2=0b10, funct3=0b100)
 C_SUB      = partial(ca_type,  opcode=0b01, funct2=0b00, funct6=0b100011)
 C_XOR      = partial(ca_type,  opcode=0b01, funct2=0b01, funct6=0b100011)
@@ -668,13 +736,13 @@ C_AND      = partial(ca_type,  opcode=0b01, funct2=0b11, funct6=0b100011)
 C_J        = partial(cj_type,  opcode=0b01, funct3=0b101)
 C_BEQZ     = partial(cb_type,  opcode=0b01, funct3=0b110)
 C_BNEZ     = partial(cb_type,  opcode=0b01, funct3=0b111)
-C_SLLI     = partial(ci_type,  opcode=0b10, funct3=0b000)
-C_LWSP     = partial(cls_type, opcode=0b10, funct3=0b010)
-C_JR       = partial(cr_type,  opcode=0b10, funct4=0b1000)
-C_MV       = partial(cr_type,  opcode=0b10, funct4=0b1000)
+C_SLLI     = partial(ci_type,  opcode=0b10, funct3=0b000, cs=[RegRdRs1NotZero, ImmNotZero])
+C_LWSP     = partial(cls_type, opcode=0b10, funct3=0b010, cs=[RegRdRs1NotZero])
+C_JR       = partial(cr_type,  opcode=0b10, funct4=0b1000, cs=[RegRdRs1NotZero])
+C_MV       = partial(cr_type,  opcode=0b10, funct4=0b1000, cs=[RegRdRs1NotZero, RegRs2NotZero])
 C_EBREAK   = partial(cr_type,  opcode=0b10, funct4=0b1001, rd_rs1=0, rs2=0)  # special syntax
-C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001)
-C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001)
+C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero])
+C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero, RegRs2NotZero])
 C_SWSP     = partial(css_type, opcode=0b10, funct3=0b110)
 
 
@@ -1905,23 +1973,6 @@ def check_compressible(items):
     return items
 
 
-def validate_compressed(items):
-    # TODO: ensure compressed inst regs / imms are valid
-    # c.addi:     rd/rs1 != 0, nzimm
-    # c.li:       rd != 0
-    # c.addi16sp: nzimm
-    # c.lui:      rd != {0,2}
-    # c.srli:     nzimm
-    # c.srai:     nzimm
-    # c.slli:     rd/rs1 != 0, nzimm
-    # c.lwsp:     rd != 0
-    # c.jr:       rs1 != 0
-    # c.mv:       rd != 0, rs2 != 0
-    # c.jalr:     rs1 != 0
-    # c.add:      rd/rs1 != 0, rs2 != 0
-    return items
-
-
 def resolve_instructions(items):
     new_items = []
     for item in items:
@@ -2130,7 +2181,6 @@ def resolve_blobs(items):
 #   - Resolve registers  (could be constants for readability)
 #   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
 #   - Check compressible  (identify and compress eligible instructions)
-#   - Valitate compressed  (validate compressed inst reg / imm values)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
 #   - Resolve sequences (convert Sequence to Blob)
 #   - Resolve strings  (convert String to Blob)
@@ -2170,7 +2220,6 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = resolve_immediates(items, env)
     if compress:
         items = check_compressible(items)
-    items = validate_compressed(items)
     items = resolve_instructions(items)
     items = resolve_sequences(items)
     items = resolve_strings(items)
@@ -2189,7 +2238,6 @@ def assemble(path_or_source, compress=False, verbose=False):
 
 
 def cli_main():
-    # TODO: better way to handle this?
     if len(sys.argv) >= 2 and sys.argv[1] == '--version':
         from bronzebeard import __version__
         version = 'bronzebeard {}'.format(__version__)
