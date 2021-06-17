@@ -1279,13 +1279,13 @@ class RTypeInstruction(Instruction):
 
 class ITypeInstruction(Instruction):
 
-    def __init__(self, line, name, rd, rs1, imm, follows_auipc=False):
+    def __init__(self, line, name, rd, rs1, imm, is_auipc_jump=False):
         super().__init__(line)
         self.name = name
         self.rd = rd
         self.rs1 = rs1
         self.imm = imm
-        self.follows_auipc = follows_auipc
+        self.is_auipc_jump = is_auipc_jump
 
     def __repr__(self):
         return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
@@ -1399,7 +1399,113 @@ class ALTypeInstruction(Instruction):
         return s
 
 
-# TODO: classes for compressed instruction types
+class CRTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd_rs1, rs2):
+        super().__init__(line)
+        self.name = name
+        self.rd_rs1 = rd_rs1
+        self.rs2 = rs2
+
+    def __repr__(self):
+        return '{}({!r}, rd_rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+
+
+class CITypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd_rs1, imm):
+        super().__init__(line)
+        self.name = name
+        self.rd_rs1 = rd_rs1
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rd_rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.imm)
+
+
+class CSSTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rs2, imm):
+        super().__init__(line)
+        self.name = name
+        self.rs2 = rs2
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs2, self.imm)
+
+
+class CIWTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd, imm):
+        super().__init__(line)
+        self.name = name
+        self.rd = rd
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
+
+
+class CLTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd, rs1, imm):
+        super().__init__(line)
+        self.name = name
+        self.rd = rd
+        self.rs1 = rs1
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+
+
+class CSTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rs1, rs2, imm):
+        super().__init__(line)
+        self.name = name
+        self.rs1 = rs1
+        self.rs2 = rs2
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+
+
+class CATypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd_rs1, rs2):
+        super().__init__(line)
+        self.name = name
+        self.rd_rs1 = rd_rs1
+        self.rs2 = rs2
+
+    def __repr__(self):
+        return '{}({!r}, rd_rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+
+
+class CBTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rs1, imm):
+        super().__init__(line)
+        self.name = name
+        self.rs1 = rs1
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.imm)
+
+
+class CJTypeInstruction(Instruction):
+
+    def __init__(self, line, name, imm):
+        super().__init__(line)
+        self.name = name
+        self.imm = imm
+
+    def __repr__(self):
+        return '{}({!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
 
 
 class PseudoInstruction(Instruction):
@@ -1804,7 +1910,7 @@ def transform_pseudo_instructions(items):
             imm = parse_immediate(imm)
             inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
             new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), follows_auipc=True)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
             new_items.append(inst)
         elif item.name == 'tail':
             reference, = item.args
@@ -1812,7 +1918,7 @@ def transform_pseudo_instructions(items):
             imm = parse_immediate(imm)
             inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
             new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), follows_auipc=True)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
             new_items.append(inst)
 
         elif item.name == 'fence':
@@ -1888,7 +1994,7 @@ def resolve_registers(items, env):
         elif isinstance(item, ITypeInstruction):
             rd = env.get(item.rd, item.rd)
             rs1 = env.get(item.rs1, item.rs1)
-            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm, item.follows_auipc)
+            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm, item.is_auipc_jump)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
             rs1 = env.get(item.rs1, item.rs1)
@@ -1933,10 +2039,10 @@ def resolve_immediates(items, env):
         if isinstance(item, ITypeInstruction):
             imm = item.imm.eval(position, env, item.line)
             # special case where the PC we care about is tied to the prior AUIPC inst
-            if item.follows_auipc:
+            if item.is_auipc_jump:
                 imm += 4
             position += item.size(position)
-            inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm, item.follows_auipc)
+            inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm, item.is_auipc_jump)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
             imm = item.imm.eval(position, env, item.line)
