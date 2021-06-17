@@ -2256,7 +2256,7 @@ def cli_main():
         prog='bronzebeard',
     )
     parser.add_argument('input_asm', type=str, help='input source file')
-    parser.add_argument('-o', '--output', type=str, default='bb.asm', help='output binary file (default "bb.asm")')
+    parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
     parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions (TODO)')
     parser.add_argument('--verbose', action='store_true', help='verbose assembler output (TODO)')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
