@@ -39,7 +39,7 @@ ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via `sudo udevadm control --reload`.
 
-## Flash the Program (via DFU)
+## Flash the Program
 With the target device in DFU mode:
 ```
 python3 -m bronzebeard.dfu <device_id> example.bin
