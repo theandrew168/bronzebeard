@@ -46,7 +46,7 @@ bronzebeard examples/example.asm
 
 By default, the assembled output binary will be placed in a file named "bb.out".
 
-### Command Line Interface
+## Command Line Interface
 ```
 usage: bronzebeard [-h] [-o OUTPUT] [--compress] [--verbose] [--version] input_asm
 
