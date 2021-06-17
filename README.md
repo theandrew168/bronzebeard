@@ -58,7 +58,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
-                        output binary file (default "bb.asm")
+                        output binary file (default "bb.out")
   --compress            identify and compress eligible instructions (TODO)
   --verbose             verbose assembler output (TODO)
   --version             print assembler version and exit
