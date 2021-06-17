@@ -1279,12 +1279,13 @@ class RTypeInstruction(Instruction):
 
 class ITypeInstruction(Instruction):
 
-    def __init__(self, line, name, rd, rs1, imm):
+    def __init__(self, line, name, rd, rs1, imm, follows_auipc=False):
         super().__init__(line)
         self.name = name
         self.rd = rd
         self.rs1 = rs1
         self.imm = imm
+        self.follows_auipc = follows_auipc
 
     def __repr__(self):
         return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
@@ -1798,16 +1799,20 @@ def transform_pseudo_instructions(items):
             inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
             new_items.append(inst)
         elif item.name == 'call':
-            imm = parse_immediate(item.args)
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
             inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
             new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm))
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), follows_auipc=True)
             new_items.append(inst)
         elif item.name == 'tail':
-            imm = parse_immediate(item.args)
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
             inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
             new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm))
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), follows_auipc=True)
             new_items.append(inst)
 
         elif item.name == 'fence':
@@ -1883,7 +1888,7 @@ def resolve_registers(items, env):
         elif isinstance(item, ITypeInstruction):
             rd = env.get(item.rd, item.rd)
             rs1 = env.get(item.rs1, item.rs1)
-            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm)
+            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm, item.follows_auipc)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
             rs1 = env.get(item.rs1, item.rs1)
@@ -1927,8 +1932,11 @@ def resolve_immediates(items, env):
     for item in items:
         if isinstance(item, ITypeInstruction):
             imm = item.imm.eval(position, env, item.line)
+            # special case where the PC we care about is tied to the prior AUIPC inst
+            if item.follows_auipc:
+                imm += 4
             position += item.size(position)
-            inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm)
+            inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm, item.follows_auipc)
             new_items.append(inst)
         elif isinstance(item, STypeInstruction):
             imm = item.imm.eval(position, env, item.line)

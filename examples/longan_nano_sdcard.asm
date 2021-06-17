@@ -108,8 +108,7 @@ rcu_init:
     slli t1, t1, 14
     sw t0, t1, 0
 
-    # return
-    jalr zero, ra, 0
+    ret
 
 # Func: gpio_init
 # Arg: a0 = GPIO port base addr
@@ -414,7 +413,7 @@ main:
     # init RCU for GPIO[ABC], AFIO, and SPI1
     lui a0, %hi(RCU_BASE_ADDR)
     addi a0, a0, %lo(RCU_BASE_ADDR)
-    jal ra, rcu_init
+    call rcu_init
 
     # setup GPIOB base addr
     lui a0, %hi(GPIOB_BASE_ADDR)

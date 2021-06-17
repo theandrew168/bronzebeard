@@ -94,8 +94,6 @@ def test_assemble_basic_uppercase():
     ('jr t0',            'jalr x0 0(t0)'),
     ('jalr t0',          'jalr x1 0(t0)'),
     ('ret',              'jalr x0 0(x1)'),
-    ('call 0x20000000',  'auipc x1 %hi(0x20000000)\n jalr x1 x1 %lo(0x20000000)'),
-    ('tail 0x20000000',  'auipc x6 %hi(0x20000000)\n jalr x0 x6 %lo(0x20000000)'),
 
     ('fence',            'fence 0b1111 0b1111'),
 ])
@@ -103,6 +101,38 @@ def test_assemble_pseudo_instructions(pseudo, transformed):
     pseudo_bin = asm.assemble(pseudo)
     transformed_bin = asm.assemble(transformed)
     assert pseudo_bin == transformed_bin
+
+
+def test_assemble_pseudo_instruction_call():
+    source = r"""
+    call main
+
+    align 0x00020000
+    main:
+        j main
+    """
+    binary = asm.assemble(source)[:8]
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.AUIPC('x1', asm.relocate_hi(0x00020000)),
+        asm.JALR('x1', 'x1', asm.relocate_lo(0x00020000)),
+    ])
+    assert binary == target
+
+
+def test_assemble_pseudo_instruction_tail():
+    source = r"""
+    tail main
+
+    align 0x00020000
+    main:
+        j main
+    """
+    binary = asm.assemble(source)[:8]
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.AUIPC('x6', asm.relocate_hi(0x00020000)),
+        asm.JALR('x0', 'x6', asm.relocate_lo(0x00020000)),
+    ])
+    assert binary == target
 
 
 @pytest.mark.parametrize(
