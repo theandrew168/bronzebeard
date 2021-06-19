@@ -17,15 +17,15 @@ Installing a full operating system doesn't have to be a prerequisite to building
 
 Check out the [DerzForth](https://github.com/theandrew168/derzforth) project for further elaboration of this idea.
 
-## Devices
-The assembler itself supports the base 32-bit instruction set as well as the M, A, and C extensions (RV32IMAC).
-At the moment, Bronzebeard has only been used to target the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
-There are plans to test on additional RISC-V boards such as the [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b) in the future.
-
 ## Documentation
 Most of the surface-level documentation for Bronzebeard lives right here in this README.
 For more specific details regarding the usage and accepted syntax of the assembler, check out the [docs](https://github.com/theandrew168/bronzebeard/tree/master/docs) directory.
 This is where the project's primary documentation will live until the time comes to setup something more official.
+
+## Devices
+The assembler itself supports the base 32-bit instruction set as well as the M, A, and C extensions (RV32IMAC).
+At the moment, Bronzebeard has only been used to target the [Longan Nano](https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-Development-Board-p-4205.html) and the [Wio Lite](https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html).
+There are plans to test on additional RISC-V boards such as the [HiFive1 Rev B](https://www.sifive.com/boards/hifive1-rev-b) in the future.
 
 ## Installation
 If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest taking a brief moment to learn about them and set one up.
