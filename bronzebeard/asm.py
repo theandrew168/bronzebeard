@@ -3,10 +3,15 @@ import argparse
 import copy
 from ctypes import c_uint32
 from functools import partial
+import logging
 import os
 import re
 import struct
 import sys
+
+# Python Cookbook: Section 13.12
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 REGISTERS = {
@@ -66,10 +71,11 @@ def lookup_register(reg, compressed=False):
     except:
         pass
 
-    if reg not in REGISTERS:
+    # at this point, any valid reg will be in the REGISTERS dict
+    try:
+        reg = REGISTERS[reg]
+    except KeyError:
         raise ValueError('register must be a valid integer, name, or alias: {}'.format(reg))
-
-    reg = REGISTERS[reg]
 
     # check for compressed instruction register, validate and apply
     if compressed:
@@ -325,7 +331,7 @@ def cr_type(rd_rs1, rs2, *, opcode, funct4, cs=None):
     return code
 
 
-# c.nop, c.addi, c.li, c.lui, c.slli
+# c.nop, c.addi, c.li, c.slli
 def ci_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
@@ -353,9 +359,7 @@ def ci_type(rd_rs1, imm, *, opcode, funct3, cs=None):
 
 # CI variation
 # c.addi16sp
-def cis_type(rd_rs1, imm, *, opcode, funct3, cs=None):
-    rd_rs1 = lookup_register(rd_rs1)
-
+def cia_type(imm, *, opcode, funct3, cs=None):
     if imm < -512 or imm > 511:
         raise ValueError('6-bit MO16 immediate must be between -512 (-0x200) and 511 (0x1ff): {}'.format(imm))
     if imm % 16 != 0:
@@ -363,7 +367,7 @@ def cis_type(rd_rs1, imm, *, opcode, funct3, cs=None):
 
     # validate constraints
     for c in cs or []:
-        c(rd_rs1=rd_rs1, imm=imm)
+        c(imm=imm)
 
     imm = imm >> 4
     imm = c_uint32(imm).value & 0b111111
@@ -374,8 +378,41 @@ def cis_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     code = 0
     code |= opcode
     code |= imm_8_4 << 2
-    code |= rd_rs1 << 7
+    code |= 2 << 7
     code |= imm_9 << 12
+    code |= funct3 << 13
+
+    return code
+
+
+# TODO: custom encoding func for c.lui (weird behavior here)
+# https://stackoverflow.com/questions/63881445/what-are-the-operands-of-c-lui-instructioncompressed-subset-of-risc-v
+
+# C.LUI loads the non-zero 6-bit immediate field into bits 17–12 of the destination register, clears the
+# bottom 12 bits, and sign-extends bit 17 into all higher bits of the destination
+
+# CI variation
+# c.lui
+def ciu_type(rd_rs1, imm, *, opcode, funct3, cs=None):
+    rd_rs1 = lookup_register(rd_rs1)
+
+    if imm < -32 or imm > 31:
+        raise ValueError('6-bit immediate must be between -32 (-0x20) and 31 (0x1f): {}'.format(imm))
+
+    # validate constraints
+    for c in cs or []:
+        c(rd_rs1=rd_rs1, imm=imm)
+
+    imm = c_uint32(imm).value & 0b111111
+
+    imm_5 = (imm >> 5) & 0b1
+    imm_4_0 = imm & 0b11111
+
+    code = 0
+    code |= opcode
+    code |= imm_4_0 << 2
+    code |= rd_rs1 << 7
+    code |= imm_5 << 12
     code |= funct3 << 13
 
     return code
@@ -383,7 +420,7 @@ def cis_type(rd_rs1, imm, *, opcode, funct3, cs=None):
 
 # CI variation
 # c.lwsp
-def cls_type(rd_rs1, imm, *, opcode, funct3, cs=None):
+def cil_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < 0 or imm > 255:
@@ -689,7 +726,7 @@ SRL        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0000000)
 SRA        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0100000)
 OR         = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000000)
 AND        = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000000)
-FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax
+FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax*
 ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
 EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
 
@@ -724,8 +761,8 @@ C_NOP      = partial(ci_type,  opcode=0b01, funct3=0b000, rd_rs1=0, imm=0)  # sp
 C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000, cs=[RegRdRs1NotZero, ImmNotZero])
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
 C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010, cs=[RegRdRs1NotZero])
-C_ADDI16SP = partial(cis_type, opcode=0b01, funct3=0b011, cs=[ImmNotZero])
-C_LUI      = partial(ci_type,  opcode=0b01, funct3=0b011, cs=[RegRdRs1NotZero, RegRdRs1NotTwo, ImmNotZero])
+C_ADDI16SP = partial(cia_type, opcode=0b01, funct3=0b011, cs=[ImmNotZero])  # special syntax
+C_LUI      = partial(ciu_type,  opcode=0b01, funct3=0b011, cs=[RegRdRs1NotZero, RegRdRs1NotTwo, ImmNotZero])
 C_SRLI     = partial(cbi_type, opcode=0b01, funct2=0b00, funct3=0b100, cs=[ImmNotZero])
 C_SRAI     = partial(cbi_type, opcode=0b01, funct2=0b01, funct3=0b100, cs=[ImmNotZero])
 C_ANDI     = partial(cbi_type, opcode=0b01, funct2=0b10, funct3=0b100)
@@ -737,11 +774,11 @@ C_J        = partial(cj_type,  opcode=0b01, funct3=0b101)
 C_BEQZ     = partial(cb_type,  opcode=0b01, funct3=0b110)
 C_BNEZ     = partial(cb_type,  opcode=0b01, funct3=0b111)
 C_SLLI     = partial(ci_type,  opcode=0b10, funct3=0b000, cs=[RegRdRs1NotZero, ImmNotZero])
-C_LWSP     = partial(cls_type, opcode=0b10, funct3=0b010, cs=[RegRdRs1NotZero])
-C_JR       = partial(cr_type,  opcode=0b10, funct4=0b1000, cs=[RegRdRs1NotZero])
+C_LWSP     = partial(cil_type, opcode=0b10, funct3=0b010, cs=[RegRdRs1NotZero])
+C_JR       = partial(cr_type,  opcode=0b10, funct4=0b1000, rs2=0, cs=[RegRdRs1NotZero])  # special syntax
 C_MV       = partial(cr_type,  opcode=0b10, funct4=0b1000, cs=[RegRdRs1NotZero, RegRs2NotZero])
 C_EBREAK   = partial(cr_type,  opcode=0b10, funct4=0b1001, rd_rs1=0, rs2=0)  # special syntax
-C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero])
+C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001, rs2=0, cs=[RegRdRs1NotZero])  # special syntax
 C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero, RegRs2NotZero])
 C_SWSP     = partial(css_type, opcode=0b10, funct3=0b110)
 
@@ -836,26 +873,33 @@ AL_TYPE_INSTRUCTIONS = {
 }
 
 CR_TYPE_INSTRUCTIONS = {
-    'c.jr':       C_JR,
     'c.mv':       C_MV,
-    'c.jalr':     C_JALR,
     'c.add':      C_ADD,
 }
 
+CRJ_TYPE_INSTRUCTIONS = {
+    'c.jr':       C_JR,
+    'c.jalr':     C_JALR,
+}
+
+CRE_TYPE_INSTRUCTIONS = {
+    'c.ebreak':   C_EBREAK,
+}
+
 CI_TYPE_INSTRUCTIONS = {
-    'c.nop':      C_NOP,
     'c.addi':     C_ADDI,
     'c.li':       C_LI,
     'c.lui':      C_LUI,
     'c.slli':     C_SLLI,
+    'c.lwsp':     C_LWSP,
 }
 
-CIS_TYPE_INSTRUCTIONS = {
+CIA_TYPE_INSTRUCTIONS = {
     'c.addi16sp': C_ADDI16SP,
 }
 
-CLS_TYPE_INSTRUCTIONS = {
-    'c.lwsp':     C_LWSP,    
+CIN_TYPE_INSTRUCTIONS = {
+    'c.nop':      C_NOP,
 }
 
 CSS_TYPE_INSTRUCTIONS = {
@@ -882,14 +926,11 @@ CA_TYPE_INSTRUCTIONS = {
 }
 
 CB_TYPE_INSTRUCTIONS = {
-    'c.beqz':     C_BEQZ,
-    'b.bnez':     C_BNEZ,
-}
-
-CBI_TYPE_INSTRUCTIONS = {
     'c.srli':     C_SRLI,
     'c.srai':     C_SRAI,
     'c.andi':     C_ANDI,
+    'c.beqz':     C_BEQZ,
+    'c.bnez':     C_BNEZ,
 }
 
 CJ_TYPE_INSTRUCTIONS = {
@@ -909,16 +950,17 @@ INSTRUCTIONS.update(FENCE_INSTRUCTIONS)
 INSTRUCTIONS.update(A_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(AL_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CR_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(CRJ_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(CRE_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CI_TYPE_INSTRUCTIONS)
-INSTRUCTIONS.update(CIS_TYPE_INSTRUCTIONS)
-INSTRUCTIONS.update(CLS_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(CIA_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(CIN_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CSS_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CIW_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CL_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CS_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CA_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
-INSTRUCTIONS.update(CBI_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
 
 PSEUDO_INSTRUCTIONS = {
@@ -966,13 +1008,8 @@ BASE_OFFSET_INSTRUCTIONS = {
     'sb',
     'sh',
     'sw',
-}
-
-SHORTHAND_PACK_NAMES = {
-    'db',
-    'dh',
-    'dw',
-    'dd',
+    'c.lw',
+    'c.sw',
 }
 
 NUMERIC_SEQUENCE_NAMES = {
@@ -985,6 +1022,13 @@ NUMERIC_SEQUENCE_NAMES = {
     'doubles',
 }
 
+SHORTHAND_PACK_NAMES = {
+    'db',
+    'dh',
+    'dw',
+    'dd',
+}
+
 KEYWORDS = {
     'align',
     'string',
@@ -992,8 +1036,8 @@ KEYWORDS = {
 }
 KEYWORDS.update(INSTRUCTIONS.keys())
 KEYWORDS.update(PSEUDO_INSTRUCTIONS)
-KEYWORDS.update(SHORTHAND_PACK_NAMES)
 KEYWORDS.update(NUMERIC_SEQUENCE_NAMES)
+KEYWORDS.update(SHORTHAND_PACK_NAMES)
 
 
 class Line:
@@ -1007,10 +1051,14 @@ class Line:
         return len(self.contents)
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r})'.format(type(self).__name__, self.file, self.number, self.contents)
+        s = '{}({!r}, {!r}, {!r})'
+        s = s.format(type(self).__name__, self.file, self.number, self.contents)
+        return s
 
     def __str__(self):
-        return 'File "{}", line {}: {}'.format(self.file, self.number, self.contents)
+        s = 'File "{}", line {}: {}'
+        s = s.format(self.file, self.number, self.contents)
+        return s
 
 
 class LineTokens:
@@ -1023,7 +1071,9 @@ class LineTokens:
         return len(self.tokens)
 
     def __repr__(self):
-        return '{}({!r}, {!r})'.format(type(self).__name__, self.line, self.tokens)
+        s = '{}({!r}, {!r})'
+        s = s.format(type(self).__name__, self.line, self.tokens)
+        return s
 
     def __str__(self):
         return str(self.tokens)
@@ -1044,7 +1094,9 @@ class Arithmetic(Immediate):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.expr)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.expr)
+        return s
 
     # be sure to not leak internal python exceptions out of this
     def eval(self, position, env, line):
@@ -1065,7 +1117,9 @@ class Position(Immediate):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r}, {!r})'.format(type(self).__name__, self.reference, self.expr)
+        s = '{}({!r}, {!r})'
+        s = s.format(type(self).__name__, self.reference, self.expr)
+        return s
 
     def eval(self, position, env, line):
         dest = env[self.reference]
@@ -1079,7 +1133,9 @@ class Offset(Immediate):
         self.reference = reference
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.reference)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.reference)
+        return s
 
     def eval(self, position, env, line):
         dest = env[self.reference]
@@ -1092,7 +1148,9 @@ class Hi(Immediate):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.expr)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.expr)
+        return s
 
     def eval(self, position, env, line):
         value = self.expr.eval(position, env, line)
@@ -1105,7 +1163,9 @@ class Lo(Immediate):
         self.expr = expr
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.expr)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.expr)
+        return s
 
     def eval(self, position, env, line):
         value = self.expr.eval(position, env, line)
@@ -1130,7 +1190,9 @@ class Label(Item):
         self.name = name
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.name)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.name)
+        return s
 
     def size(self, position):
         return 0
@@ -1144,7 +1206,9 @@ class Constant(Item):
         self.imm = imm
 
     def __repr__(self):
-        return '{}(name={!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
+        s = '{}(name={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.imm)
+        return s
 
     def size(self, position):
         return 0
@@ -1157,7 +1221,9 @@ class Align(Item):
         self.alignment = alignment
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.alignment)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.alignment)
+        return s
 
     def size(self, position):
         padding = self.alignment - (position % self.alignment)
@@ -1174,7 +1240,9 @@ class String(Item):
         self.value = value
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.value)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.value)
+        return s
 
     def size(self, position):
         return len(self.value.encode('utf-8'))
@@ -1188,7 +1256,9 @@ class Pack(Item):
         self.imm = imm
 
     def __repr__(self):
-        return '{}(fmt={!r}, imm={!r})'.format(type(self).__name__, self.fmt, self.imm)
+        s = '{}(fmt={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.fmt, self.imm)
+        return s
 
     def size(self, position):
         return struct.calcsize(self.fmt)
@@ -1202,7 +1272,9 @@ class ShorthandPack(Item):
         self.imm = imm
 
     def __repr__(self):
-        return '{}(name={!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
+        s = '{}(name={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.imm)
+        return s
 
     def size(self, position):
         sizes = {
@@ -1222,7 +1294,9 @@ class Sequence(Item):
         self.values = values
 
     def __repr__(self):
-        return '{}(name={!r}, {!r})'.format(type(self).__name__, self.name, self.values)
+        s = '{}(name={!r}, {!r})'
+        s = s.format(type(self).__name__, self.name, self.values)
+        return s
 
     def size(self, position):
         sizes = {
@@ -1257,6 +1331,10 @@ class Instruction(Item):
     def size(self, position):
         return 4
 
+    @abc.abstractmethod
+    def args(self):
+        """Return list of arguments for this instruction"""
+
 
 class CompressedInstruction(Instruction):
 
@@ -1274,7 +1352,12 @@ class RTypeInstruction(Instruction):
         self.rs2 = rs2
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
+        s = '{}({!r}, rd={!r}, rs1={!r}, rs2={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
+        return s
+
+    def args(self):
+        return [self.rd, self.rs1, self.rs2]
 
 
 class ITypeInstruction(Instruction):
@@ -1288,10 +1371,15 @@ class ITypeInstruction(Instruction):
         self.is_auipc_jump = is_auipc_jump
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+        s = '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd, self.rs1, self.imm]
 
 
-# custom syntax for ecall / ebreak insts
+# custom syntax for: ecall, ebreak
 class IETypeInstruction(Instruction):
 
     def __init__(self, line, name):
@@ -1299,7 +1387,12 @@ class IETypeInstruction(Instruction):
         self.name = name
 
     def __repr__(self):
-        return '{}({!r})'.format(type(self).__name__, self.name)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.name)
+        return s
+
+    def args(self):
+        return []
 
 
 class STypeInstruction(Instruction):
@@ -1312,7 +1405,12 @@ class STypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        s = '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        return s
+
+    def args(self):
+        return [self.rs1, self.rs2, self.imm]
 
 
 class BTypeInstruction(Instruction):
@@ -1325,7 +1423,12 @@ class BTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        s = '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        return s
+
+    def args(self):
+        return [self.rs1, self.rs2, self.imm]
 
 
 class UTypeInstruction(Instruction):
@@ -1337,7 +1440,12 @@ class UTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
+        s = '{}({!r}, rd={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd, self.imm]
 
 
 class JTypeInstruction(Instruction):
@@ -1349,10 +1457,15 @@ class JTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
+        s = '{}({!r}, rd={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd, self.imm]
 
 
-# custom syntax for fence inst
+# custom syntax for: fence
 class FenceInstruction(Instruction):
 
     def __init__(self, line, name, succ, pred):
@@ -1362,7 +1475,12 @@ class FenceInstruction(Instruction):
         self.pred = pred
 
     def __repr__(self):
-        return '{}({!r}, succ={!r}, pred={!r})'.format(type(self).__name__, self.name, self.succ, self.pred)
+        s = '{}({!r}, succ={!r}, pred={!r})'
+        s = s.format(type(self).__name__, self.name, self.succ, self.pred)
+        return s
+
+    def args(self):
+        return [self.succ, self.pred]
 
 
 class ATypeInstruction(Instruction):
@@ -1381,8 +1499,11 @@ class ATypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2, self.aq, self.rl)
         return s
 
+    def args(self):
+        return [self.rd, self.rs1, self.rs2, self.aq, self.rl]
 
-# custom syntax for lr.w inst
+
+# custom syntax for: lr.w
 class ALTypeInstruction(Instruction):
 
     def __init__(self, line, name, rd, rs1, aq=0, rl=0):
@@ -1398,6 +1519,9 @@ class ALTypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.aq, self.rl)
         return s
 
+    def args(self):
+        return [self.rd, self.rs1, self.aq, self.rl]
+
 
 class CRTypeInstruction(Instruction):
 
@@ -1408,7 +1532,45 @@ class CRTypeInstruction(Instruction):
         self.rs2 = rs2
 
     def __repr__(self):
-        return '{}({!r}, rd_rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+        s = '{}({!r}, rd_rs1={!r}, rs2={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+        return s
+
+    def args(self):
+        return [self.rd_rs1, self.rs2]
+
+
+# custom syntax for: c.jr, c.jalr
+class CRJTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd_rs1):
+        super().__init__(line)
+        self.name = name
+        self.rd_rs1 = rd_rs1
+
+    def __repr__(self):
+        s = '{}({!r}, rd_rs1={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd_rs1)
+        return s
+
+    def args(self):
+        return [self.rd_rs1]
+
+
+# custom syntax for: c.ebreak
+class CRETypeInstruction(Instruction):
+
+    def __init__(self, line, name):
+        super().__init__(line)
+        self.name = name
+
+    def __repr__(self):
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.name)
+        return s
+
+    def args(self):
+        return []
 
 
 class CITypeInstruction(Instruction):
@@ -1420,7 +1582,45 @@ class CITypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd_rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.imm)
+        s = '{}({!r}, rd_rs1={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd_rs1, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd_rs1, self.imm]
+
+
+# custom syntax for: c.addi16sp
+class CIATypeInstruction(Instruction):
+
+    def __init__(self, line, name, imm):
+        super().__init__(line)
+        self.name = name
+        self.imm = imm
+
+    def __repr__(self):
+        s = '{}({!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.imm)
+        return s
+
+    def args(self):
+        return [self.imm]
+
+
+# custom syntax for: c.nop
+class CINTypeInstruction(Instruction):
+
+    def __init__(self, line, name):
+        super().__init__(line)
+        self.name = name
+
+    def __repr__(self):
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.name)
+        return s
+
+    def args(self):
+        return []
 
 
 class CSSTypeInstruction(Instruction):
@@ -1432,7 +1632,12 @@ class CSSTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs2, self.imm)
+        s = '{}({!r}, rs2={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs2, self.imm)
+        return s
+
+    def args(self):
+        return [self.rs2, self.imm]
 
 
 class CIWTypeInstruction(Instruction):
@@ -1444,7 +1649,12 @@ class CIWTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.imm)
+        s = '{}({!r}, rd={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd, self.imm]
 
 
 class CLTypeInstruction(Instruction):
@@ -1457,7 +1667,12 @@ class CLTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+        s = '{}({!r}, rd={!r}, rs1={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
+        return s
+
+    def args(self):
+        return [self.rd, self.rs1, self.imm]
 
 
 class CSTypeInstruction(Instruction):
@@ -1470,7 +1685,12 @@ class CSTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        s = '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        return s
+
+    def args(self):
+        return [self.rs1, self.rs2, self.imm]
 
 
 class CATypeInstruction(Instruction):
@@ -1482,7 +1702,12 @@ class CATypeInstruction(Instruction):
         self.rs2 = rs2
 
     def __repr__(self):
-        return '{}({!r}, rd_rs1={!r}, rs2={!r})'.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+        s = '{}({!r}, rd_rs1={!r}, rs2={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
+        return s
+
+    def args(self):
+        return [self.rd_rs1, self.rs2]
 
 
 class CBTypeInstruction(Instruction):
@@ -1494,7 +1719,12 @@ class CBTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, rs1={!r}, imm={!r})'.format(type(self).__name__, self.name, self.rs1, self.imm)
+        s = '{}({!r}, rs1={!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs1, self.imm)
+        return s
+
+    def args(self):
+        return [self.rs1, self.imm]
 
 
 class CJTypeInstruction(Instruction):
@@ -1505,7 +1735,12 @@ class CJTypeInstruction(Instruction):
         self.imm = imm
 
     def __repr__(self):
-        return '{}({!r}, imm={!r})'.format(type(self).__name__, self.name, self.imm)
+        s = '{}({!r}, imm={!r})'
+        s = s.format(type(self).__name__, self.name, self.imm)
+        return s
+
+    def args(self):
+        return [self.imm]
 
 
 class PseudoInstruction(Instruction):
@@ -1519,6 +1754,9 @@ class PseudoInstruction(Instruction):
         s = '{}({!r}, args={!r})'
         s = s.format(type(self).__name__, self.name, self.args)
         return s
+
+    def args(self):
+        return self.args
 
     def size(self, position):
         # some pseudo-instructions expand into 2 regular ones
@@ -1547,9 +1785,9 @@ def read_lines(path_or_source):
     return lines
 
 
-RE_STRING = re.compile(r'\s*string (.*)')
-
 def lex_tokens(line):
+    RE_STRING = re.compile(r'\s*string (.*)')
+
     # simplify lexing a single string
     if type(line) == str:
         line = Line('<string>', 1, line)
@@ -1625,18 +1863,15 @@ def parse_item(line_tokens):
         name, _, *imm = tokens
         imm = parse_immediate(imm)
         return Constant(line, name, imm)
-    # aligns
-    elif head == 'align':
-        _, alignment = tokens
-        try:
-            alignment = int(alignment, base=0)
-        except ValueError:
-            raise AssemblerError('alignment must be an integer', line)
-        return Align(line, alignment)
     # strings
     elif head == 'string':
         _, value = tokens
         return String(line, value)
+    # sequences
+    elif head in NUMERIC_SEQUENCE_NAMES:
+        name, *values = tokens
+        name = name.lower()
+        return Sequence(line, name, values)
     # packs
     elif head == 'pack':
         _, fmt, *imm = tokens
@@ -1647,11 +1882,14 @@ def parse_item(line_tokens):
         name, *imm = tokens
         imm = parse_immediate(imm)
         return ShorthandPack(line, name, imm)
-    # sequences
-    elif head in NUMERIC_SEQUENCE_NAMES:
-        name, *values = tokens
-        name = name.lower()
-        return Sequence(line, name, values)
+    # aligns
+    elif head == 'align':
+        _, alignment = tokens
+        try:
+            alignment = int(alignment, base=0)
+        except ValueError:
+            raise AssemblerError('alignment must be an integer', line)
+        return Align(line, alignment)
     # r-type instructions
     elif head in R_TYPE_INSTRUCTIONS:
         if len(tokens) != 4:
@@ -1762,7 +2000,98 @@ def parse_item(line_tokens):
         else:
             raise AssemblerError('invalid syntax for atomic instruction', line)
         return ALTypeInstruction(line, name, rd, rs1, aq, rl)
-    # TODO: compressed instructions
+    # cr-type instructions
+    elif head in CR_TYPE_INSTRUCTIONS:
+        if len(tokens) != 3:
+            raise AssemblerError('cr-type instructions require exactly 2 args', line)
+        name, rd_rs1, rs2 = tokens
+        name = name.lower()
+        return CRTypeInstruction(line, name, rd_rs1, rs2)
+    # crj-type instructions
+    elif head in CRJ_TYPE_INSTRUCTIONS:
+        if len(tokens) != 2:
+            raise AssemblerError('crj-type instructions require exactly 1 arg', line)
+        name, rd_rs1 = tokens
+        name = name.lower()
+        return CRJTypeInstruction(line, name, rd_rs1)
+    # cre-type instructions
+    elif head in CRE_TYPE_INSTRUCTIONS:
+        if len(tokens) != 1:
+            raise AssemblerError('cre-type instructions require no args', line)
+        name, = tokens
+        name = name.lower()
+        return CRETypeInstruction(line, name)
+    # ci-type instructions
+    elif head in CI_TYPE_INSTRUCTIONS:
+        name, rd_rs1, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CITypeInstruction(line, name, rd_rs1, imm)
+    # cia-type instructions
+    elif head in CIA_TYPE_INSTRUCTIONS:
+        name, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CIATypeInstruction(line, name, imm)
+    # cin-type instructions
+    elif head in CIN_TYPE_INSTRUCTIONS:
+        if len(tokens) != 1:
+            raise AssemblerError('cin-type instructions require no args', line)
+        name, = tokens
+        name = name.lower()
+        return CINTypeInstruction(line, name)
+    # css-type instructions
+    elif head in CSS_TYPE_INSTRUCTIONS:
+        name, rs2, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CSSTypeInstruction(line, name, rs2, imm)
+    # ciw-type instructions
+    elif head in CIW_TYPE_INSTRUCTIONS:
+        name, rd, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CIWTypeInstruction(line, name, rd, imm)
+    # cl-type instructions (all are base offset insts)
+    elif head in CL_TYPE_INSTRUCTIONS:
+        if tokens[3] == '(':
+            name, rd, offset, _, rs1, _ = tokens
+            imm = [offset]
+        else:
+            name, rd, rs1, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CLTypeInstruction(line, name, rd, rs1, imm)
+    # cs-type instructions (all are base offset insts)
+    elif head in CS_TYPE_INSTRUCTIONS:
+        if tokens[3] == '(':
+            name, rs2, offset, _, rs1, _ = tokens
+            imm = [offset]
+        else:
+            name, rs1, rs2, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CSTypeInstruction(line, name, rs1, rs2, imm)
+    # ca-type instructions
+    elif head in CA_TYPE_INSTRUCTIONS:
+        if len(tokens) != 3:
+            raise AssemblerError('ca-type instructions require exactly 2 args', line)
+        name, rd_rs1, rs2 = tokens
+        name = name.lower()
+        return CATypeInstruction(line, name, rd_rs1, rs2)
+    # cb-type instructions
+    elif head in CB_TYPE_INSTRUCTIONS:
+        name, rs1, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CBTypeInstruction(line, name, rs1, imm)
+    # cj-type instructions
+    elif head in CJ_TYPE_INSTRUCTIONS:
+        name, *imm = tokens
+        name = name.lower()
+        imm = parse_immediate(imm)
+        return CJTypeInstruction(line, name, imm)
+    # pseudo instructions
     elif head in PSEUDO_INSTRUCTIONS:
         name, *args = tokens
         name = name.lower()
@@ -1983,51 +2312,27 @@ def resolve_constants(items, env):
 
 
 def resolve_registers(items, env):
+    REGS = {'rd', 'rs1', 'rs2', 'rd_rs1'}
+
     new_items = []
     for item in items:
-        if isinstance(item, RTypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            rs1 = env.get(item.rs1, item.rs1)
-            rs2 = env.get(item.rs2, item.rs2)
-            inst = RTypeInstruction(item.line, item.name, rd, rs1, rs2)
-            new_items.append(inst)
-        elif isinstance(item, ITypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            rs1 = env.get(item.rs1, item.rs1)
-            inst = ITypeInstruction(item.line, item.name, rd, rs1, item.imm, item.is_auipc_jump)
-            new_items.append(inst)
-        elif isinstance(item, STypeInstruction):
-            rs1 = env.get(item.rs1, item.rs1)
-            rs2 = env.get(item.rs2, item.rs2)
-            inst = STypeInstruction(item.line, item.name, rs1, rs2, item.imm)
-            new_items.append(inst)
-        elif isinstance(item, BTypeInstruction):
-            rs1 = env.get(item.rs1, item.rs1)
-            rs2 = env.get(item.rs2, item.rs2)
-            inst = BTypeInstruction(item.line, item.name, rs1, rs2, item.imm)
-            new_items.append(inst)
-        elif isinstance(item, UTypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            inst = UTypeInstruction(item.line, item.name, rd, item.imm)
-            new_items.append(inst)
-        elif isinstance(item, JTypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            inst = JTypeInstruction(item.line, item.name, rd, item.imm)
-            new_items.append(inst)
-        elif isinstance(item, ATypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            rs1 = env.get(item.rs1, item.rs1)
-            rs2 = env.get(item.rs2, item.rs2)
-            inst = ATypeInstruction(item.line, item.name, rd, rs1, rs2, item.aq, item.rl)
-            new_items.append(inst)
-        elif isinstance(item, ALTypeInstruction):
-            rd = env.get(item.rd, item.rd)
-            rs1 = env.get(item.rs1, item.rs1)
-            inst = ALTypeInstruction(item.line, item.name, rd, rs1, item.aq, item.rl)
-            new_items.append(inst)
-        # TODO: compressed instructions
-        else:
+        d = copy.deepcopy(item.__dict__)
+
+        # skip items without any register fields
+        if not set(d.keys()) & REGS:
             new_items.append(item)
+            continue
+
+        # resolve all fields that are registers
+        for key, value in d.items():
+            if key not in REGS:
+                continue
+            reg = env.get(value, value)
+            d[key] = reg
+
+        # create the new item using the resolved registers
+        new_item = item.__class__(*d.values())
+        new_items.append(new_item)
 
     return new_items
 
@@ -2036,153 +2341,85 @@ def resolve_immediates(items, env):
     position = 0
     new_items = []
     for item in items:
-        if isinstance(item, ITypeInstruction):
-            imm = item.imm.eval(position, env, item.line)
-            # special case where the PC we care about is tied to the prior AUIPC inst
-            if item.is_auipc_jump:
-                imm += 4
-            position += item.size(position)
-            inst = ITypeInstruction(item.line, item.name, item.rd, item.rs1, imm, item.is_auipc_jump)
-            new_items.append(inst)
-        elif isinstance(item, STypeInstruction):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            inst = STypeInstruction(item.line, item.name, item.rs1, item.rs2, imm)
-            new_items.append(inst)
-        elif isinstance(item, BTypeInstruction):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            inst = BTypeInstruction(item.line, item.name, item.rs1, item.rs2, imm)
-            new_items.append(inst)
-        elif isinstance(item, UTypeInstruction):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            inst = UTypeInstruction(item.line, item.name, item.rd, imm)
-            new_items.append(inst)
-        elif isinstance(item, JTypeInstruction):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            inst = JTypeInstruction(item.line, item.name, item.rd, imm)
-            new_items.append(inst)
-        # TODO: compressed instructions
-        elif isinstance(item, Pack):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            pack = Pack(item.line, item.fmt, imm)
-            new_items.append(pack)
-        elif isinstance(item, ShorthandPack):
-            imm = item.imm.eval(position, env, item.line)
-            position += item.size(position)
-            pack = ShorthandPack(item.line, item.name, imm)
-            new_items.append(pack)
-        else:
+        d = copy.deepcopy(item.__dict__)
+
+        # skip items without an immediate field
+        if 'imm' not in d:
             position += item.size(position)
             new_items.append(item)
+            continue
+
+        # resolve the immediate field
+        imm = item.imm.eval(position, env, item.line)
+        if hasattr(item, 'is_auipc_jump') and item.is_auipc_jump:
+            imm += 4
+        d['imm'] = imm
+
+        # create the new item using the resolved immediate
+        position += item.size(position)
+        new_item = item.__class__(*d.values())
+        new_items.append(new_item)
 
     return new_items
 
 
-def check_compressible(items):
-    # TODO: check if any instructions meet the criteria for a compressed equivalent
+def transform_compressible(items):
+    # TODO: data-driven table of criteria? inst -> set of preds? xform if all are true?
+
+    # C_ADDI4SPN: addi: rd', rs1 == x2/sp, imm != 0, imm % 4, imm [0, 1023]
+    # C_LW:       lw:   rd', rs1', imm % 4, imm [0, 127]
+    # C_SW:       sw:   rs1', rs2', imm % 4, imm [0, 127]
+    # C_NOP:      addi: rd == rs1 == 0, imm == 0
+    # C_ADDI:     addi: rd == rs1 != 0, imm != 0, imm [-32, 31]
+    # C_JAL:      jal:  rd == x1/ra, imm % 2, imm [-2048, 2047]
+    # C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
+    # C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
+    # C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [???, ???]
+    # C_SRLI:
+    # C_SRAI:
+    # C_ANDI:
+    # C_SUB:
+    # C_XOR:
+    # C_OR:
+    # C_AND:
+    # C_J: jal, rd == 0, imm % 2, imm [-2048, 2047]
+    # C_BEQZ:
+    # C_BNEZ:
+    # C_SLLI:
+    # C_LWSP:
+    # C_JR:
+    # C_MV:
+    # C_EBREAK:
+    # C_JALR:
+    # C_ADD:
+    # C_SWSP:
+
     return items
 
 
 def resolve_instructions(items):
     new_items = []
+
     for item in items:
-        if isinstance(item, RTypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.rs1, item.rs2)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, ITypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.rs1, item.imm)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, IETypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func()
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, STypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rs1, item.rs2, item.imm)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, BTypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rs1, item.rs2, item.imm)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, UTypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.imm)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, JTypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.imm)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, FenceInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.succ, item.pred)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, ATypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.rs1, item.rs2, aq=item.aq, rl=item.rl)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        elif isinstance(item, ALTypeInstruction):
-            encode_func = INSTRUCTIONS[item.name]
-            try:
-                code = encode_func(item.rd, item.rs1, aq=item.aq, rl=item.rl)
-            except ValueError as e:
-                raise AssemblerError(str(e), item.line)
-            code = struct.pack('<I', code)
-            blob = Blob(item.line, code)
-            new_items.append(blob)
-        # TODO: compressed instructions
-        else:
+        if not isinstance(item, Instruction):
             new_items.append(item)
+            continue
+
+        encode_func = INSTRUCTIONS[item.name]
+        try:
+            # atomic insts expect aq and rl as kwargs
+            if isinstance(item, ATypeInstruction) or isinstance(item, ALTypeInstruction):
+                *args, aq, rl = item.args()
+                code = encode_func(*args, aq=aq, rl=rl)
+            else:
+                args = item.args()
+                code = encode_func(*args)
+        except ValueError as e:
+            raise AssemblerError(str(e), item.line)
+
+        code = struct.pack('<I', code)
+        blob = Blob(item.line, code)
+        new_items.append(blob)
 
     return new_items
 
@@ -2294,7 +2531,7 @@ def resolve_blobs(items):
 #   - Resolve constants  (eval expr and update env)
 #   - Resolve registers  (could be constants for readability)
 #   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
-#   - Check compressible  (identify and compress eligible instructions)
+#   - Transform compressible  (identify and compress eligible instructions)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
 #   - Resolve sequences (convert Sequence to Blob)
 #   - Resolve strings  (convert String to Blob)
@@ -2302,7 +2539,7 @@ def resolve_blobs(items):
 #   - Resolve packs  (convert Pack to Blob)
 #   - Resolve blobs  (merge all Blobs into a single binary)
 
-def assemble(path_or_source, compress=False, verbose=False):
+def assemble(path_or_source, compress=False):
     """
     Assemble a RISC-V assembly program into a raw binary.
 
@@ -2333,20 +2570,13 @@ def assemble(path_or_source, compress=False, verbose=False):
     items = resolve_registers(items, env)
     items = resolve_immediates(items, env)
     if compress:
-        items = check_compressible(items)
+        items = transform_compressible(items)
     items = resolve_instructions(items)
     items = resolve_sequences(items)
     items = resolve_strings(items)
     items = transform_shorthand_packs(items)
     items = resolve_packs(items)
     program = resolve_blobs(items)
-
-    if verbose:
-        # print resolved environment
-        succint_env = {k: v for k, v in env.items() if k not in REGISTERS}
-        succint_env.pop('__builtins__')
-        for k, v in succint_env.items():
-            print('{} = {} (0x{:08x})'.format(k, v, v))
 
     return program
 
@@ -2364,12 +2594,19 @@ def cli_main():
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
     parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions (TODO)')
-    parser.add_argument('--verbose', action='store_true', help='verbose assembler output (TODO)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
+    parser.add_argument('-vv', '--very-verbose', action='store_true', help='very verbose assembler output')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
 
+    log_fmt = '%(levelname)s: %(message)s'
+    if args.verbose:
+        logging.basicConfig(format=log_fmt, level=logging.INFO)
+    if args.very_verbose:
+        logging.basicConfig(format=log_fmt, level=logging.DEBUG)
+
     try:
-        binary = assemble(args.input_asm, args.compress, args.verbose)
+        binary = assemble(args.input_asm, args.compress)
     except Exception as e:
         raise SystemExit(e)
 

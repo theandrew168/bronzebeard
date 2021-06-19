@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from bronzebeard import asm
@@ -199,3 +201,44 @@ def test_amominu_w(rd, rs1, rs2, aq, rl, code):
 ])
 def test_amomaxu_w(rd, rs1, rs2, aq, rl, code):
     assert asm.AMOMAXU_W(rd, rs1, rs2, aq=aq, rl=rl) == code
+
+
+@pytest.mark.parametrize(
+    'source,               expected', [
+    ('lr.w      x0 x1',    asm.LR_W('x0', 'x1')),
+    ('sc.w      x0 x1 x2', asm.SC_W('x0', 'x1', 'x2')),
+    ('amoswap.w x0 x1 x2', asm.AMOSWAP_W('x0', 'x1', 'x2')),
+    ('amoadd.w  x0 x1 x2', asm.AMOADD_W('x0', 'x1', 'x2')),
+    ('amoxor.w  x0 x1 x2', asm.AMOXOR_W('x0', 'x1', 'x2')),
+    ('amoand.w  x0 x1 x2', asm.AMOAND_W('x0', 'x1', 'x2')),
+    ('amoor.w   x0 x1 x2', asm.AMOOR_W('x0', 'x1', 'x2')),
+    ('amomin.w  x0 x1 x2', asm.AMOMIN_W('x0', 'x1', 'x2')),
+    ('amomax.w  x0 x1 x2', asm.AMOMAX_W('x0', 'x1', 'x2')),
+    ('amominu.w x0 x1 x2', asm.AMOMINU_W('x0', 'x1', 'x2')),
+    ('amomaxu.w x0 x1 x2', asm.AMOMAXU_W('x0', 'x1', 'x2')),
+])
+def test_assemble_ext_a(source, expected):
+    binary = asm.assemble(source)
+    target = struct.pack('<I', expected)
+    assert binary == target
+
+
+def test_assemble_aq_rl():
+    source = r"""
+    lr.w zero zero
+    sc.w zero zero zero 0 0
+    sc.w zero zero zero 1 0
+    sc.w zero zero zero 0 1
+    sc.w zero zero zero 1 1
+    amomaxu.w t0 t1 t2
+    """
+    binary = asm.assemble(source)
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.LR_W(0, 0),
+        asm.SC_W(0, 0, 0, aq=0, rl=0),
+        asm.SC_W(0, 0, 0, aq=1, rl=0),
+        asm.SC_W(0, 0, 0, aq=0, rl=1),
+        asm.SC_W(0, 0, 0, aq=1, rl=1),
+        asm.AMOMAXU_W('t0', 't1', 't2'),
+    ])
+    assert binary == target

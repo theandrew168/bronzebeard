@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from bronzebeard import asm
@@ -100,14 +102,14 @@ def test_c_li(rd_rs1, imm, code):
 
 
 @pytest.mark.parametrize(
-    'rd_rs1, imm,  code', [
-    (2,      16,   0b0110000100000101),
-    (2,      496,  0b0110000101111101),
-    (2,      -16,  0b0111000101111101),
-    (2,      -512, 0b0111000100000001),
+    'imm,  code', [
+    (16,   0b0110000100000101),
+    (496,  0b0110000101111101),
+    (-16,  0b0111000101111101),
+    (-512, 0b0111000100000001),
 ])
-def test_c_addi16sp(rd_rs1, imm, code):
-    assert asm.C_ADDI16SP(rd_rs1, imm) == code
+def test_c_addi16sp(imm, code):
+    assert asm.C_ADDI16SP(imm) == code
 
 
 @pytest.mark.parametrize(
@@ -282,14 +284,12 @@ def test_c_lwsp(rd, imm, code):
 
 
 @pytest.mark.parametrize(
-    'rs1, rs2, code', [
-    (1,   0,   0b1000000010000010),
-    (1 ,  0,   0b1000000010000010),
-    (31,  0 ,  0b1000111110000010),
-    (31,  0,   0b1000111110000010),
+    'rs1, code', [
+    (1,   0b1000000010000010),
+    (31,  0b1000111110000010),
 ])
-def test_c_jr(rs1, rs2, code):
-    assert asm.C_JR(rs1, rs2) == code
+def test_c_jr(rs1, code):
+    assert asm.C_JR(rs1) == code
 
 
 @pytest.mark.parametrize(
@@ -308,14 +308,12 @@ def test_c_ebreak():
 
 
 @pytest.mark.parametrize(
-    'rs1, rs2, code', [
-    (1,   0,   0b1001000010000010),
-    (1 ,  0,   0b1001000010000010),
-    (31,  0 ,  0b1001111110000010),
-    (31,  0,   0b1001111110000010),
+    'rs1, code', [
+    (1,   0b1001000010000010),
+    (31,  0b1001111110000010),
 ])
-def test_c_jalr(rs1, rs2, code):
-    assert asm.C_JALR(rs1, rs2) == code
+def test_c_jalr(rs1, code):
+    assert asm.C_JALR(rs1) == code
 
 
 @pytest.mark.parametrize(
@@ -343,3 +341,66 @@ def test_c_add(rd_rs1, rs2, code):
 ])
 def test_c_swsp(rs2, imm, code):
     assert asm.C_SWSP(rs2, imm) == code
+
+
+@pytest.mark.parametrize(
+    'source,               expected', [
+    ('c.addi4spn x8 4',    asm.C_ADDI4SPN('x8', 4)),
+    ('c.lw       x8 x9 0', asm.C_LW('x8', 'x9', 0)),
+    ('c.sw       x8 x9 0', asm.C_SW('x8', 'x9', 0)),
+    ('c.nop',              asm.C_NOP()),
+    ('c.addi     x1 1',    asm.C_ADDI('x1', 1)),
+    ('c.jal      0',       asm.C_JAL(0)),
+    ('c.li       x1 0',    asm.C_LI('x1', 0)),
+    ('c.addi16sp 16',      asm.C_ADDI16SP(16)),
+    ('c.lui      x1 1',    asm.C_LUI('x1', 1)),
+    ('c.srli     x8 1',    asm.C_SRLI('x8', 1)),
+    ('c.srai     x8 1',    asm.C_SRAI('x8', 1)),
+    ('c.andi     x8 0',    asm.C_ANDI('x8', 0)),
+    ('c.sub      x8 x9',   asm.C_SUB('x8', 'x9')),
+    ('c.xor      x8 x9',   asm.C_XOR('x8', 'x9')),
+    ('c.or       x8 x9',   asm.C_OR('x8', 'x9')),
+    ('c.and      x8 x9',   asm.C_AND('x8', 'x9')),
+    ('c.j        0',       asm.C_J(0)),
+    ('c.beqz     x8 0',    asm.C_BEQZ('x8', 0)),
+    ('c.bnez     x8 0',    asm.C_BNEZ('x8', 0)),
+    ('c.slli     x1 1',    asm.C_SLLI('x1', 1)),
+    ('c.lwsp     x1 0',    asm.C_LWSP('x1', 0)),
+    ('c.jr       x1',      asm.C_JR('x1')),
+    ('c.mv       x1 x2',   asm.C_MV('x1', 'x2')),
+    ('c.ebreak',           asm.C_EBREAK()),
+    ('c.jalr     x1',      asm.C_JALR('x1')),
+    ('c.add      x1 x2',   asm.C_ADD('x1', 'x2')),
+    ('c.swsp     x1 0',    asm.C_SWSP('x1', 0)),
+])
+def test_assemble_ext_c(source, expected):
+    binary = asm.assemble(source)
+    target = struct.pack('<I', expected)
+    assert binary == target
+
+
+@pytest.mark.parametrize(
+    'source', [
+    ('c.addi4spn x8 0'),  # ImmNotZero
+    ('c.addi     x0 1'),  # RegRdRs1NotZero
+    ('c.addi     x1 0'),  # ImmNotZero
+    ('c.li       x0 0'),  # RegRdRs1NotZero
+    ('c.addi16sp 0'),     # ImmNotZero
+    ('c.lui      x0 1'),  # RegRdRs1NotZero
+    ('c.lui      x2 1'),  # RegRdRs1NotTwo
+    ('c.lui      x1 0'),  # ImmNotZero
+    ('c.srli     x8 0'),  # ImmNotZero
+    ('c.srai     x8 0'),  # ImmNotZero
+    ('c.slli     x0 1'),  # RegRdRs1NotZero
+    ('c.slli     x1 0'),  # ImmNotZero
+    ('c.lwsp     x0 0'),  # RegRdRs1NotZero
+    ('c.jr       x0'),    # RegRdRs1NotZero
+    ('c.mv       x0 x2'), # RegRdRs1NotZero
+    ('c.mv       x1 x0'), # RegRs2NotZero
+    ('c.jalr     x0'),    # RegRdRs1NotZero
+    ('c.add      x0 x2'), # RegRdRs1NotZero
+    ('c.add      x1 x0'), # RegRs2NotZero
+])
+def test_constraints(source):
+    with pytest.raises(asm.AssemblerError):
+        asm.assemble(source)

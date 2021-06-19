@@ -22,7 +22,7 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
     ],
-    python_requires='>=3.0',
+    python_requires='>=3.6',
     entry_points={
         'console_scripts': [
             'bronzebeard = bronzebeard.asm:cli_main',

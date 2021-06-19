@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from bronzebeard import asm
@@ -575,3 +577,52 @@ def test_ecall():
 
 def test_ebreak():
     assert asm.EBREAK() == 0b00000000000100000000000001110011
+
+
+@pytest.mark.parametrize(
+    'source,           expected', [
+    ('lui   x0 0',     asm.LUI('x0', 0)),
+    ('auipc x0 0',     asm.AUIPC('x0', 0)),
+    ('jal   x0 0',     asm.JAL('x0', 0)),
+    ('jalr  x0 x1 0',  asm.JALR('x0', 'x1', 0)),
+    ('beq   x0 x1 0',  asm.BEQ('x0', 'x1', 0)),
+    ('bne   x0 x1 0',  asm.BNE('x0', 'x1', 0)),
+    ('blt   x0 x1 0',  asm.BLT('x0', 'x1', 0)),
+    ('bge   x0 x1 0',  asm.BGE('x0', 'x1', 0)),
+    ('bltu  x0 x1 0',  asm.BLTU('x0', 'x1', 0)),
+    ('bgeu  x0 x1 0',  asm.BGEU('x0', 'x1', 0)),
+    ('lb    x0 x1 0',  asm.LB('x0', 'x1', 0)),
+    ('lh    x0 x1 0',  asm.LH('x0', 'x1', 0)),
+    ('lw    x0 x1 0',  asm.LW('x0', 'x1', 0)),
+    ('lbu   x0 x1 0',  asm.LBU('x0', 'x1', 0)),
+    ('lhu   x0 x1 0',  asm.LHU('x0', 'x1', 0)),
+    ('sb    x0 x1 0',  asm.SB('x0', 'x1', 0)),
+    ('sh    x0 x1 0',  asm.SH('x0', 'x1', 0)),
+    ('sw    x0 x1 0',  asm.SW('x0', 'x1', 0)),
+    ('addi  x0 x1 0',  asm.ADDI('x0', 'x1', 0)),
+    ('slti  x0 x1 0',  asm.SLTI('x0', 'x1', 0)),
+    ('sltiu x0 x1 0',  asm.SLTIU('x0', 'x1', 0)),
+    ('xori  x0 x1 0',  asm.XORI('x0', 'x1', 0)),
+    ('ori   x0 x1 0',  asm.ORI('x0', 'x1', 0)),
+    ('andi  x0 x1 0',  asm.ANDI('x0', 'x1', 0)),
+    ('slli  x0 x1 0',  asm.SLLI('x0', 'x1', 0)),
+    ('srli  x0 x1 0',  asm.SRLI('x0', 'x1', 0)),
+    ('srai  x0 x1 0',  asm.SRAI('x0', 'x1', 0)),
+    ('add   x0 x1 x2', asm.ADD('x0', 'x1', 'x2')),
+    ('sub   x0 x1 x2', asm.SUB('x0', 'x1', 'x2')),
+    ('sll   x0 x1 x2', asm.SLL('x0', 'x1', 'x2')),
+    ('slt   x0 x1 x2', asm.SLT('x0', 'x1', 'x2')),
+    ('sltu  x0 x1 x2', asm.SLTU('x0', 'x1', 'x2')),
+    ('xor   x0 x1 x2', asm.XOR('x0', 'x1', 'x2')),
+    ('srl   x0 x1 x2', asm.SRL('x0', 'x1', 'x2')),
+    ('sra   x0 x1 x2', asm.SRA('x0', 'x1', 'x2')),
+    ('or    x0 x1 x2', asm.OR('x0', 'x1', 'x2')),
+    ('and   x0 x1 x2', asm.AND('x0', 'x1', 'x2')),
+    ('fence 0xf 0xf',  asm.FENCE(0b1111, 0b1111)),
+    ('ecall',          asm.ECALL()),
+    ('ebreak',         asm.EBREAK()),
+])
+def test_assemble_base_i(source, expected):
+    binary = asm.assemble(source)
+    target = struct.pack('<I', expected)
+    assert binary == target

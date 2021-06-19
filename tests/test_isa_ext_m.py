@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from bronzebeard import asm
@@ -121,3 +123,20 @@ def test_rem(rd, rs1, rs2, code):
 ])
 def test_remu(rd, rs1, rs2, code):
     assert asm.REMU(rd, rs1, rs2) == code
+
+
+@pytest.mark.parametrize(
+    'source,            expected', [
+    ('mul    x0 x1 x2', asm.MUL('x0', 'x1', 'x2')),
+    ('mulh   x0 x1 x2', asm.MULH('x0', 'x1', 'x2')),
+    ('mulhsu x0 x1 x2', asm.MULHSU('x0', 'x1', 'x2')),
+    ('mulhu  x0 x1 x2', asm.MULHU('x0', 'x1', 'x2')),
+    ('div    x0 x1 x2', asm.DIV('x0', 'x1', 'x2')),
+    ('divu   x0 x1 x2', asm.DIVU('x0', 'x1', 'x2')),
+    ('rem    x0 x1 x2', asm.REM('x0', 'x1', 'x2')),
+    ('remu   x0 x1 x2', asm.REMU('x0', 'x1', 'x2')),
+])
+def test_assemble_ext_m(source, expected):
+    binary = asm.assemble(source)
+    target = struct.pack('<I', expected)
+    assert binary == target

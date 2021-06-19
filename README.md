@@ -1,8 +1,8 @@
 # bronzebeard
-Minimal ecosystem for bare-metal RISC-V development
+Simple RISC-V assembler for writing bare-metal programs
 
 ## What
-Bronzebeard is first and foremost a [single-file](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py) [nanopass](https://legacy.cs.indiana.edu/~dyb/pubs/nano-jfp.pdf) assembler for developing [bare metal](https://en.wikipedia.org/wiki/Bare_machine) [RISC-V](https://en.wikipedia.org/wiki/Riscv) programs.
+Bronzebeard is a [single-file](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py), [nanopass](https://legacy.cs.indiana.edu/~dyb/pubs/nano-jfp.pdf) assembler for developing [bare metal](https://en.wikipedia.org/wiki/Bare_machine) [RISC-V](https://en.wikipedia.org/wiki/Riscv) programs.
 It is designed for applications that stand on their own without relying on [operating systems](https://en.wikipedia.org/wiki/Operating_system), frameworks, SDKs, or pre-existing software of any kind.
 
 ## Why
@@ -44,11 +44,11 @@ With Bronzebeard installed:
 bronzebeard examples/example.asm
 ```
 
-By default, the assembled output binary will be placed in a file named "bb.out".
+By default, the assembled output binary will be placed in a file named `bb.out`.
 
 ## Command Line Interface
 ```
-usage: bronzebeard [-h] [-o OUTPUT] [--compress] [--verbose] [--version] input_asm
+usage: bronzebeard [-h] [-o OUTPUT] [--compress] [-v] [-vv] [--version] input_asm
 
 Assemble RISC-V source code
 
@@ -60,6 +60,7 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         output binary file (default "bb.out")
   --compress            identify and compress eligible instructions (TODO)
-  --verbose             verbose assembler output (TODO)
+  -v, --verbose         verbose assembler output
+  -vv, --very-verbose   very verbose assembler output
   --version             print assembler version and exit
 ```
