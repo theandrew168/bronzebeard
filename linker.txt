@@ -7,8 +7,37 @@ immediates depend on labels
 inst sizes depend on immediates
 
 labels -> sizes
+    could this be deferred? just keep label items in the list til later?
+
 imms   -> labels
+    this is unlikely to change
+
 sizes  -> imms
+    this is unlikely to change
 
 How can this be avoided?
 How do traditional assemblers / linkers solve this?
+
+
+test 1
+------
+
+# loc = 0
+foo:
+    li t0 bar  # 4 or 8 bytes (expand to 2 insts)
+
+# loc = 4 or 8
+bar:
+    j foo        # offset = 4 or 8
+
+
+test 2
+------
+
+# loc = 0
+foo:
+    addi t0 t0 bar  # 4 or 2 bytes (compress to c.addi)
+
+# loc = 4 or 2
+bar:
+    j foo         # offset = 4 or 2
