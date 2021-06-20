@@ -53,7 +53,6 @@ def test_assemble_string():
     ('shorts 0x1234 0x5678', b'\x34\x12\x78\x56'),
     ('ints  1 2 3 4',        b'\x01\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x04\x00\x00\x00'),
     ('longs 1 2 3 4',        b'\x01\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x04\x00\x00\x00'),
-    ('floats 3.141 2.345',   b'\x25\x06\x49\x40\x7b\x14\x16\x40'),
 ])
 def test_assemble_sequence(source, expected):
     binary = asm.assemble(source)
@@ -82,14 +81,12 @@ def test_assemble_pack():
     pack <B 0
     pack <B 255
     pack <I ADDR
-    pack <f 3.14159
     """
     binary = asm.assemble(source)
     target = b''.join([
         struct.pack('<B', 0),
         struct.pack('<B', 255),
         struct.pack('<I', 0x20000000),
-        struct.pack('<f', 3.14159),
     ])
     assert binary == target
 

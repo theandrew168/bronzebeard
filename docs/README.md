@@ -101,14 +101,6 @@ Integers can be positive or negative and expressed in decimal, binary, or hex.
 | `longs`     | 4                |
 | `longlongs` | 8                |
 
-#### Floating-point Sequences
-Floating-point numbers can be positive or negative.
-
-| Keyword     | Bytes per Number |
-| ----------- | ---------------- |
-| `floats`    | 4                |
-| `doubles`   | 8                |
-
 #### Examples
 ```
 bytes 1 2 0x03 0b100 5 0x06 0b111 8
@@ -116,7 +108,6 @@ bytes -1 0xff  # same value once encoded as 2's comp integers
 shorts 0x1234 0x5678
 ints  1 2 3 4
 longs 1 2 3 4  # same as above (both 4 bytes each)
-floats 3.141 2.3455
 ```
 
 ### Packed Values
@@ -139,8 +130,6 @@ The pack format is composed of two characters: the first specifies endianness an
 | `L`       | 4     | Unsigned long |
 | `q`       | 8     | Signed long long |
 | `Q`       | 8     | Unsigned long long |
-| `f`       | 4     | IEEE 754 single-precision floating-point number |
-| `d`       | 8     | IEEE 754 double-precision floating-point number |
 
 Here are a few examples:
 ```

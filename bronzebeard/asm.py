@@ -1018,8 +1018,6 @@ NUMERIC_SEQUENCE_NAMES = {
     'ints',
     'longs',
     'longlongs',
-    'floats',
-    'doubles',
 }
 
 SHORTHAND_PACK_NAMES = {
@@ -1101,13 +1099,21 @@ class Arithmetic(Immediate):
     # be sure to not leak internal python exceptions out of this
     def eval(self, position, env, line):
         try:
-            return eval(self.expr, env)
+            result = eval(self.expr, env)
         except SyntaxError:
             raise AssemblerError('invalid syntax in expr: "{}"'.format(self.expr), line)
         except TypeError:
             raise AssemblerError('unknown variable in expr: "{}"'.format(self.expr), line)
         except:
             raise AssemblerError('other error in expr: "{}"'.format(self.expr), line)
+
+        # ensure resulting value is an integer
+        if type(result) != int:
+            s = 'result "{}" is not an integer from expr: "{}"'
+            s = s.format(result, self.expr)
+            raise AssemblerError(s, line)
+
+        return result
 
 
 class Position(Immediate):
@@ -1305,8 +1311,6 @@ class Sequence(Item):
             'ints': 4,
             'longs': 4,
             'longlongs': 8,
-            'floats': 4,
-            'doubles': 8,
         }
         return sizes[self.name] * len(self.values)
 
