@@ -18,6 +18,9 @@ sizes  -> imms
 How can this be avoided?
 How do traditional assemblers / linkers solve this?
 
+Links:
+https://github.com/riscv/riscv-gnu-toolchain/issues/703
+https://www.sifive.com/blog/all-aboard-part-3-linker-relaxation-in-riscv-toolchain
 
 test 1
 ------
@@ -41,3 +44,29 @@ foo:
 # loc = 4 or 2
 bar:
     j foo         # offset = 4 or 2
+
+
+test 3
+------
+
+# loc = 0
+foo:
+    jal x0 bar  # 4 or 2 bytes (compress to c.j)
+    jal x0 bar  # 4 or 2 bytes (compress to c.j)
+    jal x0 bar  # 4 or 2 bytes (compress to c.j)
+
+# loc = 6 or 12
+bar:
+    j foo
+
+
+Label('foo')  # loc = 0
+  JTypeInst('jal', 'x0', Arithmetic('bar'))
+  JTypeInst('jal', 'x0', Arithmetic('bar'))
+  JTypeInst('jal', 'x0', Arithmetic('bar'))
+
+Label('bar')  # loc = 6 (min) to 12 (max)
+  JTypeInst('jal', 'x0', Arithmetic('foo'))
+
+# can the jal(s) be compressed?
+# well, where is 'bar'? somewhere between 6 and 12.

@@ -762,7 +762,7 @@ C_ADDI     = partial(ci_type,  opcode=0b01, funct3=0b000, cs=[RegRdRs1NotZero, I
 C_JAL      = partial(cj_type,  opcode=0b01, funct3=0b001)
 C_LI       = partial(ci_type,  opcode=0b01, funct3=0b010, cs=[RegRdRs1NotZero])
 C_ADDI16SP = partial(cia_type, opcode=0b01, funct3=0b011, cs=[ImmNotZero])  # special syntax
-C_LUI      = partial(ciu_type,  opcode=0b01, funct3=0b011, cs=[RegRdRs1NotZero, RegRdRs1NotTwo, ImmNotZero])
+C_LUI      = partial(ciu_type, opcode=0b01, funct3=0b011, cs=[RegRdRs1NotZero, RegRdRs1NotTwo, ImmNotZero])
 C_SRLI     = partial(cbi_type, opcode=0b01, funct2=0b00, funct3=0b100, cs=[ImmNotZero])
 C_SRAI     = partial(cbi_type, opcode=0b01, funct2=0b01, funct3=0b100, cs=[ImmNotZero])
 C_ANDI     = partial(cbi_type, opcode=0b01, funct2=0b10, funct3=0b100)
@@ -2386,7 +2386,7 @@ def transform_compressible(items):
     # C_XOR:
     # C_OR:
     # C_AND:
-    # C_J: jal, rd == 0, imm % 2, imm [-2048, 2047]
+    # C_J:        jal, rd == 0, imm % 2, imm [-2048, 2047]
     # C_BEQZ:
     # C_BNEZ:
     # C_SLLI:
