@@ -10,7 +10,7 @@ labels -> sizes
     could this be deferred? just keep label items in the list til later?
 
 imms   -> labels
-    this is unlikely to change
+    this could be split into vars / refs (separate namespaces)
 
 sizes  -> imms
     this is unlikely to change
@@ -21,6 +21,20 @@ How do traditional assemblers / linkers solve this?
 Links:
 https://github.com/riscv/riscv-gnu-toolchain/issues/703
 https://www.sifive.com/blog/all-aboard-part-3-linker-relaxation-in-riscv-toolchain
+
+Idea (split refs and vars, assume the worst (8 bytes per LI/CALL/TAIL), no growing):
+    No nesting of Arith under Position / Offset?
+    Can't assign a label ref to a var?
+
+resolve constants (vars)
+resolve regs
+resolve labels
+for each potential xform:
+    eval imms using current label refs
+    if eligible, make the swap (first come, first serve)
+        if shrink (8 -> 4 or 4 -> 2), sub from all subsequent refs
+resolve imms (using vars OR updated refs)
+...
 
 test 1
 ------
