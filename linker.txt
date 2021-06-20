@@ -1,0 +1,14 @@
+Currently, the assembler doesn't support passes that would alter label locations.
+Examples of this would be the LI, CALL, and TAIL pseudo-insts (grow) or compressed inst swaps (shrink).
+
+There is currently a chicken and the egg problem:
+labels depend on inst sizes
+immediates depend on labels
+inst sizes depend on immediates
+
+labels -> sizes
+imms   -> labels
+sizes  -> imms
+
+How can this be avoided?
+How do traditional assemblers / linkers solve this?
