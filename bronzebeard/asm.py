@@ -2260,9 +2260,9 @@ def transform_pseudo_instructions(items, constants, labels):
             # check if eligible for single inst expansion
             env = ChainMap(constants, labels)
             value = imm.eval(position, env, item.line)
-            #value = c_int32(value).value
+            value = c_int32(value).value
             if value >= -2048 and value <= 2047:
-                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=imm)
+                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=Lo(imm))
                 new_items.append(inst)
                 # shrink all subsequent labels by 4
                 for label in labels:
