@@ -1192,21 +1192,6 @@ class Item(abc.ABC):
         """Check the size of this item at the given position in a program"""
 
 
-class Label(Item):
-
-    def __init__(self, line, name):
-        super().__init__(line)
-        self.name = name
-
-    def __repr__(self):
-        s = '{}({!r})'
-        s = s.format(type(self).__name__, self.name)
-        return s
-
-    def size(self, position):
-        return 0
-
-
 class Constant(Item):
 
     def __init__(self, line, name, expr):
@@ -1223,23 +1208,19 @@ class Constant(Item):
         return 0
 
 
-class Align(Item):
+class Label(Item):
 
-    def __init__(self, line, alignment):
+    def __init__(self, line, name):
         super().__init__(line)
-        self.alignment = alignment
+        self.name = name
 
     def __repr__(self):
         s = '{}({!r})'
-        s = s.format(type(self).__name__, self.alignment)
+        s = s.format(type(self).__name__, self.name)
         return s
 
     def size(self, position):
-        padding = self.alignment - (position % self.alignment)
-        if padding == self.alignment:
-            return 0
-        else:
-            return padding
+        return 0
 
 
 class String(Item):
@@ -1255,6 +1236,29 @@ class String(Item):
 
     def size(self, position):
         return len(self.value.encode('utf-8'))
+
+
+class Sequence(Item):
+
+    def __init__(self, line, name, values):
+        super().__init__(line)
+        self.name = name
+        self.values = values
+
+    def __repr__(self):
+        s = '{}(name={!r}, {!r})'
+        s = s.format(type(self).__name__, self.name, self.values)
+        return s
+
+    def size(self, position):
+        sizes = {
+            'bytes': 1,
+            'shorts': 2,
+            'ints': 4,
+            'longs': 4,
+            'longlongs': 8,
+        }
+        return sizes[self.name] * len(self.values)
 
 
 class Pack(Item):
@@ -1295,27 +1299,23 @@ class ShorthandPack(Item):
         return sizes[self.name]
 
 
-class Sequence(Item):
+class Align(Item):
 
-    def __init__(self, line, name, values):
+    def __init__(self, line, alignment):
         super().__init__(line)
-        self.name = name
-        self.values = values
+        self.alignment = alignment
 
     def __repr__(self):
-        s = '{}(name={!r}, {!r})'
-        s = s.format(type(self).__name__, self.name, self.values)
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.alignment)
         return s
 
     def size(self, position):
-        sizes = {
-            'bytes': 1,
-            'shorts': 2,
-            'ints': 4,
-            'longs': 4,
-            'longlongs': 8,
-        }
-        return sizes[self.name] * len(self.values)
+        padding = self.alignment - (position % self.alignment)
+        if padding == self.alignment:
+            return 0
+        else:
+            return padding
 
 
 class Blob(Item):
