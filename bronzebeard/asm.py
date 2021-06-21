@@ -249,6 +249,9 @@ def b_type(rs1, rs2, imm, *, opcode, funct3):
 def u_type(rd, imm, *, opcode):
     rd = lookup_register(rd)
 
+    # be flexible with the "upper" range here (wraps to negative)
+    if imm >= 0x80000 and imm <= 0xfffff:
+        imm = imm - 2**20
     if imm < -0x80000 or imm > 0x7ffff:
         raise ValueError('20-bit immediate must be between -0x80000 (-524288) and 0x7ffff (524287): {}'.format(imm))
 

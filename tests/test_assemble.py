@@ -326,3 +326,15 @@ def test_assemble_hex_register():
         asm.SLLI('a4', 'a4', 10),
     ])
     assert binary == target
+
+
+# https://github.com/theandrew168/bronzebeard/issues/8
+def test_assemble_lui_signedness():
+    source = r"""
+    lui a4,0xfffff
+    """
+    binary = asm.assemble(source)
+    target = b''.join(struct.pack('<I', inst) for inst in [
+        asm.LUI('a4', -1),
+    ])
+    assert binary == target
