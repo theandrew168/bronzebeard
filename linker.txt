@@ -24,17 +24,23 @@ https://www.sifive.com/blog/all-aboard-part-3-linker-relaxation-in-riscv-toolcha
 
 Idea (split refs and vars, assume the worst (8 bytes per LI/CALL/TAIL), no growing):
     No nesting of Arith under Position / Offset?
-    Can't assign a label ref to a var?
+    Can't assign a label ref to a var? but can use it as an inst/pack arg?
+    3 dicts: regs (immutable), refs (lazy), vars (bound early)
+    can chainmap where necessary
 
 resolve constants (vars)
+resolve labels (pessimistic)
 resolve regs
-resolve labels
 for each potential xform:
+    keep track of current position
     eval imms using current label refs
     if eligible, make the swap (first come, first serve)
         if shrink (8 -> 4 or 4 -> 2), sub from all subsequent refs
+        *** can only do shrinks, no grows ***
 resolve imms (using vars OR updated refs)
-...
+resolve aligns (need to know all sizes beforehand)
+
+
 
 test 1
 ------
@@ -71,7 +77,7 @@ foo:
 
 # loc = 6 or 12
 bar:
-    j foo
+    jal x0 foo
 
 
 Label('foo')  # loc = 0

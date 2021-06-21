@@ -230,9 +230,9 @@ def test_assemble_alternate_offset_syntax_compressed():
     'pseudo,             transformed', [
 
     ('nop',              'addi x0 x0 0'),
-#    ('li t0 0',          'addi t0 x0 0'),
-#    ('li t0 -2048',      'addi t0 x0 -2048'),
-#    ('li t0 2047',       'addi t0 x0 2047'),
+    ('li t0 0',          'addi t0 x0 0'),
+    ('li t0 -2048',      'addi t0 x0 -2048'),
+    ('li t0 2047',       'addi t0 x0 2047'),
     ('li t0 -2049',      'lui t0 %hi(-2049)\n addi t0 t0 %lo(-2049)'),
     ('li t0 2048',       'lui t0 %hi(2048)\n addi t0 t0 %lo(2048)'),
     ('mv t0 t1',         'addi t0 t1 0'),
@@ -243,20 +243,20 @@ def test_assemble_alternate_offset_syntax_compressed():
     ('sltz t0 t1',       'slt t0 t1 x0'),
     ('sgtz t0 t1',       'slt t0 x0 t1'),
 
-    ('beqz t0 16',       'beq t0 x0 16'),
-    ('bnez t0 16',       'bne t0 x0 16'),
-    ('blez t0 16',       'bge x0 t0 16'),
-    ('bgez t0 16',       'bge t0 x0 16'),
-    ('bltz t0 16',       'blt t0 x0 16'),
-    ('bgtz t0 16',       'blt x0 t0 16'),
+    ('beqz t0 test',     'beq t0 x0 test'),
+    ('bnez t0 test',     'bne t0 x0 test'),
+    ('blez t0 test',     'bge x0 t0 test'),
+    ('bgez t0 test',     'bge t0 x0 test'),
+    ('bltz t0 test',     'blt t0 x0 test'),
+    ('bgtz t0 test',     'blt x0 t0 test'),
 
-    ('bgt t0 t1 16',     'blt t1 t0 16'),
-    ('ble t0 t1 16',     'bge t1 t0 16'),
-    ('bgtu t0 t1 16',    'bltu t1 t0 16'),
-    ('bleu t0 t1 16',    'bgeu t1 t0 16'),
+    ('bgt t0 t1 test',   'blt t1 t0 test'),
+    ('ble t0 t1 test',   'bge t1 t0 test'),
+    ('bgtu t0 t1 test',  'bltu t1 t0 test'),
+    ('bleu t0 t1 test',  'bgeu t1 t0 test'),
 
-    ('j 16',             'jal x0 16'),
-    ('jal 16',           'jal x1 16'),
+    ('j test',           'jal x0 test'),
+    ('jal test',         'jal x1 test'),
     ('jr t0',            'jalr x0 0(t0)'),
     ('jalr t0',          'jalr x1 0(t0)'),
     ('ret',              'jalr x0 0(x1)'),
@@ -264,8 +264,9 @@ def test_assemble_alternate_offset_syntax_compressed():
     ('fence',            'fence 0b1111 0b1111'),
 ])
 def test_assemble_pseudo_instructions(pseudo, transformed):
-    pseudo_bin = asm.assemble(pseudo)
-    transformed_bin = asm.assemble(transformed)
+    labels = {'test': 0}
+    pseudo_bin = asm.assemble(pseudo, labels=labels)
+    transformed_bin = asm.assemble(transformed, labels=labels)
     assert pseudo_bin == transformed_bin
 
 
@@ -299,6 +300,18 @@ def test_assemble_pseudo_instruction_tail():
         asm.JALR('x0', 'x6', asm.relocate_lo(0x00020000)),
     ])
     assert binary == target
+
+
+@pytest.mark.parametrize(
+    'regular,       compressed', [
+    ('jal x0 test', 'c.j test'),
+    ('jal x1 test', 'c.jal test'),
+])
+def test_assemble_compress(regular, compressed):
+    labels = {'test': 0}
+    regular_bin = asm.assemble(regular, labels=labels, compress=True)
+    compressed_bin = asm.assemble(compressed, labels=labels)
+    assert regular_bin == compressed_bin
 
 
 # https://github.com/theandrew168/bronzebeard/issues/9

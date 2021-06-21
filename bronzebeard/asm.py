@@ -1,7 +1,8 @@
 import abc
 import argparse
 import copy
-from ctypes import c_uint32
+from collections import ChainMap
+from ctypes import c_int32, c_uint32
 from functools import partial
 import logging
 import os
@@ -1077,16 +1078,16 @@ class LineTokens:
         return str(self.tokens)
 
 
-class Immediate(abc.ABC):
+class Expr(abc.ABC):
 
     @abc.abstractmethod
     def eval(self, position, env, line):
         """Evaluate an expression to an integer"""
 
 
-# arithmetic / lookup / combo of both
+# basic arithmetic expression
 # defers evaulation to Python's builtin eval (RIP double-slash comments)
-class Arithmetic(Immediate):
+class Arithmetic(Expr):
 
     def __init__(self, expr):
         self.expr = expr
@@ -1099,7 +1100,9 @@ class Arithmetic(Immediate):
     # be sure to not leak internal python exceptions out of this
     def eval(self, position, env, line):
         try:
-            result = eval(self.expr, env)
+            # exclude Python builtins from eval env
+            # https://docs.python.org/3/library/functions.html#eval
+            result = eval(self.expr, {'__builtins__': None}, env)
         except SyntaxError:
             raise AssemblerError('invalid syntax in expr: "{}"'.format(self.expr), line)
         except TypeError:
@@ -1116,7 +1119,7 @@ class Arithmetic(Immediate):
         return result
 
 
-class Position(Immediate):
+class Position(Expr):
 
     def __init__(self, reference, expr):
         self.reference = reference
@@ -1133,7 +1136,7 @@ class Position(Immediate):
         return base + dest
 
 
-class Offset(Immediate):
+class Offset(Expr):
 
     def __init__(self, reference):
         self.reference = reference
@@ -1148,7 +1151,7 @@ class Offset(Immediate):
         return dest - position
 
 
-class Hi(Immediate):
+class Hi(Expr):
 
     def __init__(self, expr):
         self.expr = expr
@@ -1163,7 +1166,7 @@ class Hi(Immediate):
         return relocate_hi(value)
 
 
-class Lo(Immediate):
+class Lo(Expr):
 
     def __init__(self, expr) -> None:
         self.expr = expr
@@ -1206,14 +1209,14 @@ class Label(Item):
 
 class Constant(Item):
 
-    def __init__(self, line, name, imm):
+    def __init__(self, line, name, expr):
         super().__init__(line)
         self.name = name
-        self.imm = imm
+        self.expr = expr
 
     def __repr__(self):
-        s = '{}(name={!r}, imm={!r})'
-        s = s.format(type(self).__name__, self.name, self.imm)
+        s = '{}(name={!r}, expr={!r})'
+        s = s.format(type(self).__name__, self.name, self.expr)
         return s
 
     def size(self, position):
@@ -1340,10 +1343,28 @@ class Instruction(Item):
         """Return list of arguments for this instruction"""
 
 
-class CompressedInstruction(Instruction):
+class PseudoInstruction(Instruction):
+
+    def __init__(self, line, name, *args):
+        super().__init__(line)
+        self.name = name
+        self.args = args
+
+    def __repr__(self):
+        s = '{}({!r}, args={!r})'
+        s = s.format(type(self).__name__, self.name, self.args)
+        return s
+
+    def args(self):
+        return self.args
 
     def size(self, position):
-        return 2
+        # intentionally pessimistic here (may get shrunk after transform)
+        # some pseudo-instructions expand into 2 regular ones
+        if self.name in ['li', 'call', 'tail']:
+            return 8
+        else:
+            return 4
 
 
 class RTypeInstruction(Instruction):
@@ -1527,7 +1548,13 @@ class ALTypeInstruction(Instruction):
         return [self.rd, self.rs1, self.aq, self.rl]
 
 
-class CRTypeInstruction(Instruction):
+class CompressedInstruction(Instruction):
+
+    def size(self, position):
+        return 2
+
+
+class CRTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd_rs1, rs2):
         super().__init__(line)
@@ -1545,7 +1572,7 @@ class CRTypeInstruction(Instruction):
 
 
 # custom syntax for: c.jr, c.jalr
-class CRJTypeInstruction(Instruction):
+class CRJTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd_rs1):
         super().__init__(line)
@@ -1562,7 +1589,7 @@ class CRJTypeInstruction(Instruction):
 
 
 # custom syntax for: c.ebreak
-class CRETypeInstruction(Instruction):
+class CRETypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name):
         super().__init__(line)
@@ -1577,7 +1604,7 @@ class CRETypeInstruction(Instruction):
         return []
 
 
-class CITypeInstruction(Instruction):
+class CITypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd_rs1, imm):
         super().__init__(line)
@@ -1595,7 +1622,7 @@ class CITypeInstruction(Instruction):
 
 
 # custom syntax for: c.addi16sp
-class CIATypeInstruction(Instruction):
+class CIATypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, imm):
         super().__init__(line)
@@ -1612,7 +1639,7 @@ class CIATypeInstruction(Instruction):
 
 
 # custom syntax for: c.nop
-class CINTypeInstruction(Instruction):
+class CINTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name):
         super().__init__(line)
@@ -1627,7 +1654,7 @@ class CINTypeInstruction(Instruction):
         return []
 
 
-class CSSTypeInstruction(Instruction):
+class CSSTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rs2, imm):
         super().__init__(line)
@@ -1644,7 +1671,7 @@ class CSSTypeInstruction(Instruction):
         return [self.rs2, self.imm]
 
 
-class CIWTypeInstruction(Instruction):
+class CIWTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd, imm):
         super().__init__(line)
@@ -1661,7 +1688,7 @@ class CIWTypeInstruction(Instruction):
         return [self.rd, self.imm]
 
 
-class CLTypeInstruction(Instruction):
+class CLTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd, rs1, imm):
         super().__init__(line)
@@ -1679,7 +1706,7 @@ class CLTypeInstruction(Instruction):
         return [self.rd, self.rs1, self.imm]
 
 
-class CSTypeInstruction(Instruction):
+class CSTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rs1, rs2, imm):
         super().__init__(line)
@@ -1697,7 +1724,7 @@ class CSTypeInstruction(Instruction):
         return [self.rs1, self.rs2, self.imm]
 
 
-class CATypeInstruction(Instruction):
+class CATypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rd_rs1, rs2):
         super().__init__(line)
@@ -1714,7 +1741,7 @@ class CATypeInstruction(Instruction):
         return [self.rd_rs1, self.rs2]
 
 
-class CBTypeInstruction(Instruction):
+class CBTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, rs1, imm):
         super().__init__(line)
@@ -1731,7 +1758,7 @@ class CBTypeInstruction(Instruction):
         return [self.rs1, self.imm]
 
 
-class CJTypeInstruction(Instruction):
+class CJTypeInstruction(CompressedInstruction):
 
     def __init__(self, line, name, imm):
         super().__init__(line)
@@ -1745,29 +1772,6 @@ class CJTypeInstruction(Instruction):
 
     def args(self):
         return [self.imm]
-
-
-class PseudoInstruction(Instruction):
-
-    def __init__(self, line, name, *args):
-        super().__init__(line)
-        self.name = name
-        self.args = args
-
-    def __repr__(self):
-        s = '{}({!r}, args={!r})'
-        s = s.format(type(self).__name__, self.name, self.args)
-        return s
-
-    def args(self):
-        return self.args
-
-    def size(self, position):
-        # some pseudo-instructions expand into 2 regular ones
-        if self.name in ['li', 'call', 'tail']:
-            return 8
-        else:
-            return 4
 
 
 def read_lines(path_or_source):
@@ -2102,204 +2106,9 @@ def parse_item(line_tokens):
         return PseudoInstruction(line, name, *args)
     else:
         raise AssemblerError('invalid syntax', line)
-        
 
 
-def transform_pseudo_instructions(items):
-    new_items = []
-    for item in items:
-        # save an indent by early-exiting non PIs
-        if not isinstance(item, PseudoInstruction):
-            new_items.append(item)
-            continue
-
-        if item.name == 'nop':
-            inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
-            new_items.append(inst)
-        elif item.name == 'li':
-            rd, *imm = item.args
-            imm = parse_immediate(imm)
-            inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
-            new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
-            new_items.append(inst)
-        elif item.name == 'mv':
-            rd, rs = item.args
-            inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rs, imm=Arithmetic('0'))
-            new_items.append(inst)
-        elif item.name == 'not':
-            rd, rs = item.args
-            inst = ITypeInstruction(item.line, 'xori', rd=rd, rs1=rs, imm=Arithmetic('-1'))
-            new_items.append(inst)
-        elif item.name == 'neg':
-            rd, rs = item.args
-            inst = RTypeInstruction(item.line, 'sub', rd=rd, rs1='x0', rs2=rs)
-            new_items.append(inst)
-        elif item.name == 'seqz':
-            rd, rs = item.args
-            inst = ITypeInstruction(item.line, 'sltiu', rd=rd, rs1=rs, imm=Arithmetic('1'))
-            new_items.append(inst)
-        elif item.name == 'snez':
-            rd, rs = item.args
-            inst = RTypeInstruction(item.line, 'sltu', rd=rd, rs1='x0', rs2=rs)
-            new_items.append(inst)
-        elif item.name == 'sltz':
-            rd, rs = item.args
-            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1=rs, rs2='x0')
-            new_items.append(inst)
-        elif item.name == 'sgtz':
-            rd, rs = item.args
-            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1='x0', rs2=rs)
-            new_items.append(inst)
-
-        elif item.name == 'beqz':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'beq', rs1=rs, rs2='x0', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bnez':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bne', rs1=rs, rs2='x0', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'blez':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1='x0', rs2=rs, imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bgez':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1=rs, rs2='x0', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bltz':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1=rs, rs2='x0', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bgtz':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1='x0', rs2=rs, imm=imm)
-            new_items.append(inst)
-
-        elif item.name == 'bgt':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1=rt, rs2=rs, imm=imm)
-            new_items.append(inst)
-        elif item.name == 'ble':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1=rt, rs2=rs, imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bgtu':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bltu', rs1=rt, rs2=rs, imm=imm)
-            new_items.append(inst)
-        elif item.name == 'bleu':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bgeu', rs1=rt, rs2=rs, imm=imm)
-            new_items.append(inst)
-
-        elif item.name == 'j':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'jal':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
-            new_items.append(inst)
-        elif item.name == 'jr':
-            rs, = item.args
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1=rs, imm=Arithmetic('0'))
-            new_items.append(inst)
-        elif item.name == 'jalr':
-            rs, = item.args
-            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1=rs, imm=Arithmetic('0'))
-            new_items.append(inst)
-        elif item.name == 'ret':
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
-            new_items.append(inst)
-        elif item.name == 'call':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
-            new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
-            new_items.append(inst)
-        elif item.name == 'tail':
-            reference, = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
-            new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
-            new_items.append(inst)
-
-        elif item.name == 'fence':
-            inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
-            new_items.append(inst)
-
-        else:
-            raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
-
-    return new_items
-
-
-def resolve_aligns(items):
-    position = 0
-    new_items = []
-    for item in items:
-        if not isinstance(item, Align):
-            position += item.size(position)
-            new_items.append(item)
-            continue
-
-        padding = item.size(position)
-        position += padding
-        blob = Blob(item.line, b'\x00' * padding)
-        new_items.append(blob)
-
-    return new_items
-
-
-def resolve_labels(items, env):
-    new_env = copy.deepcopy(env)
-
-    position = 0
-    new_items = []
-    for item in items:
-        if not isinstance(item, Label):
-            position += item.size(position)
-            new_items.append(item)
-            continue
-
-        new_env[item.name] = position
-
-    return new_items, new_env
-
-
-def resolve_constants(items, env):
-    new_env = copy.deepcopy(env)
-
+def resolve_constants(items, constants):
     position = 0
     new_items = []
     for item in items:
@@ -2309,13 +2118,32 @@ def resolve_constants(items, env):
             continue
 
         if item.name in REGISTERS:
-            raise AssemblerError('constant name shadows register name "{}"'.format(item.name), item.line)
-        new_env[item.name] = item.imm.eval(position, new_env, item.line)
+            s = 'constant name shadows register name "{}"'
+            s = s.format(item.name)
+            raise AssemblerError(s, item.line)
 
-    return new_items, new_env
+        # NOTE: no labels here
+        env = ChainMap(constants, REGISTERS)
+        constants[item.name] = item.expr.eval(position, env, item.line)
+
+    return new_items
 
 
-def resolve_registers(items, env):
+def resolve_labels(items, labels):
+    position = 0
+    new_items = []
+    for item in items:
+        if not isinstance(item, Label):
+            position += item.size(position)
+            new_items.append(item)
+            continue
+
+        labels[item.name] = position
+
+    return new_items
+
+
+def resolve_register_aliases(items, constants):
     REGS = {'rd', 'rs1', 'rs2', 'rd_rs1'}
 
     new_items = []
@@ -2331,7 +2159,8 @@ def resolve_registers(items, env):
         for key, value in d.items():
             if key not in REGS:
                 continue
-            reg = env.get(value, value)
+            # reg might be aliased via a constant
+            reg = constants.get(value, value)
             d[key] = reg
 
         # create the new item using the resolved registers
@@ -2341,35 +2170,7 @@ def resolve_registers(items, env):
     return new_items
 
 
-def resolve_immediates(items, env):
-    position = 0
-    new_items = []
-    for item in items:
-        d = copy.deepcopy(item.__dict__)
-
-        # skip items without an immediate field
-        if 'imm' not in d:
-            position += item.size(position)
-            new_items.append(item)
-            continue
-
-        # resolve the immediate field
-        imm = item.imm.eval(position, env, item.line)
-        if hasattr(item, 'is_auipc_jump') and item.is_auipc_jump:
-            imm += 4
-        d['imm'] = imm
-
-        # create the new item using the resolved immediate
-        position += item.size(position)
-        new_item = item.__class__(*d.values())
-        new_items.append(new_item)
-
-    return new_items
-
-
-def transform_compressible(items):
-    # TODO: data-driven table of criteria? inst -> set of preds? xform if all are true?
-
+def transform_compressible(items, constants, labels):
     # C_ADDI4SPN: addi: rd', rs1 == x2/sp, imm != 0, imm % 4, imm [0, 1023]
     # C_LW:       lw:   rd', rs1', imm % 4, imm [0, 127]
     # C_SW:       sw:   rs1', rs2', imm % 4, imm [0, 127]
@@ -2398,7 +2199,279 @@ def transform_compressible(items):
     # C_ADD:
     # C_SWSP:
 
-    return items
+    position = 0
+    new_items = []
+    for item in items:
+        # TODO: data-driven table of criteria? inst -> set of preds? xform if all are true?
+
+        # check for c.j
+        if isinstance(item, Instruction) and item.name == 'jal':
+            rd = lookup_register(item.rd)
+            env = ChainMap(constants, labels)
+            imm = item.imm.eval(position, env, item.line)
+            if rd == 0 and imm % 2 == 0 and imm >= -2048 and imm <= 2047:
+                inst = CJTypeInstruction(item.line, 'c.j', item.imm)
+                # shrink all subsequent labels by 2
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 2
+                    
+                position += inst.size(position)
+                new_items.append(inst)
+            elif rd == 1 and imm % 2 == 0 and imm >= -2048 and imm <= 2047:
+                inst = CJTypeInstruction(item.line, 'c.jal', item.imm)
+                # shrink all subsequent labels by 2
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 2
+                    
+                position += inst.size(position)
+                new_items.append(inst)
+            else:
+                position += item.size(position)
+                new_items.append(item)
+        else:
+            position += item.size(position)
+            new_items.append(item)
+            continue
+        
+    return new_items
+        
+
+def transform_pseudo_instructions(items, constants, labels):
+    position = 0
+    new_items = []
+    for item in items:
+        # save an indent by early-exiting non PIs
+        if not isinstance(item, PseudoInstruction):
+            position += item.size(position)
+            new_items.append(item)
+            continue
+
+        if item.name == 'nop':
+            inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'li':
+            rd, *imm = item.args
+            imm = parse_immediate(imm)
+            # check if eligible for single inst expansion
+            env = ChainMap(constants, labels)
+            value = imm.eval(position, env, item.line)
+            #value = c_int32(value).value
+            if value >= -2048 and value <= 2047:
+                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=imm)
+                new_items.append(inst)
+                # shrink all subsequent labels by 4
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 4
+                position += inst.size(position)
+            else:
+                inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
+                position += inst.size(position)
+                new_items.append(inst)
+                inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
+                position += inst.size(position)
+                new_items.append(inst)
+        elif item.name == 'mv':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rs, imm=Arithmetic('0'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'not':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'xori', rd=rd, rs1=rs, imm=Arithmetic('-1'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'neg':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'sub', rd=rd, rs1='x0', rs2=rs)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'seqz':
+            rd, rs = item.args
+            inst = ITypeInstruction(item.line, 'sltiu', rd=rd, rs1=rs, imm=Arithmetic('1'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'snez':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'sltu', rd=rd, rs1='x0', rs2=rs)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'sltz':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1=rs, rs2='x0')
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'sgtz':
+            rd, rs = item.args
+            inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1='x0', rs2=rs)
+            position += inst.size(position)
+            new_items.append(inst)
+
+        elif item.name == 'beqz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'beq', rs1=rs, rs2='x0', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bnez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bne', rs1=rs, rs2='x0', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'blez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1='x0', rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bgez':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1=rs, rs2='x0', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bltz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1=rs, rs2='x0', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bgtz':
+            rs, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1='x0', rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+
+        elif item.name == 'bgt':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'blt', rs1=rt, rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'ble':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bge', rs1=rt, rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bgtu':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bltu', rs1=rt, rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'bleu':
+            rs, rt, reference = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = BTypeInstruction(item.line, 'bgeu', rs1=rt, rs2=rs, imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+
+        elif item.name == 'j':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'jal':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'jr':
+            rs, = item.args
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1=rs, imm=Arithmetic('0'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'jalr':
+            rs, = item.args
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1=rs, imm=Arithmetic('0'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'ret':
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'call':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            # TODO: check if eligible for single inst expansion
+            inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
+            position += inst.size(position)
+            new_items.append(inst)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
+            position += inst.size(position)
+            new_items.append(inst)
+        elif item.name == 'tail':
+            reference, = item.args
+            imm = ['%offset', reference]
+            imm = parse_immediate(imm)
+            # TODO: check if eligible for single inst expansion
+            inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
+            position += inst.size(position)
+            new_items.append(inst)
+            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
+            position += inst.size(position)
+            new_items.append(inst)
+
+        elif item.name == 'fence':
+            inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
+            position += inst.size(position)
+            new_items.append(inst)
+
+        else:
+            raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
+
+    return new_items
+
+
+def resolve_immediates(items, constants, labels):
+    position = 0
+    new_items = []
+    for item in items:
+        d = copy.deepcopy(item.__dict__)
+
+        # skip items without an immediate field
+        if 'imm' not in d:
+            position += item.size(position)
+            new_items.append(item)
+            continue
+
+        # resolve the immediate field
+        env = ChainMap(constants, labels)
+        imm = item.imm.eval(position, env, item.line)
+        if hasattr(item, 'is_auipc_jump') and item.is_auipc_jump:
+            imm += 4
+        d['imm'] = imm
+
+        # create the new item using the resolved immediate
+        position += item.size(position)
+        new_item = item.__class__(*d.values())
+        new_items.append(new_item)
+
+    return new_items
 
 
 def resolve_instructions(items):
@@ -2423,6 +2496,50 @@ def resolve_instructions(items):
 
         code = struct.pack('<I', code)
         blob = Blob(item.line, code)
+        new_items.append(blob)
+
+    return new_items
+
+
+def resolve_strings(items):
+    new_items = []
+    for item in items:
+        if not isinstance(item, String):
+            new_items.append(item)
+            continue
+
+        blob = Blob(item.line, item.value.encode('utf-8'))
+        new_items.append(blob)
+
+    return new_items
+
+
+def resolve_sequences(items):
+    endianness = '<'
+    formats = {
+        'bytes': 'B',
+        'shorts': 'H',
+        'ints': 'I',
+        'longs': 'L',
+        'longlongs': 'Q',
+    }
+
+    new_items = []
+    for item in items:
+        if not isinstance(item, Sequence):
+            new_items.append(item)
+            continue
+
+        values = [int(value, base=0) for value in item.values]
+
+        data = bytearray()
+        for value in values:
+            fmt = endianness + formats[item.name]
+            if value < 0:
+                fmt = fmt.lower()
+            value = struct.pack(fmt, value)
+            data.extend(value)
+        blob = Blob(item.line, bytes(data))
         new_items.append(blob)
 
     return new_items
@@ -2467,50 +2584,22 @@ def resolve_packs(items):
     return new_items
 
 
-def resolve_sequences(items):
-    endianness = '<'
-    formats = {
-        'bytes': 'B',
-        'shorts': 'H',
-        'ints': 'I',
-        'longs': 'L',
-        'longlongs': 'Q',
-        'floats': 'f',
-        'doubles': 'd',
-    }
-
+def resolve_aligns(items):
+    position = 0
     new_items = []
     for item in items:
-        if not isinstance(item, Sequence):
+        if not isinstance(item, Align):
+            position += item.size(position)
             new_items.append(item)
             continue
 
-        if item.name in ['floats', 'doubles']:
-            values = [float(value) for value in item.values]
-        else:
-            values = [int(value, base=0) for value in item.values]
-
-        data = bytearray()
-        for value in values:
-            fmt = endianness + formats[item.name]
-            if value < 0:
-                fmt = fmt.lower()
-            value = struct.pack(fmt, value)
-            data.extend(value)
-        blob = Blob(item.line, bytes(data))
-        new_items.append(blob)
-
-    return new_items
-
-
-def resolve_strings(items):
-    new_items = []
-    for item in items:
-        if not isinstance(item, String):
-            new_items.append(item)
+        # skip if already aligned
+        padding = item.size(position)
+        if padding == 0:
             continue
 
-        blob = Blob(item.line, item.value.encode('utf-8'))
+        position += padding
+        blob = Blob(item.line, b'\x00' * padding)
         new_items.append(blob)
 
     return new_items
@@ -2529,21 +2618,21 @@ def resolve_blobs(items):
 
 # Passes:
 #   - Read -> Lex -> Parse source
-#   - Transform pseudo-instructions (expand PIs into regular instructions)
-#   - Resolve aligns  (convert aligns to blobs based on position)
-#   - Resolve labels  (store label locations into env)
 #   - Resolve constants  (eval expr and update env)
-#   - Resolve registers  (could be constants for readability)
-#   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
+#   - Resolve labels  (store label locations into env)
+#   - Resolve register aliases  (could be constants for readability)
 #   - Transform compressible  (identify and compress eligible instructions)
+#   - Transform pseudo-instructions  (expand PIs into regular instructions)
+#   - Transform compressible  (again)
+#   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
-#   - Resolve sequences (convert Sequence to Blob)
 #   - Resolve strings  (convert String to Blob)
+#   - Resolve sequences (convert Sequence to Blob)
 #   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve packs  (convert Pack to Blob)
+#   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve blobs  (merge all Blobs into a single binary)
-
-def assemble(path_or_source, compress=False):
+def assemble(path_or_source, constants=None, labels=None, compress=False):
     """
     Assemble a RISC-V assembly program into a raw binary.
 
@@ -2551,12 +2640,9 @@ def assemble(path_or_source, compress=False):
     :returns: Assembled binary as bytes
     """
 
-    # exclude Python builtins from eval env
-    # https://docs.python.org/3/library/functions.html#eval
-    env = {
-        '__builtins__': None,
-    }
-    env.update(REGISTERS)
+    # keep constants and labels in separate namespaces
+    constants = constants or {}
+    labels = labels or {}
 
     # read, lex, and parse the source
     lines = read_lines(path_or_source)
@@ -2567,19 +2653,21 @@ def assemble(path_or_source, compress=False):
     items = [i for i in items if i is not None]
 
     # run items through each pass
-    items = transform_pseudo_instructions(items)
-    items = resolve_aligns(items)
-    items, env = resolve_labels(items, env)
-    items, env = resolve_constants(items, env)
-    items = resolve_registers(items, env)
-    items = resolve_immediates(items, env)
+    items = resolve_constants(items, constants)
+    items = resolve_labels(items, labels)
+    items = resolve_register_aliases(items, constants)
     if compress:
-        items = transform_compressible(items)
+        items = transform_compressible(items, constants, labels)
+    items = transform_pseudo_instructions(items, constants, labels)
+    if compress:
+        items = transform_compressible(items, constants, labels)
+    items = resolve_immediates(items, constants, labels)
     items = resolve_instructions(items)
-    items = resolve_sequences(items)
     items = resolve_strings(items)
+    items = resolve_sequences(items)
     items = transform_shorthand_packs(items)
     items = resolve_packs(items)
+    items = resolve_aligns(items)
     program = resolve_blobs(items)
 
     return program
