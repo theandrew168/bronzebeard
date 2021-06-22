@@ -1,5 +1,5 @@
 # bronzebeard
-Simple RISC-V assembler for writing bare-metal programs
+Minimal ecosystem for bare-metal RISC-V development
 
 ## Overview
 Bronzebeard is a [single-file](https://github.com/theandrew168/bronzebeard/blob/master/bronzebeard/asm.py), [nanopass](https://legacy.cs.indiana.edu/~dyb/pubs/nano-jfp.pdf) assembler for developing [bare metal](https://en.wikipedia.org/wiki/Bare_machine) [RISC-V](https://en.wikipedia.org/wiki/Riscv) programs.
