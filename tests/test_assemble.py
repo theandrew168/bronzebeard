@@ -278,9 +278,14 @@ def test_assemble_pseudo_instructions(pseudo, transformed):
 
 
 @pytest.mark.parametrize(
-    'regular,       compressed', [
-    ('jal x0 test', 'c.j test'),
-    ('jal x1 test', 'c.jal test'),
+    'regular,        compressed', [
+    ('addi x8 sp 4', 'c.addi4spn x8 4'),
+    ('lw x8 0(x9)',  'c.lw x8 0(x9)'),
+    ('sw x8 0(x9)',  'c.sw x8 0(x9)'),
+    ('addi x0 x0 0', 'c.nop'),
+    ('addi x1 x1 1', 'c.addi x1 1'),
+    ('jal x0 test',  'c.j test'),
+    ('jal ra test',  'c.jal test'),
 ])
 def test_assemble_compress(regular, compressed):
     labels = {'test': 0, 'near': 0, 'far': 0x20000000}

@@ -2174,33 +2174,147 @@ def resolve_register_aliases(items, constants):
 
 
 def transform_compressible(items, constants, labels):
-    # C_ADDI4SPN: addi: rd', rs1 == x2/sp, imm != 0, imm % 4, imm [0, 1023]
-    # C_LW:       lw:   rd', rs1', imm % 4, imm [0, 127]
-    # C_SW:       sw:   rs1', rs2', imm % 4, imm [0, 127]
-    # C_NOP:      addi: rd == rs1 == 0, imm == 0
-    # C_ADDI:     addi: rd == rs1 != 0, imm != 0, imm [-32, 31]
-    # C_JAL:      jal:  rd == x1/ra, imm % 2, imm [-2048, 2047]
-    # C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
-    # C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
-    # C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [???, ???]
-    # C_SRLI:
-    # C_SRAI:
-    # C_ANDI:
-    # C_SUB:
-    # C_XOR:
-    # C_OR:
-    # C_AND:
-    # C_J:        jal, rd == 0, imm % 2, imm [-2048, 2047]
-    # C_BEQZ:
-    # C_BNEZ:
-    # C_SLLI:
-    # C_LWSP:
-    # C_JR:
-    # C_MV:
-    # C_EBREAK:
-    # C_JALR:
-    # C_ADD:
-    # C_SWSP:
+
+    def NameEquals(value):
+        def inner(i, p, e):
+            return i.name == value
+        return inner
+
+    def RegEquals(name, value):
+        def inner(i, p, e):
+            reg = getattr(i, name)
+            reg = lookup_register(reg)
+            return reg == value
+        return inner
+
+    def RegNotEquals(name, value):
+        def inner(i, p, e):
+            reg = getattr(i, name)
+            reg = lookup_register(reg)
+            return reg != value
+        return inner
+
+    def RegBetween(name, lo, hi):
+        def inner(i, p, e):
+            reg = getattr(i, name)
+            reg = lookup_register(reg)
+            return reg >= lo and reg <= hi
+        return inner
+
+    def RegsMatch(a, b):
+        def inner(i, p, e):
+            reg_a = getattr(i, a)
+            reg_a = lookup_register(reg_a)
+            reg_b = getattr(i, b)
+            reg_b = lookup_register(reg_b)
+            return reg_a == reg_b
+        return inner
+
+    def ImmEquals(value):
+        def inner(i, p, e):
+            imm = i.imm.eval(p, e, i.line)
+            return imm == value
+        return inner
+
+    def ImmNotEquals(value):
+        def inner(i, p, e):
+            imm = i.imm.eval(p, e, i.line)
+            return imm != value
+        return inner
+
+    def ImmDivisibleBy(value):
+        def inner(i, p, e):
+            imm = i.imm.eval(p, e, i.line)
+            return imm % value == 0
+        return inner
+
+    def ImmBetween(lo, hi):
+        def inner(i, p, e):
+            imm = i.imm.eval(p, e, i.line)
+            return imm >= lo and imm <= hi
+        return inner
+
+    # [x] C_ADDI4SPN: addi: rd', rs1 == x2/sp, imm != 0, imm % 4, imm [0, 1023]
+    # [x] C_LW:       lw:   rd', rs1', imm % 4, imm [0, 127]
+    # [x] C_SW:       sw:   rs1', rs2', imm % 4, imm [0, 127]
+    # [x] C_NOP:      addi: rd == rs1 == 0, imm == 0
+    # [x] C_ADDI:     addi: rd == rs1 != 0, imm != 0, imm [-32, 31]
+    # [x] C_JAL:      jal:  rd == x1/ra, imm % 2, imm [-2048, 2047]
+    # [ ] C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
+    # [ ] C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
+    # [ ] C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [???, ???]
+    # [ ] C_SRLI:
+    # [ ] C_SRAI:
+    # [ ] C_ANDI:
+    # [ ] C_SUB:
+    # [ ] C_XOR:
+    # [ ] C_OR:
+    # [ ] C_AND:
+    # [x] C_J:        jal, rd == 0, imm % 2, imm [-2048, 2047]
+    # [ ] C_BEQZ:
+    # [ ] C_BNEZ:
+    # [ ] C_SLLI:
+    # [ ] C_LWSP:
+    # [ ] C_JR:
+    # [ ] C_MV:
+    # [ ] C_EBREAK:
+    # [ ] C_JALR:
+    # [ ] C_ADD:
+    # [ ] C_SWSP:
+
+    criteria = {
+        'c.addi4spn': [
+            NameEquals('addi'),
+            RegBetween('rd', 8, 15),
+            RegEquals('rs1', 2),
+            ImmNotEquals(0),
+            ImmDivisibleBy(4),
+            ImmBetween(0, 2**8 * 4 - 1),
+        ],
+        'c.lw': [
+            NameEquals('lw'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            ImmDivisibleBy(4),
+            ImmBetween(0, 2**5 * 4 - 1),
+        ],
+        'c.sw': [
+            NameEquals('sw'),
+            RegBetween('rs1', 8, 15),
+            RegBetween('rs2', 8, 15),
+            ImmDivisibleBy(4),
+            ImmBetween(0, 2**5 * 4 - 1),
+        ],
+        'c.nop': [
+            NameEquals('addi'),
+            RegEquals('rd', 0),
+            RegEquals('rs1', 0),
+            ImmEquals(0),
+        ],
+        'c.addi': [
+            NameEquals('addi'),
+            RegNotEquals('rd', 0),
+            RegNotEquals('rs1', 0),
+            RegsMatch('rd', 'rs1'),
+            ImmNotEquals(0),
+            ImmBetween(-2**5, 2**5 - 1),
+        ],
+        'c.j': [
+            NameEquals('jal'),
+            RegEquals('rd', 0),
+            ImmDivisibleBy(2),
+            ImmBetween(-2**11, 2**11 - 1),
+        ],
+        'c.jal': [
+            NameEquals('jal'),
+            RegEquals('rd', 1),
+            ImmDivisibleBy(2),
+            ImmBetween(-2**11, 2**11 - 1),
+        ],
+    }
+
+    # used for imm evaluation
+    env = ChainMap(constants, labels)
 
     position = 0
     new_items = []
@@ -2211,52 +2325,47 @@ def transform_compressible(items, constants, labels):
             new_items.append(item)
             continue
 
-        # map of inst name to list of predicates (closures around position and env)
-        env = ChainMap(constants, labels)
-        criteria = {
-            'c.j': [
-                lambda i: i.name == 'jal',
-                lambda i: lookup_register(i.rd) == 0,
-                lambda i: i.imm.eval(position, env, i.line) % 2 == 0,
-                lambda i: i.imm.eval(position, env, i.line) >= (-2**11),
-                lambda i: i.imm.eval(position, env, i.line) <= (2**11 - 1),
-            ],
-            'c.jal': [
-                lambda i: i.name == 'jal',
-                lambda i: lookup_register(i.rd) == 1,
-                lambda i: i.imm.eval(position, env, i.line) % 2 == 0,
-                lambda i: i.imm.eval(position, env, i.line) >= (-2**11),
-                lambda i: i.imm.eval(position, env, i.line) <= (2**11 - 1),
-            ],
-        }
 
-        # check if inst can be compressed (and do so)
-        compressed = False
+        # check if any set of criteria is all true for this item
+        compressed = None
         for name, preds in criteria.items():
-            if all(pred(item) for pred in preds):
-                if name == 'c.j':
-                    inst = CJTypeInstruction(item.line, name, item.imm)
-                elif name == 'c.jal':
-                    inst = CJTypeInstruction(item.line, name, item.imm)
-                else:
-                    raise AssemblerError('bad logic in inst compression', item.line)
-
-                # shrink all subsequent labels by 2
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 2
-
-                compressed = True
-                log.info('compressed {} to {}'.format(item, inst))
-
-                # add compressed inst to items and break the search loop
-                position += inst.size(position)
-                new_items.append(inst)
+            if all(pred(item, position, env) for pred in preds):
+                compressed = name
                 break
 
+        # swap out the instruction for its compressed counterpart
+        if compressed is not None:
+            if compressed == 'c.addi4spn':
+                inst = CIWTypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed == 'c.lw':
+                inst = CLTypeInstruction(item.line, compressed, item.rd, item.rs1, item.imm)
+            elif compressed == 'c.sw':
+                inst = CSTypeInstruction(item.line, compressed, item.rs1, item.rs2, item.imm)
+            elif compressed == 'c.nop':
+                inst = CINTypeInstruction(item.line, compressed)
+            elif compressed == 'c.addi':
+                inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed == 'c.j':
+                inst = CJTypeInstruction(item.line, compressed, item.imm)
+            elif compressed == 'c.jal':
+                inst = CJTypeInstruction(item.line, compressed, item.imm)
+            else:
+                raise AssemblerError('bad logic in inst compression', item.line)
+
+            # shrink all subsequent labels by 2
+            for label in labels:
+                if labels[label] <= position:
+                    continue
+                labels[label] = labels[label] - 2
+
+            log.info('compressed {} to {}'.format(item, inst))
+
+            # add compressed inst to items and break the search loop
+            position += inst.size(position)
+            new_items.append(inst)
+
         # if inst wasn't compressed, append to list like normal
-        if not compressed:
+        else:
             position += item.size(position)
             new_items.append(item)
 
