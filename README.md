@@ -57,7 +57,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
                         output binary file (default "bb.out")
-  --compress            identify and compress eligible instructions (TODO)
+  --compress            identify and compress eligible instructions
   -v, --verbose         verbose assembler output
   -vv, --very-verbose   very verbose assembler output
   --version             print assembler version and exit

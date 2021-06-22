@@ -2806,7 +2806,7 @@ def cli_main():
     )
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
-    parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions (TODO)')
+    parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
     parser.add_argument('-vv', '--very-verbose', action='store_true', help='very verbose assembler output')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
