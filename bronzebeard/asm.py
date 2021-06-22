@@ -2125,7 +2125,7 @@ def resolve_constants(items, constants):
             s = s.format(item.name)
             raise AssemblerError(s, item.line)
 
-        # NOTE: no labels here
+        # intentionally no labels here
         env = ChainMap(constants, REGISTERS)
         constants[item.name] = item.expr.eval(position, env, item.line)
 
@@ -2205,43 +2205,63 @@ def transform_compressible(items, constants, labels):
     position = 0
     new_items = []
     for item in items:
-        # TODO: data-driven table of criteria? inst -> set of preds? xform if all are true?
-
-        # check for c.j
-        if isinstance(item, Instruction) and item.name == 'jal':
-            rd = lookup_register(item.rd)
-            env = ChainMap(constants, labels)
-            imm = item.imm.eval(position, env, item.line)
-            if rd == 0 and imm % 2 == 0 and imm >= -2048 and imm <= 2047:
-                inst = CJTypeInstruction(item.line, 'c.j', item.imm)
-                # shrink all subsequent labels by 2
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 2
-                    
-                position += inst.size(position)
-                new_items.append(inst)
-            elif rd == 1 and imm % 2 == 0 and imm >= -2048 and imm <= 2047:
-                inst = CJTypeInstruction(item.line, 'c.jal', item.imm)
-                # shrink all subsequent labels by 2
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 2
-                    
-                position += inst.size(position)
-                new_items.append(inst)
-            else:
-                position += item.size(position)
-                new_items.append(item)
-        else:
+        # skip non-instructions
+        if not isinstance(item, Instruction):
             position += item.size(position)
             new_items.append(item)
             continue
-        
+
+        # map of inst name to list of predicates (closures around position and env)
+        env = ChainMap(constants, labels)
+        criteria = {
+            'c.j': [
+                lambda i: i.name == 'jal',
+                lambda i: lookup_register(i.rd) == 0,
+                lambda i: i.imm.eval(position, env, i.line) % 2 == 0,
+                lambda i: i.imm.eval(position, env, i.line) >= (-2**11),
+                lambda i: i.imm.eval(position, env, i.line) <= (2**11 - 1),
+            ],
+            'c.jal': [
+                lambda i: i.name == 'jal',
+                lambda i: lookup_register(i.rd) == 1,
+                lambda i: i.imm.eval(position, env, i.line) % 2 == 0,
+                lambda i: i.imm.eval(position, env, i.line) >= (-2**11),
+                lambda i: i.imm.eval(position, env, i.line) <= (2**11 - 1),
+            ],
+        }
+
+        # check if inst can be compressed (and do so)
+        compressed = False
+        for name, preds in criteria.items():
+            if all(pred(item) for pred in preds):
+                if name == 'c.j':
+                    inst = CJTypeInstruction(item.line, name, item.imm)
+                elif name == 'c.jal':
+                    inst = CJTypeInstruction(item.line, name, item.imm)
+                else:
+                    raise AssemblerError('bad logic in inst compression', item.line)
+
+                # shrink all subsequent labels by 2
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 2
+
+                compressed = True
+                log.info('compressed {} to {}'.format(item, inst))
+
+                # add compressed inst to items and break the search loop
+                position += inst.size(position)
+                new_items.append(inst)
+                break
+
+        # if inst wasn't compressed, append to list like normal
+        if not compressed:
+            position += item.size(position)
+            new_items.append(item)
+
     return new_items
-        
+
 
 def transform_pseudo_instructions(items, constants, labels):
     position = 0
@@ -2263,16 +2283,25 @@ def transform_pseudo_instructions(items, constants, labels):
             # check if eligible for single inst expansion
             env = ChainMap(constants, labels)
             value = imm.eval(position, env, item.line)
-            value = c_int32(value).value
-            if value >= -2048 and value <= 2047:
+            value = c_int32(value).value  # signed imm
+            if value >= (-2**11) and value <= (2**11 - 1):
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=Lo(imm))
-                new_items.append(inst)
                 # shrink all subsequent labels by 4
                 for label in labels:
                     if labels[label] <= position:
                         continue
                     labels[label] = labels[label] - 4
                 position += inst.size(position)
+                new_items.append(inst)
+            elif (value & 0xfff) == 0:
+                inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
+                # shrink all subsequent labels by 4
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 4
+                position += inst.size(position)
+                new_items.append(inst)
             else:
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 position += inst.size(position)
@@ -2420,24 +2449,50 @@ def transform_pseudo_instructions(items, constants, labels):
             reference, = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
-            # TODO: check if eligible for single inst expansion
-            inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
-            position += inst.size(position)
-            new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
-            position += inst.size(position)
-            new_items.append(inst)
+            # check if eligible for single inst expansion
+            env = ChainMap(constants, labels)
+            value = imm.eval(position, env, item.line)
+            value = c_int32(value).value  # signed imm
+            if value >= (-2**20) and value <= (2**20 - 1):
+                inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=Lo(imm))
+                # shrink all subsequent labels by 4
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 4
+                position += inst.size(position)
+                new_items.append(inst)
+            else:
+                inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
+                position += inst.size(position)
+                new_items.append(inst)
+                inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
+                position += inst.size(position)
+                new_items.append(inst)
         elif item.name == 'tail':
             reference, = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
-            # TODO: check if eligible for single inst expansion
-            inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
-            position += inst.size(position)
-            new_items.append(inst)
-            inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
-            position += inst.size(position)
-            new_items.append(inst)
+            # check if eligible for single inst expansion
+            env = ChainMap(constants, labels)
+            value = imm.eval(position, env, item.line)
+            value = c_int32(value).value  # signed imm
+            if value >= (-2**20) and value <= (2**20 - 1):
+                inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=Lo(imm))
+                # shrink all subsequent labels by 4
+                for label in labels:
+                    if labels[label] <= position:
+                        continue
+                    labels[label] = labels[label] - 4
+                position += inst.size(position)
+                new_items.append(inst)
+            else:
+                inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
+                position += inst.size(position)
+                new_items.append(inst)
+                inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
+                position += inst.size(position)
+                new_items.append(inst)
 
         elif item.name == 'fence':
             inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
@@ -2635,7 +2690,7 @@ def resolve_blobs(items):
 #   - Resolve packs  (convert Pack to Blob)
 #   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve blobs  (merge all Blobs into a single binary)
-def assemble(path_or_source, constants=None, labels=None, compress=False):
+def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     """
     Assemble a RISC-V assembly program into a raw binary.
 
@@ -2701,7 +2756,7 @@ def cli_main():
         logging.basicConfig(format=log_fmt, level=logging.DEBUG)
 
     try:
-        binary = assemble(args.input_asm, args.compress)
+        binary = assemble(args.input_asm, compress=args.compress)
     except Exception as e:
         raise SystemExit(e)
 

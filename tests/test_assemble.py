@@ -230,11 +230,12 @@ def test_assemble_alternate_offset_syntax_compressed():
     'pseudo,             transformed', [
 
     ('nop',              'addi x0 x0 0'),
-    ('li t0 0',          'addi t0 x0 0'),
-    ('li t0 -1',         'addi t0 x0 -1'),
-    ('li t0 0xffffffff', 'addi t0 x0 -1'),
-    ('li t0 -2048',      'addi t0 x0 -2048'),
-    ('li t0 2047',       'addi t0 x0 2047'),
+    ('li t0 0',          'addi t0 x0 %lo(0)'),
+    ('li t0 -1',         'addi t0 x0 %lo(-1)'),
+    ('li t0 0xffffffff', 'addi t0 x0 %lo(0xffffffff)'),
+    ('li t0 -2048',      'addi t0 x0 %lo(-2048)'),
+    ('li t0 2047',       'addi t0 x0 %lo(2047)'),
+    ('li t0 0x4000',     'lui t0 %hi(0x4000)'),
     ('li t0 -2049',      'lui t0 %hi(-2049)\n addi t0 t0 %lo(-2049)'),
     ('li t0 2048',       'lui t0 %hi(2048)\n addi t0 t0 %lo(2048)'),
     ('mv t0 t1',         'addi t0 t1 0'),
@@ -262,46 +263,18 @@ def test_assemble_alternate_offset_syntax_compressed():
     ('jr t0',            'jalr x0 0(t0)'),
     ('jalr t0',          'jalr x1 0(t0)'),
     ('ret',              'jalr x0 0(x1)'),
+    ('call near',        'jal x1 near'),
+    ('call far',         'auipc x1 %hi(far)\n jalr x1 x1 %lo(far)'),
+    ('tail near',        'jal x0 near'),
+    ('tail far',         'auipc x6 %hi(far)\n jalr x0 x6 %lo(far)'),
 
     ('fence',            'fence 0b1111 0b1111'),
 ])
 def test_assemble_pseudo_instructions(pseudo, transformed):
-    labels = {'test': 0}
+    labels = {'test': 0, 'near': 0, 'far': 0x20000000}
     pseudo_bin = asm.assemble(pseudo, labels=labels)
     transformed_bin = asm.assemble(transformed, labels=labels)
     assert pseudo_bin == transformed_bin
-
-
-def test_assemble_pseudo_instruction_call():
-    source = r"""
-    call main
-
-    align 0x00020000
-    main:
-        j main
-    """
-    binary = asm.assemble(source)[:8]
-    target = b''.join(struct.pack('<I', inst) for inst in [
-        asm.AUIPC('x1', asm.relocate_hi(0x00020000)),
-        asm.JALR('x1', 'x1', asm.relocate_lo(0x00020000)),
-    ])
-    assert binary == target
-
-
-def test_assemble_pseudo_instruction_tail():
-    source = r"""
-    tail main
-
-    align 0x00020000
-    main:
-        j main
-    """
-    binary = asm.assemble(source)[:8]
-    target = b''.join(struct.pack('<I', inst) for inst in [
-        asm.AUIPC('x6', asm.relocate_hi(0x00020000)),
-        asm.JALR('x0', 'x6', asm.relocate_lo(0x00020000)),
-    ])
-    assert binary == target
 
 
 @pytest.mark.parametrize(
@@ -310,7 +283,7 @@ def test_assemble_pseudo_instruction_tail():
     ('jal x1 test', 'c.jal test'),
 ])
 def test_assemble_compress(regular, compressed):
-    labels = {'test': 0}
+    labels = {'test': 0, 'near': 0, 'far': 0x20000000}
     regular_bin = asm.assemble(regular, labels=labels, compress=True)
     compressed_bin = asm.assemble(compressed, labels=labels)
     assert regular_bin == compressed_bin
