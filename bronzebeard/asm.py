@@ -2345,75 +2345,29 @@ def transform_pseudo_instructions(items, constants, labels):
             position += inst.size(position)
             new_items.append(inst)
 
-        elif item.name == 'beqz':
+        elif item.name in ['beqz', 'bnez', 'bgez', 'bltz']:
+            names = {'beqz': 'beq', 'bnez': 'bne', 'bgez': 'bge', 'bltz': 'blt'}
             rs, reference = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'beq', rs1=rs, rs2='x0', imm=imm)
+            inst = BTypeInstruction(item.line, names[item.name], rs1=rs, rs2='x0', imm=imm)
             position += inst.size(position)
             new_items.append(inst)
-        elif item.name == 'bnez':
+        elif item.name in ['blez', 'bgtz']:
+            names = {'blez': 'bge', 'bgtz': 'blt'}
             rs, reference = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bne', rs1=rs, rs2='x0', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'blez':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1='x0', rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'bgez':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1=rs, rs2='x0', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'bltz':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1=rs, rs2='x0', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'bgtz':
-            rs, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1='x0', rs2=rs, imm=imm)
+            inst = BTypeInstruction(item.line, names[item.name], rs1='x0', rs2=rs, imm=imm)
             position += inst.size(position)
             new_items.append(inst)
 
-        elif item.name == 'bgt':
+        elif item.name in ['bgt', 'ble', 'bgtu', 'bleu']:
+            names = {'bgt': 'blt', 'ble': 'bge', 'bgtu': 'bltu', 'bleu': 'bgeu'}
             rs, rt, reference = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'blt', rs1=rt, rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'ble':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bge', rs1=rt, rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'bgtu':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bltu', rs1=rt, rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
-        elif item.name == 'bleu':
-            rs, rt, reference = item.args
-            imm = ['%offset', reference]
-            imm = parse_immediate(imm)
-            inst = BTypeInstruction(item.line, 'bgeu', rs1=rt, rs2=rs, imm=imm)
+            inst = BTypeInstruction(item.line, names[item.name], rs1=rt, rs2=rs, imm=imm)
             position += inst.size(position)
             new_items.append(inst)
 
