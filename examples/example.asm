@@ -31,17 +31,10 @@ bytes 1 2 0x03 0b100 5 0x06 0b111 8
 pack <B, 0
 pack <B, 255
 pack <I, ADDR
-pack <f, 3.14159
 
 # align to 4-byte (32-bit) boundary
 align 4
 
 main:
-    # without nestable exprs under hi / lo
-    lui t0, %hi(ADDR)
-    addi t0, t0, %lo(ADDR)
-    addi t0, t0, main
-
-    # with nestable exprs under hi / lo
-    lui t0, %hi(%position(main, ADDR))
-    addi t0, t0, %lo(%position(main, ADDR))
+    # set t0 to location of "main" relative to ADDR
+    li t0 %position(main, ADDR)
