@@ -1,6 +1,0 @@
-Optimizations flag to find and apply compressions
-Better error messages
-
-Define flag: -D FOO=3 -D BAR
-Include statement
-Include flag: -I examples/ -I src/
