@@ -2757,7 +2757,7 @@ def cli_main():
 
     try:
         binary = assemble(args.input_asm, compress=args.compress)
-    except Exception as e:
+    except AssemblerError as e:
         raise SystemExit(e)
 
     with open(args.output, 'wb') as out_bin:
