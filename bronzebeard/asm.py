@@ -389,17 +389,15 @@ def cia_type(imm, *, opcode, funct3, cs=None):
     return code
 
 
-# TODO: custom encoding func for c.lui (weird behavior here)
-# https://stackoverflow.com/questions/63881445/what-are-the-operands-of-c-lui-instructioncompressed-subset-of-risc-v
-
-# C.LUI loads the non-zero 6-bit immediate field into bits 17–12 of the destination register, clears the
-# bottom 12 bits, and sign-extends bit 17 into all higher bits of the destination
-
 # CI variation
 # c.lui
 def ciu_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
+    # be flexible with the "upper" range here (wraps to negative)
+    # https://stackoverflow.com/questions/63881445/what-are-the-operands-of-c-lui-instructioncompressed-subset-of-risc-v
+    if imm >= 0xfffe0 and imm <= 0xfffff:
+        imm = imm - 2**20
     if imm < -32 or imm > 31:
         raise ValueError('6-bit immediate must be between -32 (-0x20) and 31 (0x1f): {}'.format(imm))
 
@@ -2240,29 +2238,38 @@ def transform_compressible(items, constants, labels):
     # [x] C_NOP:      addi: rd == rs1 == 0, imm == 0
     # [x] C_ADDI:     addi: rd == rs1 != 0, imm != 0, imm [-32, 31]
     # [x] C_JAL:      jal:  rd == x1/ra, imm % 2, imm [-2048, 2047]
-    # [ ] C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
-    # [ ] C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
-    # [ ] C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [???, ???]
-    # [ ] C_SRLI:
-    # [ ] C_SRAI:
-    # [ ] C_ANDI:
-    # [ ] C_SUB:
-    # [ ] C_XOR:
-    # [ ] C_OR:
-    # [ ] C_AND:
-    # [x] C_J:        jal, rd == 0, imm % 2, imm [-2048, 2047]
-    # [ ] C_BEQZ:
-    # [ ] C_BNEZ:
-    # [ ] C_SLLI:
-    # [ ] C_LWSP:
-    # [ ] C_JR:
-    # [ ] C_MV:
-    # [ ] C_EBREAK:
-    # [ ] C_JALR:
-    # [ ] C_ADD:
-    # [ ] C_SWSP:
+    # [x] C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
+    # [x] C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
+    # [-] C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [-32, 31], imm [???, ???]
+    # [x] C_SRLI:     srli: rd', rs1', rd == rs1, imm != 0, imm [0, 2**5 - 1]
+    # [x] C_SRAI:     srai: rd', rs1', rd == rs1, imm != 0, imm [0, 2**5 - 1]
+    # [x] C_ANDI:     andi: rd', rs1', rd == rs1, imm [-2**5, 2**5 - 1]
+    # [x] C_SUB:      sub:  rd', rs1', rd == rs1, rs2'
+    # [x] C_XOR:      xor:  rd', rs1', rd == rs1, rs2'
+    # [x] C_OR:       or:   rd', rs1', rd == rs1, rs2'
+    # [x] C_AND:      and:  rd', rs1', rd == rs1, rs2'
+    # [x] C_J:        jal:  rd == 0, imm % 2, imm [-2048, 2047]
+    # [x] C_BEQZ:     beq:  rs1', rs2 == 0, imm % 2, imm [-2**7 * 2, 2**7 * 2 -1]
+    # [x] C_BNEZ:     bne:  rs1', rs2 == 0, imm % 2, imm [-2**7 * 2, 2**7 * 2 -1]
+    # [x] C_SLLI:     slli: rd != 0, rs1 != 0, rd == rs1, imm [0, 2**5 - 1]
+    # [x] C_LWSP:     lw:   rd != 0, rs1 == 2, imm % 4, imm [0, 2**6 * 4 - 1]
+    # [x] C_JR:       jalr: rs1 != 0, rs2 == 0
+    # [x] C_MV:       add:  rd != 0, rs1 == 0, rs2 != 0
+    # [x] C_EBREAK:   ebreak
+    # [x] C_JALR:     jalr: rs1 != 0, rs2 == x1
+    # [x] C_ADD:      add:  rd != 0, rs1 != 0, rd == rs1, rs2 != 0
+    # [x] C_SWSP:     sw:   rs1 == 2, imm % 4, imm [-2**5 * 4, 2**6 * 4 - 1]
 
     criteria = {
+        # this has to be first since it collides with c.addi
+        'c.addi16sp': [
+            NameEquals('addi'),
+            RegEquals('rd', 2),
+            RegEquals('rs1', 2),
+            ImmNotEquals(0),
+            ImmDivisibleBy(16),
+            ImmBetween(-2**5 * 16, 2**5 * 16 - 1),
+        ],
         'c.addi4spn': [
             NameEquals('addi'),
             RegBetween('rd', 8, 15),
@@ -2299,17 +2306,152 @@ def transform_compressible(items, constants, labels):
             ImmNotEquals(0),
             ImmBetween(-2**5, 2**5 - 1),
         ],
+        'c.jal': [
+            NameEquals('jal'),
+            RegEquals('rd', 1),
+            ImmDivisibleBy(2),
+            ImmBetween(-2**11, 2**11 - 1),
+        ],
+        'c.li': [
+            NameEquals('addi'),
+            RegNotEquals('rd', 0),
+            RegEquals('rs1', 0),
+            ImmBetween(-2**5, 2**5 - 1),
+        ],
+        'c.lui': [
+            NameEquals('lui'),
+            RegNotEquals('rd', 0),
+            RegNotEquals('rd', 2),
+            ImmNotEquals(0),
+            ImmBetween(-2**5, 2**5 - 1),
+        ],
+        # check for alternate upper bound case
+        'c.lui_alt': [
+            NameEquals('lui'),
+            RegNotEquals('rd', 0),
+            RegNotEquals('rd', 2),
+            ImmNotEquals(0),
+            ImmBetween(0xfffe0, 0xfffff),
+        ],
+        'c.srli': [
+            NameEquals('srli'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegNotEquals('rs2', 0),
+            RegBetween('rs2', 0, 2**5 - 1),
+        ],
+        'c.srai': [
+            NameEquals('srai'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegNotEquals('rs2', 0),
+            RegBetween('rs2', 0, 2**5 - 1),
+        ],
+        'c.andi': [
+            NameEquals('andi'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            ImmBetween(-2**5, 2**5 - 1),
+        ],
+        'c.sub': [
+            NameEquals('sub'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegBetween('rs2', 8, 15),
+        ],
+        'c.xor': [
+            NameEquals('xor'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegBetween('rs2', 8, 15),
+        ],
+        'c.or': [
+            NameEquals('or'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegBetween('rs2', 8, 15),
+        ],
+        'c.and': [
+            NameEquals('and'),
+            RegBetween('rd', 8, 15),
+            RegBetween('rs1', 8, 15),
+            RegsMatch('rd', 'rs1'),
+            RegBetween('rs2', 8, 15),
+        ],
         'c.j': [
             NameEquals('jal'),
             RegEquals('rd', 0),
             ImmDivisibleBy(2),
             ImmBetween(-2**11, 2**11 - 1),
         ],
-        'c.jal': [
-            NameEquals('jal'),
-            RegEquals('rd', 1),
+        'c.beqz': [
+            NameEquals('beq'),
+            RegBetween('rs1', 8, 15),
+            RegEquals('rs2', 0),
             ImmDivisibleBy(2),
-            ImmBetween(-2**11, 2**11 - 1),
+            ImmBetween(-2**7 * 2, 2**7 * 2 - 1),
+        ],
+        'c.bnez': [
+            NameEquals('bne'),
+            RegBetween('rs1', 8, 15),
+            RegEquals('rs2', 0),
+            ImmDivisibleBy(2),
+            ImmBetween(-2**7 * 2, 2**7 * 2 - 1),
+        ],
+        'c.slli': [
+            NameEquals('slli'),
+            RegNotEquals('rd', 0),
+            RegNotEquals('rs1', 0),
+            RegsMatch('rd', 'rs1'),
+            RegNotEquals('rs2', 0),
+            RegBetween('rs2', 0, 2**5 - 1),
+        ],
+        'c.lwsp': [
+            NameEquals('lw'),
+            RegNotEquals('rd', 0),
+            RegEquals('rs1', 2),
+            ImmDivisibleBy(4),
+            ImmBetween(0, 2**6 * 4 - 1),
+        ],
+        'c.jr': [
+            NameEquals('jalr'),
+            RegEquals('rd', 0),
+            RegNotEquals('rs1', 0),
+            ImmEquals(0),
+        ],
+        'c.mv': [
+            NameEquals('add'),
+            RegNotEquals('rd', 0),
+            RegEquals('rs1', 0),
+            RegNotEquals('rs2', 0),
+        ],
+        'c.ebreak': [
+            NameEquals('ebreak'),
+        ],
+        'c.add': [
+            NameEquals('add'),
+            RegNotEquals('rd', 0),
+            RegNotEquals('rs1', 0),
+            RegsMatch('rd', 'rs1'),
+            RegNotEquals('rs2', 0),
+        ],
+        'c.jalr': [
+            NameEquals('jalr'),
+            RegEquals('rd', 1),
+            RegNotEquals('rs1', 0),
+            ImmEquals(0),
+        ],
+        'c.swsp': [
+            NameEquals('sw'),
+            RegEquals('rs1', 2),
+            ImmDivisibleBy(4),
+            ImmBetween(0, 2**6 * 4 - 1),
         ],
     }
 
@@ -2324,7 +2466,6 @@ def transform_compressible(items, constants, labels):
             position += item.size(position)
             new_items.append(item)
             continue
-
 
         # check if any set of criteria is all true for this item
         compressed = None
@@ -2345,10 +2486,51 @@ def transform_compressible(items, constants, labels):
                 inst = CINTypeInstruction(item.line, compressed)
             elif compressed == 'c.addi':
                 inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
-            elif compressed == 'c.j':
-                inst = CJTypeInstruction(item.line, compressed, item.imm)
             elif compressed == 'c.jal':
                 inst = CJTypeInstruction(item.line, compressed, item.imm)
+            elif compressed == 'c.li':
+                inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed in ['c.lui', 'c.lui_alt']:
+                compressed = 'c.lui'
+                inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed == 'c.addi16sp':
+                inst = CIATypeInstruction(item.line, compressed, item.imm)
+            elif compressed == 'c.srli':
+                inst = CBTypeInstruction(item.line, compressed, item.rd, Arithmetic(item.rs2))
+            elif compressed == 'c.srai':
+                inst = CBTypeInstruction(item.line, compressed, item.rd, Arithmetic(item.rs2))
+            elif compressed == 'c.andi':
+                inst = CBTypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed == 'c.sub':
+                inst = CATypeInstruction(item.line, compressed, item.rd, item.rs2)
+            elif compressed == 'c.xor':
+                inst = CATypeInstruction(item.line, compressed, item.rd, item.rs2)
+            elif compressed == 'c.or':
+                inst = CATypeInstruction(item.line, compressed, item.rd, item.rs2)
+            elif compressed == 'c.and':
+                inst = CATypeInstruction(item.line, compressed, item.rd, item.rs2)
+            elif compressed == 'c.j':
+                inst = CJTypeInstruction(item.line, compressed, item.imm)
+            elif compressed == 'c.beqz':
+                inst = CBTypeInstruction(item.line, compressed, item.rs1, item.imm)
+            elif compressed == 'c.bnez':
+                inst = CBTypeInstruction(item.line, compressed, item.rs1, item.imm)
+            elif compressed == 'c.slli':
+                inst = CITypeInstruction(item.line, compressed, item.rd, Arithmetic(item.rs2))
+            elif compressed == 'c.lwsp':
+                inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
+            elif compressed == 'c.jr':
+                inst = CRJTypeInstruction(item.line, compressed, item.rs1) 
+            elif compressed == 'c.mv':
+                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2) 
+            elif compressed == 'c.ebreak':
+                inst = CRETypeInstruction(item.line, compressed) 
+            elif compressed == 'c.jalr':
+                inst = CRJTypeInstruction(item.line, compressed, item.rs1) 
+            elif compressed == 'c.add':
+                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2) 
+            elif compressed == 'c.swsp':
+                inst = CSSTypeInstruction(item.line, compressed, item.rs2, item.imm)
             else:
                 raise AssemblerError('bad logic in inst compression', item.line)
 
@@ -2615,7 +2797,13 @@ def resolve_instructions(items):
         except ValueError as e:
             raise AssemblerError(str(e), item.line)
 
-        code = struct.pack('<I', code)
+        # pack into 2 bytes if item is a CompressedInstruction, else 4
+        if isinstance(item, CompressedInstruction):
+            fmt = '<H'
+        else:
+            fmt = '<I'
+
+        code = struct.pack(fmt, code)
         blob = Blob(item.line, code)
         new_items.append(blob)
 

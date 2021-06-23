@@ -217,7 +217,7 @@ def test_assemble_alternate_offset_syntax_compressed():
     c.sw x9, 0(x8)
     """
     binary = asm.assemble(source)
-    target = b''.join(struct.pack('<I', inst) for inst in [
+    target = b''.join(struct.pack('<H', inst) for inst in [
         asm.C_LW('x8', 'x9', 0),
         asm.C_LW('x8', 'x9', 0),
         asm.C_SW('x8', 'x9', 0),
@@ -278,14 +278,35 @@ def test_assemble_pseudo_instructions(pseudo, transformed):
 
 
 @pytest.mark.parametrize(
-    'regular,        compressed', [
-    ('addi x8 sp 4', 'c.addi4spn x8 4'),
-    ('lw x8 0(x9)',  'c.lw x8 0(x9)'),
-    ('sw x8 0(x9)',  'c.sw x8 0(x9)'),
-    ('addi x0 x0 0', 'c.nop'),
-    ('addi x1 x1 1', 'c.addi x1 1'),
-    ('jal x0 test',  'c.j test'),
-    ('jal ra test',  'c.jal test'),
+    'regular,          compressed', [
+    ('addi x8 sp 4',   'c.addi4spn x8 4'),
+    ('lw x8 0(x9)',    'c.lw x8 0(x9)'),
+    ('sw x8 0(x9)',    'c.sw x8 0(x9)'),
+    ('addi x0 x0 0',   'c.nop'),
+    ('addi x1 x1 1',   'c.addi x1 1'),
+    ('jal ra test',    'c.jal test'),
+    ('addi x1 x0 1',   'c.li x1 1'),
+    ('lui x1 1',       'c.lui x1 1'),
+    ('lui x1 0xfffff', 'c.lui x1 -1'),
+    ('addi x2 x2 16',  'c.addi16sp 16'),
+    ('srli x8 x8 1',   'c.srli x8 1'),
+    ('srai x8 x8 1',   'c.srai x8 1'),
+    ('andi x8 x8 0',   'c.andi x8 0'),
+    ('sub x8 x8 x9',   'c.sub x8 x9'),
+    ('xor x8 x8 x9',   'c.xor x8 x9'),
+    ('or x8 x8 x9',    'c.or x8 x9'),
+    ('and x8 x8 x9',   'c.and x8 x9'),
+    ('jal x0 test',    'c.j test'),
+    ('beq x8 x0 0',    'c.beqz x8 0'),
+    ('bne x8 x0 0',    'c.bnez x8 0'),
+    ('slli x1 x1 1',   'c.slli x1 1'),
+    ('lw x1 0(x2)',    'c.lwsp x1 0'),
+    ('jalr x0 0(x1)',  'c.jr x1'),
+    ('add x1 x0 x2',   'c.mv x1 x2'),
+    ('ebreak',         'c.ebreak'),
+    ('jalr x1 0(x1)',  'c.jalr x1'),
+    ('add x1 x1 x2',   'c.add x1 x2'),
+    ('sw x1 0(x2)',    'c.swsp x1 0'),
 ])
 def test_assemble_compress(regular, compressed):
     labels = {'test': 0, 'near': 0, 'far': 0x20000000}

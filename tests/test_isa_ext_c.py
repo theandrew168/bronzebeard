@@ -375,7 +375,7 @@ def test_c_swsp(rs2, imm, code):
 ])
 def test_assemble_ext_c(source, expected):
     binary = asm.assemble(source)
-    target = struct.pack('<I', expected)
+    target = struct.pack('<H', expected)
     assert binary == target
 
 
