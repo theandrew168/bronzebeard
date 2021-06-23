@@ -296,8 +296,8 @@ Depending on the value of the `imm`, `li` may get expanded into a few different 
 
 | Criteria | Expansion |
 | -------- | --------- |
-| `imm` between `[-2048, 2047]` | `addi rd, x0, %lo(imm)` |
-| `imm` & 0xfff == 0` | `lui rd, %hi(imm)` |
+| `imm between [-2048, 2047]` | `addi rd, x0, %lo(imm)` |
+| `imm & 0xfff == 0` | `lui rd, %hi(imm)` |
 | otherwise | `lui rd, %hi(imm)`<br/>`addi rd, rd, %lo(imm)` |
 
 ### Expansion of `call offset`
@@ -306,7 +306,7 @@ Depending on how near / far away the label referred to by `offset` is, `call` ma
 | Criteria | Expansion |
 | -------- | --------- |
 | `offset` is near | `jal x1, %lo(offset)` |
-| otherwise | ``auipc x1, %hi(offset)`<br/>`jalr x1, x1, %lo(offset) |
+| otherwise | `auipc x1, %hi(offset)`<br/>`jalr x1, x1, %lo(offset)` |
 
 ### Expansion of `tail imm`
 Depending on how near / far away the label referred to by `offset` is, `tail` may get expanded into a few different combinations of instructions.
@@ -314,7 +314,7 @@ Depending on how near / far away the label referred to by `offset` is, `tail` ma
 | Criteria | Expansion |
 | -------- | --------- |
 | `offset` is near | `jal x0, %lo(offset)` |
-| otherwise | ``auipc x6, %hi(offset)`<br/>`jalr x0, x6, %lo(offset) |
+| otherwise | `auipc x6, %hi(offset)`<br/>`jalr x0, x6, %lo(offset)` |
 
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
