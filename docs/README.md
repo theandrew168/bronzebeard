@@ -216,10 +216,7 @@ align 2
 # main program starts here
 main:
     # load address of data into register t0
-    lui t0, %hi(%position(data, ROM_ADDR))
-    addi t0, t0, %lo(%position(data, ROM_ADDR))
-    # do stuff with data
-    # ...
+    li t0, %position(data, ROM_ADDR)
 ```
 
 This program contains three labels: `start`, `data`, and `main`.
@@ -264,35 +261,60 @@ They are given more meaning when dealing with more complex [ABIs](https://en.wik
 These pseudo-instructions represent additional actions and can be used like regular instructions.
 One of the early passes in the assembler will transform them as described in this table.
 
-| Instruction        | Expansion          | Description |
-| ------------------ | ------------------ | ----------- |
-| `nop`              | `addi x0, x0, 0`   | No operation |
-| `li rd, imm`       | `lui rd, %hi(imm)`<br/>`addi rd, rd, %lo(imm)` | Load immediate |
-| `mv rd, rs`        | `addi rd, rs, 0`   | Copy register |
-| `not rd, rs`       | `xori rd, rs, -1`  | One's complement |
-| `neg rd, rs`       | `sub rd, x0, rs`   | Two's complement |
-| `seqz rd, rs`      | `sltiu rd, rs, 1`  | Set if == zero |
-| `snez rd, rs`      | `sltu rd, x0, rs`  | Set if != zero |
-| `sltz rd, rs`      | `slt rd, rs, x0`   | Set if < zero |
-| `sgtz rd, rs`      | `slt rd, x0, rs`   | Set if > zero |
-| `beqz rs, imm`     | `beq rs, x0, imm`  | Branch if == zero |
-| `bnez rs, imm`     | `bne rs, x0, imm`  | Branch if != zero |
-| `blez rs, imm`     | `bge x0, rs, imm`  | Branch if <= zero |
-| `bgez rs, imm`     | `bge rs, x0, imm`  | Branch if >= zero |
-| `bltz rs, imm`     | `blt rs, x0, imm`  | Branch if < zero |
-| `bgtz rs, imm`     | `blt x0, rs, imm`  | Branch if > zero |
-| `bgt rs, rt, imm`  | `blt rt, rs, imm`  | Branch if > |
-| `ble rs, rt, imm`  | `bge rt, rs, imm`  | Branch if <= |
-| `bgtu rs, rt, imm` | `bltu rt, rs, imm` | Branch if >, unsigned |
-| `bleu rs, rt, imm` | `bgeu rt, rs, imm` | Branch if <=, unsigned |
-| `j imm`            | `jal x0, imm`      | Jump |
-| `jal imm`          | `jal x1, imm`      | Jump and link |
-| `jr rs`            | `jalr x0, 0(rs)`   | Jump register |
-| `jalr rs`          | `jalr x1, 0(rs)`   | Jump and link register |
-| `ret`              | `jalr x0, 0(x1)`   | Return from subroutine |
-| `call imm`         | `auipc x1, %hi(imm)`<br/>`jalr x1, x1, %lo(imm)` | Call far-away subroutine |
-| `tail imm`         | `auipc x6, %hi(imm)`<br/>`jalr x0, x6, %lo(imm)` | Tail call fair-away subroutine |
-| `fence`            | `fence iorw, iorw` | Fence on all memory and I/O |
+| Instruction           | Expansion             | Description |
+| --------------------- | --------------------- | ----------- |
+| `nop`                 | `addi x0, x0, 0`      | No operation |
+| `li rd, imm`          | See below             | Load immediate |
+| `mv rd, rs`           | `addi rd, rs, 0`      | Copy register |
+| `not rd, rs`          | `xori rd, rs, -1`     | One's complement |
+| `neg rd, rs`          | `sub rd, x0, rs`      | Two's complement |
+| `seqz rd, rs`         | `sltiu rd, rs, 1`     | Set if == zero |
+| `snez rd, rs`         | `sltu rd, x0, rs`     | Set if != zero |
+| `sltz rd, rs`         | `slt rd, rs, x0`      | Set if < zero |
+| `sgtz rd, rs`         | `slt rd, x0, rs`      | Set if > zero |
+| `beqz rs, offset`     | `beq rs, x0, offset`  | Branch if == zero |
+| `bnez rs, offset`     | `bne rs, x0, offset`  | Branch if != zero |
+| `blez rs, offset`     | `bge x0, rs, offset`  | Branch if <= zero |
+| `bgez rs, offset`     | `bge rs, x0, offset`  | Branch if >= zero |
+| `bltz rs, offset`     | `blt rs, x0, offset`  | Branch if < zero |
+| `bgtz rs, offset`     | `blt x0, rs, offset`  | Branch if > zero |
+| `bgt rs, rt, offset`  | `blt rt, rs, offset`  | Branch if > |
+| `ble rs, rt, offset`  | `bge rt, rs, offset`  | Branch if <= |
+| `bgtu rs, rt, offset` | `bltu rt, rs, offset` | Branch if >, unsigned |
+| `bleu rs, rt, offset` | `bgeu rt, rs, offset` | Branch if <=, unsigned |
+| `j offset`            | `jal x0, offset`      | Jump |
+| `jal offset`          | `jal x1, offset`      | Jump and link |
+| `jr rs`               | `jalr x0, 0(rs)`      | Jump register |
+| `jalr rs`             | `jalr x1, 0(rs)`      | Jump and link register |
+| `ret`                 | `jalr x0, 0(x1)`      | Return from subroutine |
+| `call offset`         | See below             | Call far-away subroutine |
+| `tail offset`         | See below             | Tail call fair-away subroutine |
+| `fence`               | `fence iorw, iorw`    | Fence on all memory and I/O |
+
+### Expansion of `li rd, imm`
+Depending on the value of the `imm`, `li` may get expanded into a few different combinations of instructions.
+
+| Criteria | Expansion |
+| -------- | --------- |
+| `imm` between `[-2048, 2047]` | `addi rd, x0, %lo(imm)` |
+| `imm` & 0xfff == 0` | `lui rd, %hi(imm)` |
+| otherwise | `lui rd, %hi(imm)`<br/>`addi rd, rd, %lo(imm)` |
+
+### Expansion of `call offset`
+Depending on how near / far away the label referred to by `offset` is, `call` may get expanded into a few different combinations of instructions.
+
+| Criteria | Expansion |
+| -------- | --------- |
+| `offset` is near | `jal x1, %lo(offset)` |
+| otherwise | ``auipc x1, %hi(offset)`<br/>`jalr x1, x1, %lo(offset) |
+
+### Expansion of `tail imm`
+Depending on how near / far away the label referred to by `offset` is, `tail` may get expanded into a few different combinations of instructions.
+
+| Criteria | Expansion |
+| -------- | --------- |
+| `offset` is near | `jal x0, %lo(offset)` |
+| otherwise | ``auipc x6, %hi(offset)`<br/>`jalr x0, x6, %lo(offset) |
 
 ## Instructions
 These tables provide summaries for the baseline RISC-V instructions and common extensions.
