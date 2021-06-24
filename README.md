@@ -19,7 +19,7 @@ Check out the [DerzForth](https://github.com/theandrew168/derzforth) project for
 
 ## Documentation
 Most of the surface-level documentation for Bronzebeard lives right here in this README.
-For more specific details regarding the usage and accepted syntax of the assembler, check out the [docs](https://github.com/theandrew168/bronzebeard/tree/master/docs) directory.
+For more specific details regarding the usage and accepted syntax of the assembler, check out the [docs_old](https://github.com/theandrew168/bronzebeard/tree/master/docs_old) directory.
 This is where the project's primary documentation will live until the time comes to setup something more official.
 
 ## Devices
