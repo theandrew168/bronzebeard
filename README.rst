@@ -38,22 +38,3 @@ With Bronzebeard installed::
   bronzebeard examples/example.asm
 
 By default, the assembled output binary will be placed in a file named `bb.out`.
-
-Command Line Interface
-----------------------
-.. code-block:: none
-
-  usage: bronzebeard [-h] [-o OUTPUT] [--compress] [-v] [-vv] [--version] input_asm
-  
-  Assemble RISC-V source code
-  
-  positional arguments:
-    input_asm             input source file
-  
-  optional arguments:
-    -h, --help            show this help message and exit
-    -o OUTPUT, --output OUTPUT
-                          output binary file (default "bb.out")
-    --compress            identify and compress eligible instructions
-    -v, --verbose         verbose assembler output
-    --version             print assembler version and exit
