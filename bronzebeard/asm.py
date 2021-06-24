@@ -2461,8 +2461,8 @@ def transform_compressible(items, constants, labels):
     position = 0
     new_items = []
     for item in items:
-        # skip non-instructions
-        if not isinstance(item, Instruction):
+        # skip non-instructions and pseudo-instructions
+        if not isinstance(item, Instruction) or isinstance(item, PseudoInstruction):
             position += item.size(position)
             new_items.append(item)
             continue
