@@ -1098,6 +1098,11 @@ class Arithmetic(Expr):
         s = s.format(type(self).__name__, self.expr)
         return s
 
+    def __str__(self):
+        s = '{}'
+        s = s.format(self.expr)
+        return s
+
     # be sure to not leak internal python exceptions out of this
     def eval(self, position, env, line):
         try:
@@ -1131,6 +1136,11 @@ class Position(Expr):
         s = s.format(type(self).__name__, self.reference, self.expr)
         return s
 
+    def __str__(self):
+        s = '%position({}, {})'
+        s = s.format(self.reference, self.expr)
+        return s
+
     def eval(self, position, env, line):
         dest = env[self.reference]
         base = self.expr.eval(position, env, line)
@@ -1145,6 +1155,11 @@ class Offset(Expr):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.reference)
+        return s
+
+    def __str__(self):
+        s = '%offset({})'
+        s = s.format(self.reference)
         return s
 
     def eval(self, position, env, line):
@@ -1162,6 +1177,11 @@ class Hi(Expr):
         s = s.format(type(self).__name__, self.expr)
         return s
 
+    def __str__(self):
+        s = '%hi({})'
+        s = s.format(self.expr)
+        return s
+
     def eval(self, position, env, line):
         value = self.expr.eval(position, env, line)
         return relocate_hi(value)
@@ -1175,6 +1195,11 @@ class Lo(Expr):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.expr)
+        return s
+
+    def __str__(self):
+        s = '%lo({})'
+        s = s.format(self.expr)
         return s
 
     def eval(self, position, env, line):
@@ -1205,6 +1230,11 @@ class Constant(Item):
         s = s.format(type(self).__name__, self.name, self.expr)
         return s
 
+    def __str__(self):
+        s = '{} = {}'
+        s = s.format(self.name, self.expr)
+        return s
+
     def size(self, position):
         return 0
 
@@ -1218,6 +1248,11 @@ class Label(Item):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.name)
+        return s
+
+    def __str__(self):
+        s = '{}:'
+        s = s.format(self.name)
         return s
 
     def size(self, position):
@@ -1235,6 +1270,11 @@ class String(Item):
         s = s.format(type(self).__name__, self.value)
         return s
 
+    def __str__(self):
+        s = 'string {}'
+        s = s.format(self.value)
+        return s
+
     def size(self, position):
         return len(self.value.encode('utf-8'))
 
@@ -1249,6 +1289,11 @@ class Sequence(Item):
     def __repr__(self):
         s = '{}(name={!r}, {!r})'
         s = s.format(type(self).__name__, self.name, self.values)
+        return s
+
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, ' '.join(self.values))
         return s
 
     def size(self, position):
@@ -1274,6 +1319,11 @@ class Pack(Item):
         s = s.format(type(self).__name__, self.fmt, self.imm)
         return s
 
+    def __str__(self):
+        s = 'pack {} {}'
+        s = s.format(self.fmt, self.imm)
+        return s
+
     def size(self, position):
         return struct.calcsize(self.fmt)
 
@@ -1288,6 +1338,11 @@ class ShorthandPack(Item):
     def __repr__(self):
         s = '{}(name={!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, self.imm)
         return s
 
     def size(self, position):
@@ -1311,6 +1366,11 @@ class Align(Item):
         s = s.format(type(self).__name__, self.alignment)
         return s
 
+    def __str__(self):
+        s = 'align {}'
+        s = s.format(self.alignment)
+        return s
+
     def size(self, position):
         padding = self.alignment - (position % self.alignment)
         if padding == self.alignment:
@@ -1329,6 +1389,11 @@ class Blob(Item):
         # repr is still "correct", just wanted a more consistent hex format
         s = ''.join(['\\x{:02x}'.format(b) for b in self.data])
         return "{}(b'{}')".format(type(self).__name__, s)
+
+    def __str__(self):
+        s = 'blob {}'
+        s = s.format(' '.join('0x{:02x}'.format(b) for b in self.data))
+        return s
 
     def size(self, position):
         return len(self.data)
@@ -1354,6 +1419,11 @@ class PseudoInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r}, args={!r})'
         s = s.format(type(self).__name__, self.name, self.args)
+        return s
+
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, ', '.join(self.args))
         return s
 
     def args(self):
@@ -1382,6 +1452,11 @@ class RTypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rd, self.rs1, self.rs2)
+        return s
+
     def args(self):
         return [self.rd, self.rs1, self.rs2]
 
@@ -1401,6 +1476,11 @@ class ITypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rd, self.rs1, self.imm)
+        return s
+
     def args(self):
         return [self.rd, self.rs1, self.imm]
 
@@ -1415,6 +1495,11 @@ class IETypeInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.name)
+        return s
+
+    def __str__(self):
+        s = '{}'
+        s = s.format(self.name)
         return s
 
     def args(self):
@@ -1435,6 +1520,11 @@ class STypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rs1, self.rs2, self.imm)
+        return s
+
     def args(self):
         return [self.rs1, self.rs2, self.imm]
 
@@ -1451,6 +1541,11 @@ class BTypeInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rs1, self.rs2, self.imm)
         return s
 
     def args(self):
@@ -1470,6 +1565,11 @@ class UTypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd, self.imm)
+        return s
+
     def args(self):
         return [self.rd, self.imm]
 
@@ -1485,6 +1585,11 @@ class JTypeInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r}, rd={!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.rd, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd, self.imm)
         return s
 
     def args(self):
@@ -1503,6 +1608,11 @@ class FenceInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r}, succ={!r}, pred={!r})'
         s = s.format(type(self).__name__, self.name, self.succ, self.pred)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.succ, self.pred)
         return s
 
     def args(self):
@@ -1525,6 +1635,11 @@ class ATypeInstruction(Instruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.rs2, self.aq, self.rl)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}, {}, {}, {}'
+        s = s.format(self.name, self.rd, self.rs1, self.rs2, self.aq, self.rl)
+        return s
+
     def args(self):
         return [self.rd, self.rs1, self.rs2, self.aq, self.rl]
 
@@ -1543,6 +1658,11 @@ class ALTypeInstruction(Instruction):
     def __repr__(self):
         s = '{}({!r}, rd={!r}, rs1={!r}, aq={!r}, rl={!r})'
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.aq, self.rl)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}, {}, {}'
+        s = s.format(self.name, self.rd, self.rs1, self.aq, self.rl)
         return s
 
     def args(self):
@@ -1568,6 +1688,11 @@ class CRTypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd_rs1, self.rs2)
+        return s
+
     def args(self):
         return [self.rd_rs1, self.rs2]
 
@@ -1585,6 +1710,11 @@ class CRJTypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rd_rs1)
         return s
 
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, self.rd_rs1)
+        return s
+
     def args(self):
         return [self.rd_rs1]
 
@@ -1599,6 +1729,11 @@ class CRETypeInstruction(CompressedInstruction):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.name)
+        return s
+
+    def __str__(self):
+        s = '{}'
+        s = s.format(self.name)
         return s
 
     def args(self):
@@ -1618,6 +1753,11 @@ class CITypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rd_rs1, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd_rs1, self.imm)
+        return s
+
     def args(self):
         return [self.rd_rs1, self.imm]
 
@@ -1635,6 +1775,11 @@ class CIATypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, self.imm)
+        return s
+
     def args(self):
         return [self.imm]
 
@@ -1649,6 +1794,11 @@ class CINTypeInstruction(CompressedInstruction):
     def __repr__(self):
         s = '{}({!r})'
         s = s.format(type(self).__name__, self.name)
+        return s
+
+    def __str__(self):
+        s = '{}'
+        s = s.format(self.name)
         return s
 
     def args(self):
@@ -1668,6 +1818,11 @@ class CSSTypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rs2, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rs2, self.imm)
+        return s
+
     def args(self):
         return [self.rs2, self.imm]
 
@@ -1683,6 +1838,11 @@ class CIWTypeInstruction(CompressedInstruction):
     def __repr__(self):
         s = '{}({!r}, rd={!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.rd, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd, self.imm)
         return s
 
     def args(self):
@@ -1703,6 +1863,11 @@ class CLTypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rd, self.rs1, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rd, self.rs1, self.imm)
+        return s
+
     def args(self):
         return [self.rd, self.rs1, self.imm]
 
@@ -1719,6 +1884,11 @@ class CSTypeInstruction(CompressedInstruction):
     def __repr__(self):
         s = '{}({!r}, rs1={!r}, rs2={!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.rs1, self.rs2, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}, {}'
+        s = s.format(self.name, self.rs1, self.rs2, self.imm)
         return s
 
     def args(self):
@@ -1738,6 +1908,11 @@ class CATypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rd_rs1, self.rs2)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd_rs1, self.rs2)
+        return s
+
     def args(self):
         return [self.rd_rs1, self.rs2]
 
@@ -1755,6 +1930,11 @@ class CBTypeInstruction(CompressedInstruction):
         s = s.format(type(self).__name__, self.name, self.rs1, self.imm)
         return s
 
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rs1, self.imm)
+        return s
+
     def args(self):
         return [self.rs1, self.imm]
 
@@ -1769,6 +1949,11 @@ class CJTypeInstruction(CompressedInstruction):
     def __repr__(self):
         s = '{}({!r}, imm={!r})'
         s = s.format(type(self).__name__, self.name, self.imm)
+        return s
+
+    def __str__(self):
+        s = '{} {}'
+        s = s.format(self.name, self.imm)
         return s
 
     def args(self):
@@ -2232,34 +2417,6 @@ def transform_compressible(items, constants, labels):
             return imm >= lo and imm <= hi
         return inner
 
-    # [x] C_ADDI4SPN: addi: rd', rs1 == x2/sp, imm != 0, imm % 4, imm [0, 1023]
-    # [x] C_LW:       lw:   rd', rs1', imm % 4, imm [0, 127]
-    # [x] C_SW:       sw:   rs1', rs2', imm % 4, imm [0, 127]
-    # [x] C_NOP:      addi: rd == rs1 == 0, imm == 0
-    # [x] C_ADDI:     addi: rd == rs1 != 0, imm != 0, imm [-32, 31]
-    # [x] C_JAL:      jal:  rd == x1/ra, imm % 2, imm [-2048, 2047]
-    # [x] C_LI:       addi: rd != 0, rs1 == 0, imm [-32, 31]
-    # [x] C_ADDI16SP: addi: rd == rs1 == x2/sp, imm != 0, imm % 16, imm [-512, 511]
-    # [-] C_LUI:      lui:  rd != 0, rd != 2, imm != 0, imm [-32, 31], imm [???, ???]
-    # [x] C_SRLI:     srli: rd', rs1', rd == rs1, imm != 0, imm [0, 2**5 - 1]
-    # [x] C_SRAI:     srai: rd', rs1', rd == rs1, imm != 0, imm [0, 2**5 - 1]
-    # [x] C_ANDI:     andi: rd', rs1', rd == rs1, imm [-2**5, 2**5 - 1]
-    # [x] C_SUB:      sub:  rd', rs1', rd == rs1, rs2'
-    # [x] C_XOR:      xor:  rd', rs1', rd == rs1, rs2'
-    # [x] C_OR:       or:   rd', rs1', rd == rs1, rs2'
-    # [x] C_AND:      and:  rd', rs1', rd == rs1, rs2'
-    # [x] C_J:        jal:  rd == 0, imm % 2, imm [-2048, 2047]
-    # [x] C_BEQZ:     beq:  rs1', rs2 == 0, imm % 2, imm [-2**7 * 2, 2**7 * 2 -1]
-    # [x] C_BNEZ:     bne:  rs1', rs2 == 0, imm % 2, imm [-2**7 * 2, 2**7 * 2 -1]
-    # [x] C_SLLI:     slli: rd != 0, rs1 != 0, rd == rs1, imm [0, 2**5 - 1]
-    # [x] C_LWSP:     lw:   rd != 0, rs1 == 2, imm % 4, imm [0, 2**6 * 4 - 1]
-    # [x] C_JR:       jalr: rs1 != 0, rs2 == 0
-    # [x] C_MV:       add:  rd != 0, rs1 == 0, rs2 != 0
-    # [x] C_EBREAK:   ebreak
-    # [x] C_JALR:     jalr: rs1 != 0, rs2 == x1
-    # [x] C_ADD:      add:  rd != 0, rs1 != 0, rd == rs1, rs2 != 0
-    # [x] C_SWSP:     sw:   rs1 == 2, imm % 4, imm [-2**5 * 4, 2**6 * 4 - 1]
-
     criteria = {
         # this has to be first since it collides with c.addi
         'c.addi16sp': [
@@ -2540,7 +2697,7 @@ def transform_compressible(items, constants, labels):
                     continue
                 labels[label] = labels[label] - 2
 
-            log.info('compressed {} to {}'.format(item, inst))
+            log.info('compressed "{}" to "{}"'.format(item, inst))
 
             # add compressed inst to items and break the search loop
             position += inst.size(position)
@@ -2983,6 +3140,7 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
 
 
 def cli_main():
+    # TODO: any cleaner way to handle this w/ argparse positional args?
     if len(sys.argv) >= 2 and sys.argv[1] == '--version':
         from bronzebeard import __version__
         version = 'bronzebeard {}'.format(__version__)
@@ -2994,17 +3152,14 @@ def cli_main():
     )
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
-    parser.add_argument('--compress', action='store_true', help='identify and compress eligible instructions')
+    parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
-    parser.add_argument('-vv', '--very-verbose', action='store_true', help='very verbose assembler output')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
 
-    log_fmt = '%(levelname)s: %(message)s'
+    log_fmt = '%(funcName)s: %(message)s'
     if args.verbose:
         logging.basicConfig(format=log_fmt, level=logging.INFO)
-    if args.very_verbose:
-        logging.basicConfig(format=log_fmt, level=logging.DEBUG)
 
     try:
         binary = assemble(args.input_asm, compress=args.compress)
