@@ -1,7 +1,7 @@
 from importlib import import_module
 from setuptools import setup
 
-with open('README.md') as f:
+with open('README.rst') as f:
     readme = f.read()
 
 setup(
@@ -10,7 +10,7 @@ setup(
     author='Andrew Dailey',
     description='Minimal ecosystem for bare-metal RISC-V development',
     long_description=readme,
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     url='https://github.com/theandrew168/bronzebeard',
     packages=['bronzebeard'],
     install_requires=[
