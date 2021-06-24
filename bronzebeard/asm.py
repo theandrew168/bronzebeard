@@ -3157,6 +3157,11 @@ def cli_main():
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
 
+    if args.version:
+        from bronzebeard import __version__
+        version = 'bronzebeard {}'.format(__version__)
+        raise SystemExit(version)
+
     log_fmt = '%(funcName)s: %(message)s'
     if args.verbose:
         logging.basicConfig(format=log_fmt, level=logging.INFO)
