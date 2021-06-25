@@ -122,11 +122,15 @@ def test_assemble_constants():
     IP = gp
     addi zero zero BAR
     addi W IP BAZ
+
+    QMARK = '?'
+    addi x0 x0 QMARK
     """
     binary = asm.assemble(source)
     target = b''.join(struct.pack('<I', inst) for inst in [
         asm.ADDI(0, 0, 84),
         asm.ADDI('s0', 'gp', 10),
+        asm.ADDI(0, 0, ord('?')),  # ord('?') == 63
     ])
     assert binary == target
 

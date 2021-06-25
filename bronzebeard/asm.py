@@ -179,7 +179,7 @@ def ij_type(rd, rs1, imm, *, opcode, funct3):
     if imm < -0x800 or imm > 0x7ff:
         raise ValueError('12-bit immediate must be between -0x800 (-2048) and 0x7ff (2047): {}'.format(imm))
     if imm % 2 != 0:
-        raise ValueError('12-bit immediate must be a muliple of 2: {}'.format(imm))
+        raise ValueError('12-bit immediate must be a multiple of 2: {}'.format(imm))
 
     imm = c_uint32(imm).value & 0b111111111111
 
@@ -1105,6 +1105,15 @@ class Arithmetic(Expr):
 
     # be sure to not leak internal python exceptions out of this
     def eval(self, position, env, line):
+        # check for single ASCII characters
+        if self.expr.startswith('\'') and self.expr.endswith('\''):
+            c = self.expr[1:-1]
+            c = c.encode('utf-8').decode('unicode_escape')
+            try:
+                return ord(c)
+            except TypeError:
+                raise AssemblerError('invalid char literal in expr: "{}"'.format(self.expr), line)
+
         try:
             # exclude Python builtins from eval env
             # https://docs.python.org/3/library/functions.html#eval
@@ -2297,13 +2306,15 @@ def parse_item(line_tokens):
 
 
 def resolve_constants(items, constants):
-    position = 0
     new_items = []
     for item in items:
         if not isinstance(item, Constant):
-            position += item.size(position)
             new_items.append(item)
             continue
+
+        if not isinstance(item.expr, Arithmetic):
+            s = 'constants only support arithmetic expressions'
+            raise AssemblerError(s, item.line)
 
         if item.name in REGISTERS:
             s = 'constant name cannot shadow a register name "{}"'
@@ -2311,13 +2322,13 @@ def resolve_constants(items, constants):
             raise AssemblerError(s, item.line)
 
         if is_int(item.name):
-            s = 'constant name cannot be an number "{}"'
+            s = 'constant name cannot be a number "{}"'
             s = s.format(item.name)
             raise AssemblerError(s, item.line)
 
         # intentionally no labels here
         env = ChainMap(constants, REGISTERS)
-        value = item.expr.eval(position, env, item.line)
+        value = item.expr.eval(None, env, item.line)
         constants[item.name] = value
 
         log.info('line {}: "{}" -> "{} = {}"'.format(item.line.number, item, item.name, value))
@@ -2714,10 +2725,8 @@ def transform_compressible(items, constants, labels):
                 raise AssemblerError('bad logic in inst compression', item.line)
 
             # shrink all subsequent labels by 2
-            for label in labels:
-                if labels[label] <= position:
-                    continue
-                labels[label] = labels[label] - 2
+            new_labels = {k: v - 2 for k, v in labels.items() if v > position}
+            labels.update(new_labels)
 
             # add compressed inst to items and break the search loop
             position += inst.size(position)
@@ -2755,23 +2764,20 @@ def transform_pseudo_instructions(items, constants, labels):
             if value >= (-2**11) and value <= (2**11 - 1):
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=Lo(imm))
                 # shrink all subsequent labels by 4
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 4
+                new_labels = {k: v - 4 for k, v in labels.items() if v > position}
+                labels.update(new_labels)
             elif (value & 0xfff) == 0:
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 # shrink all subsequent labels by 4
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 4
+                new_labels = {k: v - 4 for k, v in labels.items() if v > position}
+                labels.update(new_labels)
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
         elif item.name == 'mv':
             rd, rs = item.args
@@ -2844,16 +2850,15 @@ def transform_pseudo_instructions(items, constants, labels):
             if value >= (-2**20) and value <= (2**20 - 1):
                 inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=Lo(imm))
                 # shrink all subsequent labels by 4
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 4
+                new_labels = {k: v - 4 for k, v in labels.items() if v > position}
+                labels.update(new_labels)
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+
                 inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
         elif item.name == 'tail':
             reference, = item.args
@@ -2866,16 +2871,15 @@ def transform_pseudo_instructions(items, constants, labels):
             if value >= (-2**20) and value <= (2**20 - 1):
                 inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=Lo(imm))
                 # shrink all subsequent labels by 4
-                for label in labels:
-                    if labels[label] <= position:
-                        continue
-                    labels[label] = labels[label] - 4
+                new_labels = {k: v - 4 for k, v in labels.items() if v > position}
+                labels.update(new_labels)
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+
                 inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
 
         elif item.name == 'fence':
@@ -2917,8 +2921,8 @@ def resolve_immediates(items, constants, labels):
         d['imm'] = imm
 
         # create the new item using the resolved immediate
-        position += item.size(position)
         new_item = item.__class__(*d.values())
+        position += new_item.size(position)
         new_items.append(new_item)
 
         if not trivial:
@@ -3122,6 +3126,8 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     tokens = [t for t in tokens if len(t) > 0]
     items = [parse_item(t) for t in tokens]
     items = [i for i in items if i is not None]
+    for item in items:
+        log.info('parsed line {}: "{}"'.format(item.line.number, item))
 
     # run items through each pass
     items = resolve_constants(items, constants)
