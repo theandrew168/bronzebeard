@@ -226,7 +226,7 @@ sd_swap_wait_tbe:
     andi t2, t2, 0x02  # isolate TBE bit
     beq t2, zero, sd_swap_wait_tbe
     # send byte
-    sw t1, a1, zero
+    sw t1, a1, 0
 sd_swap_wait_rbne:
     # wait for RBNE
     lw t2, t0, 0  # load SPI status
@@ -512,7 +512,7 @@ init_done:
     # isolate card capacity status (CCS) bit
     addi t0, zero, 1
     slli t0, t0, 30
-    andi a2, a2, t0
+    and a2, a2, t0
 
     # success if block address mode w/ 512 byte blocks
     bne a2, zero, read_block

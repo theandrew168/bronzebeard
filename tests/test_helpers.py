@@ -7,9 +7,9 @@ from bronzebeard import asm
 
 @pytest.mark.parametrize(
     'value,  expected', [
-    (-1,     True),
-    (1,      True),
-    (0x20,   True),
+    ('-1',   True),
+    ('1',    True),
+    ('0x20', True),
     ('zero', False),
     ('foo:', False),
     ('cat',  False),

@@ -91,7 +91,7 @@ def lookup_register(reg, compressed=False):
 
 def is_int(value):
     try:
-        int(value)
+        int(value, base=0)
         return True
     except:
         return False
@@ -1422,6 +1422,8 @@ class PseudoInstruction(Instruction):
         return s
 
     def __str__(self):
+        if len(self.args) == 0:
+            return self.name
         s = '{} {}'
         s = s.format(self.name, ', '.join(self.args))
         return s
@@ -2304,13 +2306,21 @@ def resolve_constants(items, constants):
             continue
 
         if item.name in REGISTERS:
-            s = 'constant name shadows register name "{}"'
+            s = 'constant name cannot shadow a register name "{}"'
+            s = s.format(item.name)
+            raise AssemblerError(s, item.line)
+
+        if is_int(item.name):
+            s = 'constant name cannot be an number "{}"'
             s = s.format(item.name)
             raise AssemblerError(s, item.line)
 
         # intentionally no labels here
         env = ChainMap(constants, REGISTERS)
-        constants[item.name] = item.expr.eval(position, env, item.line)
+        value = item.expr.eval(position, env, item.line)
+        constants[item.name] = value
+
+        log.info('line {}: "{}" -> "{} = {}"'.format(item.line.number, item, item.name, value))
 
     return new_items
 
@@ -2342,16 +2352,28 @@ def resolve_register_aliases(items, constants):
             continue
 
         # resolve all fields that are registers
+        modified = False
         for key, value in d.items():
+            # skip if item field is not a register
             if key not in REGS:
                 continue
-            # reg might be aliased via a constant
-            reg = constants.get(value, value)
+            # skip if reg is not a constant
+            if value not in constants:
+                continue
+            # reg IS a constant
+            modified = True
+            reg = constants[value]
             d[key] = reg
+
+        if not modified:
+            new_items.append(item)
+            continue
 
         # create the new item using the resolved registers
         new_item = item.__class__(*d.values())
         new_items.append(new_item)
+
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, new_item))
 
     return new_items
 
@@ -2697,11 +2719,11 @@ def transform_compressible(items, constants, labels):
                     continue
                 labels[label] = labels[label] - 2
 
-            log.info('compressed "{}" to "{}"'.format(item, inst))
-
             # add compressed inst to items and break the search loop
             position += inst.size(position)
             new_items.append(inst)
+
+            log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
 
         # if inst wasn't compressed, append to list like normal
         else:
@@ -2723,8 +2745,6 @@ def transform_pseudo_instructions(items, constants, labels):
 
         if item.name == 'nop':
             inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'li':
             rd, *imm = item.args
             imm = parse_immediate(imm)
@@ -2739,8 +2759,6 @@ def transform_pseudo_instructions(items, constants, labels):
                     if labels[label] <= position:
                         continue
                     labels[label] = labels[label] - 4
-                position += inst.size(position)
-                new_items.append(inst)
             elif (value & 0xfff) == 0:
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 # shrink all subsequent labels by 4
@@ -2748,50 +2766,32 @@ def transform_pseudo_instructions(items, constants, labels):
                     if labels[label] <= position:
                         continue
                     labels[label] = labels[label] - 4
-                position += inst.size(position)
-                new_items.append(inst)
             else:
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
-                position += inst.size(position)
-                new_items.append(inst)
         elif item.name == 'mv':
             rd, rs = item.args
             inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rs, imm=Arithmetic('0'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'not':
             rd, rs = item.args
             inst = ITypeInstruction(item.line, 'xori', rd=rd, rs1=rs, imm=Arithmetic('-1'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'neg':
             rd, rs = item.args
             inst = RTypeInstruction(item.line, 'sub', rd=rd, rs1='x0', rs2=rs)
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'seqz':
             rd, rs = item.args
             inst = ITypeInstruction(item.line, 'sltiu', rd=rd, rs1=rs, imm=Arithmetic('1'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'snez':
             rd, rs = item.args
             inst = RTypeInstruction(item.line, 'sltu', rd=rd, rs1='x0', rs2=rs)
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'sltz':
             rd, rs = item.args
             inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1=rs, rs2='x0')
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'sgtz':
             rd, rs = item.args
             inst = RTypeInstruction(item.line, 'slt', rd=rd, rs1='x0', rs2=rs)
-            position += inst.size(position)
-            new_items.append(inst)
 
         elif item.name in ['beqz', 'bnez', 'bgez', 'bltz']:
             names = {'beqz': 'beq', 'bnez': 'bne', 'bgez': 'bge', 'bltz': 'blt'}
@@ -2799,16 +2799,12 @@ def transform_pseudo_instructions(items, constants, labels):
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = BTypeInstruction(item.line, names[item.name], rs1=rs, rs2='x0', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name in ['blez', 'bgtz']:
             names = {'blez': 'bge', 'bgtz': 'blt'}
             rs, reference = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = BTypeInstruction(item.line, names[item.name], rs1='x0', rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
 
         elif item.name in ['bgt', 'ble', 'bgtu', 'bleu']:
             names = {'bgt': 'blt', 'ble': 'bge', 'bgtu': 'bltu', 'bleu': 'bgeu'}
@@ -2816,37 +2812,25 @@ def transform_pseudo_instructions(items, constants, labels):
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = BTypeInstruction(item.line, names[item.name], rs1=rt, rs2=rs, imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
 
         elif item.name == 'j':
             reference, = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'jal':
             reference, = item.args
             imm = ['%offset', reference]
             imm = parse_immediate(imm)
             inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'jr':
             rs, = item.args
             inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1=rs, imm=Arithmetic('0'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'jalr':
             rs, = item.args
             inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1=rs, imm=Arithmetic('0'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'ret':
             inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x1', imm=Arithmetic('0'))
-            position += inst.size(position)
-            new_items.append(inst)
         elif item.name == 'call':
             reference, = item.args
             imm = ['%offset', reference]
@@ -2862,15 +2846,11 @@ def transform_pseudo_instructions(items, constants, labels):
                     if labels[label] <= position:
                         continue
                     labels[label] = labels[label] - 4
-                position += inst.size(position)
-                new_items.append(inst)
             else:
                 inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
-                position += inst.size(position)
-                new_items.append(inst)
         elif item.name == 'tail':
             reference, = item.args
             imm = ['%offset', reference]
@@ -2886,23 +2866,22 @@ def transform_pseudo_instructions(items, constants, labels):
                     if labels[label] <= position:
                         continue
                     labels[label] = labels[label] - 4
-                position += inst.size(position)
-                new_items.append(inst)
             else:
                 inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
                 inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
-                position += inst.size(position)
-                new_items.append(inst)
 
         elif item.name == 'fence':
             inst = FenceInstruction(item.line, 'fence', succ=0b1111, pred=0b1111)
-            position += inst.size(position)
-            new_items.append(inst)
 
         else:
             raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
+
+        position += inst.size(position)
+        new_items.append(inst)
+
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
 
     return new_items
 
@@ -2919,6 +2898,11 @@ def resolve_immediates(items, constants, labels):
             new_items.append(item)
             continue
 
+        # check if imm is trivial for nicer logging later
+        trivial = False
+        if isinstance(item.imm, Arithmetic) and is_int(item.imm.expr):
+            trivial = True
+
         # resolve the immediate field
         env = ChainMap(constants, labels)
         imm = item.imm.eval(position, env, item.line)
@@ -2930,6 +2914,9 @@ def resolve_immediates(items, constants, labels):
         position += item.size(position)
         new_item = item.__class__(*d.values())
         new_items.append(new_item)
+
+        if not trivial:
+            log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, new_item))
 
     return new_items
 
@@ -2964,6 +2951,8 @@ def resolve_instructions(items):
         blob = Blob(item.line, code)
         new_items.append(blob)
 
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+
     return new_items
 
 
@@ -2976,6 +2965,8 @@ def resolve_strings(items):
 
         blob = Blob(item.line, item.value.encode('utf-8'))
         new_items.append(blob)
+
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
 
     return new_items
 
@@ -3008,6 +2999,8 @@ def resolve_sequences(items):
         blob = Blob(item.line, bytes(data))
         new_items.append(blob)
 
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+
     return new_items
 
 
@@ -3033,6 +3026,8 @@ def transform_shorthand_packs(items):
         pack = Pack(item.line, fmt, item.imm)
         new_items.append(pack)
 
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, pack))
+
     return new_items
 
 
@@ -3046,6 +3041,8 @@ def resolve_packs(items):
         data = struct.pack(item.fmt, item.imm)
         blob = Blob(item.line, data)
         new_items.append(blob)
+
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
 
     return new_items
 
@@ -3067,6 +3064,8 @@ def resolve_aligns(items):
         position += padding
         blob = Blob(item.line, b'\x00' * padding)
         new_items.append(blob)
+
+        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
 
     return new_items
 
@@ -3107,8 +3106,8 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     """
 
     # keep constants and labels in separate namespaces
-    constants = constants or {}
-    labels = labels or {}
+    constants = constants if constants is not None else {}
+    labels = labels if labels is not None else {}
 
     # read, lex, and parse the source
     lines = read_lines(path_or_source)
@@ -3164,12 +3163,20 @@ def cli_main():
 
     log_fmt = '%(funcName)s: %(message)s'
     if args.verbose:
-        logging.basicConfig(format=log_fmt, level=logging.INFO)
+        logging.basicConfig(format=log_fmt, level=logging.INFO, stream=sys.stdout)
 
+    constants = {}
+    labels = {}
     try:
-        binary = assemble(args.input_asm, compress=args.compress)
+        binary = assemble(args.input_asm, constants=constants, labels=labels, compress=args.compress)
     except AssemblerError as e:
         raise SystemExit(e)
+
+    if args.verbose:
+        for k, v in constants.items():
+            log.info('constant: {:<25} = 0x{:08x} ({})'.format(k, v, v))
+        for k, v in labels.items():
+            log.info('label: {:<25} = 0x{:08x} ({})'.format(k, v, v))
 
     with open(args.output, 'wb') as out_bin:
         out_bin.write(binary)
