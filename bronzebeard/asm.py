@@ -2767,9 +2767,11 @@ def transform_pseudo_instructions(items, constants, labels):
                         continue
                     labels[label] = labels[label] - 4
             else:
+                # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
+                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
         elif item.name == 'mv':
             rd, rs = item.args
@@ -2847,9 +2849,11 @@ def transform_pseudo_instructions(items, constants, labels):
                         continue
                     labels[label] = labels[label] - 4
             else:
+                # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
+                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
                 inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
         elif item.name == 'tail':
             reference, = item.args
@@ -2867,9 +2871,11 @@ def transform_pseudo_instructions(items, constants, labels):
                         continue
                     labels[label] = labels[label] - 4
             else:
+                # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
+                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
                 inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
 
         elif item.name == 'fence':
