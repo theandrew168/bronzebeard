@@ -118,7 +118,7 @@ def test_assemble_constants():
     FOO = 42
     BAR = FOO * 2
     BAZ = BAR >> 1 & 0b11111
-    W = 's0'
+    W = s0
     IP = gp
     addi zero zero BAR
     addi W IP BAZ

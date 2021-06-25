@@ -2006,7 +2006,7 @@ def lex_tokens(line):
     if len(contents) == 0:
         return LineTokens(line, [])
     # split line into tokens
-    tokens = re.split(r'[\s,\'"]+', contents)
+    tokens = re.split(r'[\s,]+', contents)
     # remove empty tokens
     while '' in tokens:
         tokens.remove('')
