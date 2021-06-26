@@ -8,8 +8,9 @@ GPIO_BASE_ADDR_C = 0x40011000  # GD32VF103 Manual: Section 7.5 (red LED)
 GPIO_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 7.5.1 (pins 0-7)
 GPIO_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 7.5.2 (pins 8-15)
 
-GPIO_MODE_OUT_50MHZ    = 0b11  # GD32VF103 Manual: Section 7.3
-GPIO_CTL_OUT_PUSH_PULL = 0b00  # GD32VF103 Manual: Section 7.3
+# GD32VF103 Manual: Section 7.3
+GPIO_MODE_OUT_50MHZ    = 0b11
+GPIO_CTL_OUT_PUSH_PULL = 0b00
 
 
 # jump to "main" since programs execute top to bottom
@@ -17,10 +18,21 @@ GPIO_CTL_OUT_PUSH_PULL = 0b00  # GD32VF103 Manual: Section 7.3
 j main
 
 
+# Func: rcu_init
+# Arg: a0 = RCU base addr
+# Arg: a1 = RCU config
+# Ret: none
+rcu_init:
+    # store config
+    sw a1, RCU_APB2EN_OFFSET(a0)
+
+    ret
+
+
 # Func: gpio_init
 # Arg: a0 = GPIO port base addr
 # Arg: a1 = GPIO pin number
-# Arg: a2 = GPIO config
+# Arg: a2 = GPIO config (4 bits)
 # Ret: none
 gpio_init:
     # advance to CTL0
@@ -67,9 +79,9 @@ gpio_init_config:
 
 main:
     # enable RCU (GPIO ports A and C)
-    li t0, RCU_BASE_ADDR
-    li t1, 0b00010100
-    sw t1, RCU_APB2EN_OFFSET(t0)
+    li a0, RCU_BASE_ADDR
+    li a1, 0b00010100
+    call rcu_init
 
     # enable red LED
     li a0, GPIO_BASE_ADDR_C
