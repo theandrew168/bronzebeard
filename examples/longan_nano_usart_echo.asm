@@ -146,8 +146,10 @@ main:
     call usart_init
 
 # main loop (read a char, write a char, repeat)
-loop:
+loop_init:
+    # setup USART base addr (won't change in getc + putc loop)
     li a0, USART_BASE_ADDR_0
+loop:
     call getc
     call putc
     j loop
