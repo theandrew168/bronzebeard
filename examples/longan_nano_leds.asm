@@ -12,6 +12,8 @@ GPIO_MODE_OUT_50MHZ    = 0b11  # GD32VF103 Manual: Section 7.3
 GPIO_CTL_OUT_PUSH_PULL = 0b00  # GD32VF103 Manual: Section 7.3
 
 
+# jump to "main" since programs execute top to bottom
+# we do this to enable writing helper funcs at the top
 j main
 
 
