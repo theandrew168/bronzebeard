@@ -1069,7 +1069,7 @@ class Line:
 
     def __str__(self):
         s = 'File "{}", line {}\n  {}'
-        s = s.format(self.file, self.number, self.contents)
+        s = s.format(self.file, self.number, self.contents.lstrip())
         return s
 
 
@@ -1163,6 +1163,10 @@ class Position(Expr):
         return s
 
     def eval(self, position, env, line):
+        if self.reference not in env:
+            s = 'invalid reference in %position modifier: {}'
+            s = s.format(self.reference)
+            raise AssemblerError(s, line)
         dest = env[self.reference]
         base = self.expr.eval(position, env, line)
         return base + dest
@@ -1184,6 +1188,10 @@ class Offset(Expr):
         return s
 
     def eval(self, position, env, line):
+        if self.reference not in env:
+            s = 'invalid reference in %offset modifier: {}'
+            s = s.format(self.reference)
+            raise AssemblerError(s, line)
         dest = env[self.reference]
         return dest - position
 
@@ -3212,6 +3220,9 @@ def cli_main():
     log_fmt = '%(message)s'
     if args.verbose:
         logging.basicConfig(format=log_fmt, level=logging.INFO, stream=sys.stdout)
+
+    if not os.path.exists(args.input_asm):
+        raise SystemExit('missing input file: {}'.format(args.input_asm))
 
     constants = {}
     labels = {}
