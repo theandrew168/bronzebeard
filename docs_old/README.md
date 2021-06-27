@@ -12,20 +12,6 @@ Single-line comments can be intermixed with the source code by using the `#` cha
 Multi-line comments are not supported at this point in time.
 However, you can always emulate multi-line comments by using multiple single-line comments to construct larger blocks.
 
-### Labels
-Labels are single-token items that end with a colon such as `foo:` or `bar:`.
-They effectively mark a location in the assembly program with a human-readable name.
-Labels have two primary use cases: being targets for jump / branch offsets and marking the position of data.
-
-Here is an example that utilizes a label in order to create an infinite loop:
-```
-# loop forever
-loop:
-    jal zero, loop
-```
-Notice how the label ends with a colon when it is defined but not when it is referenced.
-This is necessary to distinguish label definitions from other keywords.
-
 ### Instructions
 An instruction is the basic building block of any CPU.
 At a bare minimum, RISC-V supports [37 instructions](https://github.com/theandrew168/bronzebeard/tree/master/docs#rv32i-base-instruction-set).
@@ -66,6 +52,27 @@ BAZ = (BAR >> 1) & 0b11111
 QMARK = '?'
 SPACE = ' '
 ```
+
+### Labels
+Labels are single-token items that end with a colon such as `foo:` or `bar:`.
+They effectively mark a location in the assembly program with a human-readable name.
+Labels have two primary use cases: being targets for jump / branch offsets and marking the position of data.
+
+Here is an example that utilizes a label in order to create an infinite loop:
+```
+# loop forever
+loop:
+    jal zero, loop
+```
+Notice how the label ends with a colon when it is defined but not when it is referenced.
+This is necessary to distinguish label definitions from other keywords.
+
+### Include
+The `include` keyword can be used to include other assembly source files into the current program.
+At the moment, files are searched relative to the file containing the `include` keyword.
+There are plans for a formal "include directories" feature but it isn't implemented quite yet.
+
+You can find an example of this in the [Longan Nano LED example](https://github.com/theandrew168/bronzebeard/blob/master/examples/longan_nano_led.asm).
 
 ### Modifiers
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".

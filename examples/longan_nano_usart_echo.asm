@@ -1,28 +1,9 @@
 # Echo characters over serial USART (requires a USB to TTL serial cable)
 
+include gd32vf103.asm
+
 CLOCK_FREQ = 8000000  # default GD32BF103 clock freq
 USART_BAUD = 115200   # desired USART baud rate
-
-RCU_BASE_ADDR     = 0x40021000  # GD32VF103 Manual: Section 5.3
-RCU_APB2EN_OFFSET = 0x18  # GD32VF103 Manual: Section 5.3.7
-
-GPIO_BASE_ADDR_A = 0x40010800  # GD32VF103 Manual: Section 7.5 (green and blue LEDs)
-GPIO_CTL0_OFFSET = 0x00  # GD32VF103 Manual: Section 7.5.1 (pins 0-7)
-GPIO_CTL1_OFFSET = 0x04  # GD32VF103 Manual: Section 7.5.2 (pins 8-15)
-
-# GD32VF103 Manual: Section 7.3
-GPIO_MODE_IN        = 0b00
-GPIO_MODE_OUT_50MHZ = 0b11
-
-# GD32VF103 Manual: Section 7.3
-GPIO_CTL_IN_FLOATING       = 0b01
-GPIO_CTL_OUT_ALT_PUSH_PULL = 0b10
-
-USART_BASE_ADDR_0 = 0x40013800  # GD32VF103 Manual: Section 16.4
-USART_STAT_OFFSET = 0x00  # GD32VF103 Manual: Section 16.4.1
-USART_DATA_OFFSET = 0x04  # GD32VF103 Manual: Section 16.4.2
-USART_BAUD_OFFSET = 0x08  # GD32VF103 Manual: Section 16.4.3
-USART_CTL0_OFFSET = 0x0c  # GD32VF103 Manual: Section 16.4.4
 
 
 # jump to "main" since programs execute top to bottom
@@ -91,7 +72,7 @@ usart_init:
     sw a1, USART_BAUD_OFFSET(a0)
 
     # enable USART (enable RX, enable TX, enable USART)
-    li t0, 0b0010000000001100
+    li t0, (1 << USART_CTL0_REN_BIT) | (1 << USART_CTL0_TEN_BIT) | (1 << USART_CTL0_UEN_BIT)
     sw t0, USART_CTL0_OFFSET(a0)
 
     ret
@@ -102,7 +83,7 @@ usart_init:
 # Ret: a1 = character received (a1 here for simpler getc + putc loops)
 getc:
     lw t0 USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0 t0 (1 << 5)          # isolate read buffer not empty (RBNE) bit
+    andi t0 t0 (1 << USART_STAT_RBNE_BIT)  # isolate read buffer not empty (RBNE) bit
     beqz t0 getc                 # keep looping until ready to recv
     lw a1 USART_DATA_OFFSET(a0)  # load char into a1
 
@@ -115,7 +96,7 @@ getc:
 # Ret: none
 putc:
     lw t0 USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0 t0 (1 << 7)          # isolate transmit buffer empty (TBE) bit
+    andi t0 t0 (1 << USART_STAT_TBE_BIT)  # isolate transmit buffer empty (TBE) bit
     beqz t0 putc                 # keep looping until ready to send
     sw a1 USART_DATA_OFFSET(a0)  # write char from a1
 

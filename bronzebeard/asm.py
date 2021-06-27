@@ -62,7 +62,19 @@ class AssemblerError(Exception):
         self.line = line
 
     def __str__(self):
-        return 'AssemblerError: {}\n  {}'.format(self.message, self.line)
+        return '{}\nAssemblerError: {}'.format(self.line, self.message)
+
+
+def log_constant(pass_name, item, value):
+    s = '{}: file {}, line {}: "{}" -> "{} = 0x{:08x} ({})"'
+    s = s.format(pass_name, os.path.basename(item.line.file), item.line.number, item, item.name, value, value)
+    log.info(s)
+
+
+def log_conversion(pass_name, item_a, item_b):
+    s = '{}: file {}, line {}: "{}" -> "{}"'
+    s = s.format(pass_name, os.path.basename(item_a.line.file), item_a.line.number, item_a, item_b)
+    log.info(s)
 
 
 def lookup_register(reg, compressed=False):
@@ -1056,7 +1068,7 @@ class Line:
         return s
 
     def __str__(self):
-        s = 'File "{}", line {}: {}'
+        s = 'File "{}", line {}\n  {}'
         s = s.format(self.file, self.number, self.contents)
         return s
 
@@ -1198,7 +1210,7 @@ class Hi(Expr):
 
 class Lo(Expr):
 
-    def __init__(self, expr) -> None:
+    def __init__(self, expr):
         self.expr = expr
 
     def __repr__(self):
@@ -1227,6 +1239,26 @@ class Item(abc.ABC):
         """Check the size of this item at the given position in a program"""
 
 
+class Label(Item):
+
+    def __init__(self, line, name):
+        super().__init__(line)
+        self.name = name
+
+    def __repr__(self):
+        s = '{}({!r})'
+        s = s.format(type(self).__name__, self.name)
+        return s
+
+    def __str__(self):
+        s = '{}:'
+        s = s.format(self.name)
+        return s
+
+    def size(self, position):
+        return 0
+
+
 class Constant(Item):
 
     def __init__(self, line, name, expr):
@@ -1242,26 +1274,6 @@ class Constant(Item):
     def __str__(self):
         s = '{} = {}'
         s = s.format(self.name, self.expr)
-        return s
-
-    def size(self, position):
-        return 0
-
-
-class Label(Item):
-
-    def __init__(self, line, name):
-        super().__init__(line)
-        self.name = name
-
-    def __repr__(self):
-        s = '{}({!r})'
-        s = s.format(type(self).__name__, self.name)
-        return s
-
-    def __str__(self):
-        s = '{}:'
-        s = s.format(self.name)
         return s
 
     def size(self, position):
@@ -1434,7 +1446,7 @@ class PseudoInstruction(Instruction):
         if len(self.args) == 0:
             return self.name
         s = '{} {}'
-        s = s.format(self.name, ', '.join(self.args))
+        s = s.format(self.name, list(self.args))
         return s
 
     def args(self):
@@ -1971,8 +1983,11 @@ class CJTypeInstruction(CompressedInstruction):
         return [self.imm]
 
 
-def read_lines(path_or_source):
-    if os.path.exists(path_or_source):
+# TODO: impl some sort of include path
+# TODO: detect and handle / error circular includes
+def read_lines(path_or_source, *, include=False):
+    if os.path.exists(path_or_source) or include:
+        log.info('reading file: {}'.format(os.path.abspath(path_or_source)))
         path = path_or_source
         with open(path) as f:
             source = f.read()
@@ -1981,11 +1996,32 @@ def read_lines(path_or_source):
         source = path_or_source
 
     lines = []
-    for i, line in enumerate(source.splitlines(), start=1):
+    for i, raw_line in enumerate(source.splitlines(), start=1):
         # skip empty lines
-        if len(line.strip()) == 0:
+        if len(raw_line.strip()) == 0:
             continue
-        lines.append(Line(path, i, line))
+
+        line = Line(path, i, raw_line)
+
+        # handle includes in the reader
+        if raw_line.lower().startswith('include '):
+            _, name = raw_line.split()
+
+            is_path = os.path.exists(path_or_source)
+            if is_path:
+                base_path = os.path.dirname(os.path.abspath(path_or_source))
+            else:
+                base_path = os.getcwd()
+
+            include_file = os.path.join(base_path, name)
+            try:
+                include_lines = read_lines(include_file, include=True)
+            except OSError:
+                raise AssemblerError('failed to include file: {}'.format(name), line)
+            else:
+                lines.extend(include_lines)
+        else:
+            lines.append(line)
 
     return lines
 
@@ -2302,7 +2338,7 @@ def parse_item(line_tokens):
         name = name.lower()
         return PseudoInstruction(line, name, *args)
     else:
-        raise AssemblerError('invalid syntax', line)
+        raise AssemblerError('invalid syntax (expected constant, label, or instruction)', line)
 
 
 def resolve_constants(items, constants):
@@ -2331,7 +2367,7 @@ def resolve_constants(items, constants):
         value = item.expr.eval(None, env, item.line)
         constants[item.name] = value
 
-        log.info('line {}: "{}" -> "{} = {}"'.format(item.line.number, item, item.name, value))
+        log_constant('resolve_constants', item, value)
 
     return new_items
 
@@ -2384,7 +2420,7 @@ def resolve_register_aliases(items, constants):
         new_item = item.__class__(*d.values())
         new_items.append(new_item)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, new_item))
+        log_conversion('resolve_register_aliases', item, new_item)
 
     return new_items
 
@@ -2732,7 +2768,7 @@ def transform_compressible(items, constants, labels):
             position += inst.size(position)
             new_items.append(inst)
 
-            log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+            log_conversion('resolve_compressible', item, inst)
 
         # if inst wasn't compressed, append to list like normal
         else:
@@ -2776,7 +2812,7 @@ def transform_pseudo_instructions(items, constants, labels):
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
-                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+                log_conversion('transform_pseudo_instructions', item, inst)
 
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1=rd, imm=Lo(imm))
         elif item.name == 'mv':
@@ -2857,7 +2893,7 @@ def transform_pseudo_instructions(items, constants, labels):
                 inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
-                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+                log_conversion('transform_pseudo_instructions', item, inst)
 
                 inst = ITypeInstruction(item.line, 'jalr', rd='x1', rs1='x1', imm=Lo(imm), is_auipc_jump=True)
         elif item.name == 'tail':
@@ -2878,7 +2914,7 @@ def transform_pseudo_instructions(items, constants, labels):
                 inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
                 position += inst.size(position)
                 new_items.append(inst)
-                log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+                log_conversion('transform_pseudo_instructions', item, inst)
 
                 inst = ITypeInstruction(item.line, 'jalr', rd='x0', rs1='x6', imm=Lo(imm), is_auipc_jump=True)
 
@@ -2891,7 +2927,7 @@ def transform_pseudo_instructions(items, constants, labels):
         position += inst.size(position)
         new_items.append(inst)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, inst))
+        log_conversion('transform_pseudo_instructions', item, inst)
 
     return new_items
 
@@ -2926,7 +2962,7 @@ def resolve_immediates(items, constants, labels):
         new_items.append(new_item)
 
         if not trivial:
-            log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, new_item))
+            log_conversion('resolve_immediates', item, new_item)
 
     return new_items
 
@@ -2961,7 +2997,7 @@ def resolve_instructions(items):
         blob = Blob(item.line, code)
         new_items.append(blob)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+        log_conversion('resolve_instructions', item, blob)
 
     return new_items
 
@@ -2976,7 +3012,7 @@ def resolve_strings(items):
         blob = Blob(item.line, item.value.encode('utf-8'))
         new_items.append(blob)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+        log_conversion('resolve_strings', item, blob)
 
     return new_items
 
@@ -3009,7 +3045,7 @@ def resolve_sequences(items):
         blob = Blob(item.line, bytes(data))
         new_items.append(blob)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+        log_conversion('resolve_sequences', item, blob)
 
     return new_items
 
@@ -3036,7 +3072,7 @@ def transform_shorthand_packs(items):
         pack = Pack(item.line, fmt, item.imm)
         new_items.append(pack)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, pack))
+        log_conversion('transform_shorthand_packs', item, pack)
 
     return new_items
 
@@ -3052,7 +3088,7 @@ def resolve_packs(items):
         blob = Blob(item.line, data)
         new_items.append(blob)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+        log_conversion('resolve_packs', item, blob)
 
     return new_items
 
@@ -3075,7 +3111,7 @@ def resolve_aligns(items):
         blob = Blob(item.line, b'\x00' * padding)
         new_items.append(blob)
 
-        log.info('line {}: "{}" -> "{}"'.format(item.line.number, item, blob))
+        log_conversion('resolve_aligns', item, blob)
 
     return new_items
 
@@ -3127,7 +3163,7 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     items = [parse_item(t) for t in tokens]
     items = [i for i in items if i is not None]
     for item in items:
-        log.info('parsed line {}: "{}"'.format(item.line.number, item))
+        log.info('parsed file {}, line {}: "{}"'.format(os.path.basename(item.line.file), item.line.number, item))
 
     # run items through each pass
     items = resolve_constants(items, constants)
@@ -3173,7 +3209,7 @@ def cli_main():
         version = 'bronzebeard {}'.format(__version__)
         raise SystemExit(version)
 
-    log_fmt = '%(funcName)s: %(message)s'
+    log_fmt = '%(message)s'
     if args.verbose:
         logging.basicConfig(format=log_fmt, level=logging.INFO, stream=sys.stdout)
 
