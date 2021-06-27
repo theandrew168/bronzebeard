@@ -3142,6 +3142,7 @@ def resolve_blobs(items):
 #   - Resolve register aliases  (could be constants for readability)
 #   - Transform compressible  (identify and compress eligible instructions)
 #   - Transform pseudo-instructions  (expand PIs into regular instructions)
+#   - Resolve register aliases  (again)
 #   - Transform compressible  (again)
 #   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
@@ -3180,6 +3181,7 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     if compress:
         items = transform_compressible(items, constants, labels)
     items = transform_pseudo_instructions(items, constants, labels)
+    items = resolve_register_aliases(items, constants)
     if compress:
         items = transform_compressible(items, constants, labels)
     items = resolve_immediates(items, constants, labels)
