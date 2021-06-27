@@ -89,7 +89,7 @@ gpio_operate_store:
 main:
     # enable RCU (GPIO port A)
     li a0, RCU_BASE_ADDR
-    li a1, 0b00000100
+    li a1, (1 << RCU_APB2EN_PAEN_BIT)
     call rcu_init
 
     # enable blue LED
