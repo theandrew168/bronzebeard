@@ -87,9 +87,8 @@ Labels have two primary use cases: being targets for jump / branch offsets and m
 
 Here is an example that utilizes a label in order to create an infinite loop::
 
-  # loop forever
   loop:
-      jal zero, loop
+      j loop
 
 Notice how the label ends with a colon when it is defined but not when it is referenced.
 This is necessary to distinguish label definitions from other keywords.
@@ -106,6 +105,7 @@ Modifiers
 ---------
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
 Note that the :code:`%position` modifier is NOT permitted within the value of a constant.
+
 You can think of these like simple, builtin functions:
 
 * :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
@@ -165,22 +165,22 @@ The format specifier is a subset of the format outlined in Python's builtin `str
 
 The pack format is composed of two characters: the first specifies endianness and the second details the numeric size and type:
 
-=========  =====  =======
-Character  Bytes  Meaning
-=========  =====  =======
-:code:`<`  N/A    Little endian
-:code:`>`  N/A    Big endian
-:code:`b`  1      Signed char
-:code:`B`  1      Unsigned char
-:code:`h`  2      Signed short
-:code:`H`  2      Unsigned short
-:code:`i`  4      Signed int
-:code:`I`  4      Unsigned int
-:code:`l`  4      Signed long
-:code:`L`  4      Unsigned long
-:code:`q`  8      Signed long long
-:code:`Q`  8      Unsigned long long
-=========  =====  =======
+=========  ==================  =====
+Character  Meaning             Bytes
+=========  ==================  =====
+:code:`<`  Little endian       N/A
+:code:`>`  Big endian          N/A
+:code:`b`  Signed char         1
+:code:`B`  Unsigned char       1
+:code:`h`  Signed short        2
+:code:`H`  Unsigned short      2
+:code:`i`  Signed int          4
+:code:`I`  Unsigned int        4
+:code:`l`  Signed long         4
+:code:`L`  Unsigned long       4
+:code:`q`  Signed long long    8
+:code:`Q`  Unsigned long long  8
+=========  ==================  =====
 
 Here are a few examples::
 
@@ -226,22 +226,22 @@ Here are some examples::
 Alignment
 ---------
 The :code:`align` keyword tells the assembler to enforce alignment to a certain byte boundary.
-This alignment is achieved by padding the binary with :code:`0x00` bytes until it aligns with the bounary.
+This alignment is achieved by padding the binary with :code:`0x00` bytes until it aligns with the boundary.
 In pseudo-code, the assembler adds zeroes until: :code:`len(binary) % alignment == 0`::
 
   # align the current location in the binary to 2 bytes
-  align 2
+  align 4
 
 Alignment is important when mixing instructions and data into the same binary (which happens quite often).
 According to the RISC-V spec, instructions MUST be aligned to a 32-bit (4 byte) boundary unless the CPU supports the "C" Standard Extension for Compressed Instructions (in which case the alignment requirement is relaxed to a 16-bit (2 byte) boundary).
 
-For example, the following code is invalid (on an RV32IMAC device) because the instruction is not on a 16-bit boundary::
+For example, the following code may be invalid because the instruction is not on a 32-bit boundary::
 
   bytes 0x42      # occupies 1 byte
   addi x0, x0, 0  # misaligned :(
 
-To fix this, we need to tell the assembler to ensure that the binary is aligned to 16 bits (2 bytes) before proceeding::
+To fix this, we need to tell the assembler to ensure that the binary is aligned to 32 bits (4 bytes) before proceeding::
 
   bytes 0x42      # occupies 1 byte
-  align 2         # will pad the binary with 1 0x00 byte
+  align 4         # will pad the binary with 3 0x00 bytes
   addi x0, x0, 0  # aligned :)
