@@ -4,6 +4,6 @@
   :caption: Bronzebeard Documentation
   :maxdepth: 2
 
-  assembly_language
   dfu_setup
+  assembly_language
   instruction_reference
