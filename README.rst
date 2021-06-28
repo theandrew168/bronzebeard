@@ -35,6 +35,7 @@ Or, if you'd rather clone this repo and play with the examples::
 
   git clone https://github.com/theandrew168/bronzebeard.git
   cd bronzebeard/
+  # I'd still create and activate a virtual environment here
   pip install -e .
 
 Assemble!
