@@ -1,14 +1,27 @@
 Assembly Language
 =================
 RISC-V assembly programs are written as plain text files.
-The file extension is mostly arbitrary but ".asm" and ".S" are quite common.
+The file extension is mostly arbitrary but :code:`.asm` and :code:`.S` are quite common.
 An assembly program is a linear sequence of "items".
 Items can be many things: labels, instructions, literal bytes and strings, etc.
 
 The Bronzebeard assembly syntax also supports basic comments.
-Single-line comments can be intermixed with the source code by using the "#" character.
+Single-line comments can be intermixed with the source code by using the :code:`#` character.
 Multi-line comments are not supported at this point in time.
 However, you can always emulate multi-line comments by using multiple single-line comments to construct larger blocks.
+
+Instructions
+------------
+Instructions instruct the CPU to do something with a given set of registers and/or immediate values.
+Registers are named 32-bit "slots" that the CPU can use to store information at runtime.
+Immediate values are typically integers of varying sizes (depending on the specific instruction at hand).
+
+An instruction is written as a name followed by its arguments.
+The arguments can be separated by a comma for readability but this isn't a requirement (commas are treated as whitespace).
+Here is an example of using the :code:`addi` instruction to the value :code:`12` into register :code:`x1`::
+
+  # x1 = 0 + 12
+  addi x1, zero, 12
 
 Registers
 ---------
@@ -16,7 +29,7 @@ The RISC-V ISA specifies 32 general purpose registers.
 Each register is cable of a holding a single 32-bit value (or 64 bits on a 64-bit system).
 Register 0 is the only special case: it always holds the value zero no matter what gets written to it.
 There also exists the "program counter" which is a register that holds the location of the current program's execution.
-This "PC" register can't be accessed directly but is utilized by certain instructions.
+This :code:`pc` register can't be accessed directly but is utilized by certain instructions.
 
 A given register can be referenced in multiple ways: by number, by name, or by its alias.
 The alias and suggested usage of each register can be ignored when writing simple assembly programs.
@@ -39,9 +52,6 @@ Number  Name    Alias  Suggested Usage
 18-27   x18-27  s2-11  Saved registers
 28-31   x28-31  t3-6   Temporary registers
 ======  ======  =====  ===============
-
-Instructions
-------------
 
 Constants
 ---------
