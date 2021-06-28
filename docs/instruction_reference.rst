@@ -29,8 +29,8 @@ Instruction                  Expansion                    Description
 :code:`bgtz rs, offset`      :code:`blt x0, rs, offset`   Branch if > zero
 :code:`bgt rs, rt, offset`   :code:`blt rt, rs, offset`   Branch if >
 :code:`ble rs, rt, offset`   :code:`bge rt, rs, offset`   Branch if <=
-:code:`bgtu rs, rt, offset`  :code:`bltu rt, rs, offset`  Branch if >, unsigned
-:code:`bleu rs, rt, offset`  :code:`bgeu rt, rs, offset`  Branch if <=, unsigned
+:code:`bgtu rs, rt, offset`  :code:`bltu rt, rs, offset`  Branch if > (unsigned)
+:code:`bleu rs, rt, offset`  :code:`bgeu rt, rs, offset`  Branch if <= (unsigned)
 :code:`j offset`             :code:`jal x0, offset`       Jump
 :code:`jal offset`           :code:`jal x1, offset`       Jump and link
 :code:`jr rs`                :code:`jalr x0, 0(rs)`       Jump register
