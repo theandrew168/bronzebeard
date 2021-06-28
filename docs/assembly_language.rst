@@ -149,8 +149,8 @@ Keyword            Bytes per Number
 
 Examples
 ^^^^^^^^
+Here are a few examples of the various numeric sequences::
 
-::
   bytes 1 2 0x03 0b100 5 0x06 0b111 8
   bytes -1 0xff  # same value once encoded as 2's comp integers
   shorts 0x1234 0x5678
