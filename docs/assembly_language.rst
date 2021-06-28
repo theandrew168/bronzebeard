@@ -107,6 +107,7 @@ Modifiers
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
 Note that the :code:`%position` modifier is NOT permitted within the value of a constant.
 You can think of these like simple, builtin functions:
+
 * :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
 * :strong:`%lo(value)` - Calculate the sign-adjusted bottom 12 bits of a value
 * :strong:`%position(label, addr)` - Calculate the position of a label relative to given base address
