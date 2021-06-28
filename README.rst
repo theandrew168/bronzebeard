@@ -42,4 +42,4 @@ Then, with Bronzebeard installed::
 
   bronzebeard my_asm_file.asm
 
-By default, the assembled output binary will be placed in a file named `bb.out`.
+By default, the assembled output binary will be placed in a file named :code:`bb.out`.
