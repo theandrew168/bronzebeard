@@ -6,4 +6,4 @@
 
   assembly_language
   dfu_setup
-  faq
+  instruction_reference

@@ -3,6 +3,12 @@ DFU Setup
 `DFU (Device Firmware Upgrade <(https://en.wikipedia.org/wiki/USB#Device_Firmware_Upgrade_mechanism>`_ is a USB-based protocol for updating the firmware on certain embedded devices.
 At the moment, the DFU implemention included with Bronzebeard only supports the `Longan Nano <https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-DEV-Board-p-4725.html>`_ and `Wio Lite <https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html>`_.
 
+Basic Usage
+-----------
+With the target device in DFU mode::
+
+  python3 -m bronzebeard.dfu 28e9:0189 bb.out
+
 Windows
 -------
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.
@@ -39,9 +45,3 @@ If you'd like to program and interact with the device as a normal, non-root user
   ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via :code:`sudo udevadm control --reload`.
-
-Basic Usage
------------
-With the target device in DFU mode::
-
-  python3 -m bronzebeard.dfu 28e9:0189 bb.out
