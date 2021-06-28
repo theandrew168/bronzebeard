@@ -42,7 +42,7 @@ Instruction                  Expansion                    Description
 ===========================  ===========================  ===========
 
 Expansion of :code:`li rd, imm`
--------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Depending on the value of the :code:`imm`, :code:`li` may get expanded into a few different combinations of instructions.
 
 =================================  =========
@@ -50,10 +50,12 @@ Criteria                           Expansion
 =================================  =========
 :code:`imm between [-2048, 2047]`  :code:`addi rd, x0, %lo(imm)`
 :code:`imm & 0xfff == 0`           :code:`lui rd, %hi(imm)`
-otherwise                          :code:`lui rd, %hi(imm)`<br/>`addi rd, rd, %lo(imm)`
+otherwise                          :code:`lui rd, %hi(imm)`
+                                   :code:`addi rd, rd, %lo(imm)`
 =================================  =========
 
 Expansion of :code:`call offset`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 --------------------------------
 Depending on how near / far away the label referred to by :code:`offset` is, :code:`call` may get expanded into a few different combinations of instructions.
 
@@ -61,18 +63,20 @@ Depending on how near / far away the label referred to by :code:`offset` is, :co
 Criteria                Expansion
 ======================  =========
 :code:`offset` is near  :code:`jal x1, %lo(offset)`
-otherwise               :code:`auipc x1, %hi(offset)`<br/>`jalr x1, x1, %lo(offset)`
+otherwise               :code:`auipc x1, %hi(offset)`
+                        :code:`jalr x1, x1, %lo(offset)`
 ======================  =========
 
-Expansion of :code:`tail imm`
------------------------------
+Expansion of :code:`tail offset`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Depending on how near / far away the label referred to by :code:`offset` is, :code:`tail` may get expanded into a few different combinations of instructions.
 
 ======================  =========
 Criteria                Expansion
 ======================  =========
 :code:`offset` is near  :code:`jal x0, %lo(offset)`
-otherwise               :code:`auipc x6, %hi(offset)`<br/>`jalr x0, x6, %lo(offset)`
+otherwise               :code:`auipc x6, %hi(offset)`
+                        :code:`jalr x0, x6, %lo(offset)`
 ======================  =========
 
 RV32I Base Instruction Set

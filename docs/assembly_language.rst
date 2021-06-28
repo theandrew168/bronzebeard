@@ -59,7 +59,7 @@ A constant in Bronzebeard is the named result of an integer expression.
 Floating point numbers or any other non-integer expression results aren't supported at this time.
 Numbers can be represented as decimal, binary, or hex.
 Character literals can also be used if surrounded by single-quotes.
-Simple math operations such as addition, multiplication, shifting, and binary ops all work (mostly) as expected.
+Simple math operations such as addition, multiplication, shifting, and binary ops all work as one would expect.
 The actual precedence rules and evaluation of arithmetic expressions is handled by the Python lauguage itself (via the `eval <https://docs.python.org/3/library/functions.html#eval>`_ builtin).
 
 Here are a few examples::
