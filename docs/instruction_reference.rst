@@ -56,7 +56,6 @@ otherwise                          | :code:`lui rd, %hi(imm)`
 
 Expansion of :code:`call offset`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
---------------------------------
 Depending on how near / far away the label referred to by :code:`offset` is, :code:`call` may get expanded into a few different combinations of instructions.
 
 ======================  =========
