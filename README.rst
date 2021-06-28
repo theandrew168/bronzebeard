@@ -31,6 +31,12 @@ Bronzebeard can be installed via pip::
 
   pip install bronzebeard
 
+Or, if you'd rather clone this repo and play with the examples::
+
+  git clone https://github.com/theandrew168/bronzebeard.git
+  cd bronzebeard/
+  pip install -e .
+
 Assemble!
 ---------
 First, create a text file with some RISC-V assembly source code in it::
