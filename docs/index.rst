@@ -5,5 +5,5 @@
   :maxdepth: 2
 
   assembly_language
-  dfu
+  dfu_setup
   faq
