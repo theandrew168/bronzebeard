@@ -4,6 +4,6 @@
   :caption: Bronzebeard Documentation
   :maxdepth: 2
 
-  syntax
+  assembly_language
   dfu
   faq
