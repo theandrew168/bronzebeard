@@ -33,8 +33,13 @@ Bronzebeard can be installed via pip::
 
 Assemble!
 ---------
-With Bronzebeard installed::
+First, create a text file with some RISC-V assembly source code in it::
 
-  bronzebeard examples/example.asm
+  add x1, x2, x3
+  add x4, x5, x6
+
+Then, with Bronzebeard installed::
+
+  bronzebeard my_asm_file.asm
 
 By default, the assembled output binary will be placed in a file named `bb.out`.
