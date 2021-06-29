@@ -82,10 +82,10 @@ usart_init:
 # Arg: a0 = USART base addr
 # Ret: a1 = character received (a1 here for simpler getc + putc loops)
 getc:
-    lw t0 USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0 t0 (1 << USART_STAT_RBNE_BIT)  # isolate read buffer not empty (RBNE) bit
-    beqz t0 getc                 # keep looping until ready to recv
-    lw a1 USART_DATA_OFFSET(a0)  # load char into a1
+    lw t0, USART_STAT_OFFSET(a0)  # load status into t0
+    andi t0, t0, (1 << USART_STAT_RBNE_BIT)  # isolate read buffer not empty (RBNE) bit
+    beqz t0, getc                 # keep looping until ready to recv
+    lw a1, USART_DATA_OFFSET(a0)  # load char into a1
 
     ret
 
@@ -95,10 +95,10 @@ getc:
 # Arg: a1 = character to send
 # Ret: none
 putc:
-    lw t0 USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0 t0 (1 << USART_STAT_TBE_BIT)  # isolate transmit buffer empty (TBE) bit
-    beqz t0 putc                 # keep looping until ready to send
-    sw a1 USART_DATA_OFFSET(a0)  # write char from a1
+    lw t0, USART_STAT_OFFSET(a0)  # load status into t0
+    andi t0, t0, (1 << USART_STAT_TBE_BIT)  # isolate transmit buffer empty (TBE) bit
+    beqz t0, putc                 # keep looping until ready to send
+    sw a1, USART_DATA_OFFSET(a0)  # write char from a1
 
     ret
 
