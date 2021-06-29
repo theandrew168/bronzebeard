@@ -2068,7 +2068,10 @@ def lex_tokens(line):
 
 
 # helper for parsing immediates since they occur in multiple places
-def parse_immediate(imm):
+def parse_immediate(imm, line):
+    if len(imm) == 0:
+        raise AssemblerError('empty immediate value', line)
+
     head = imm[0].lower()
     if head == '%position':
         if imm[1] == '(':
@@ -2087,13 +2090,13 @@ def parse_immediate(imm):
             _, _, *imm, _ = imm
         else:
             _, *imm = imm
-        return Hi(parse_immediate(imm))
+        return Hi(parse_immediate(imm, line))
     elif head == '%lo':
         if imm[1] == '(':
             _, _, *imm, _ = imm
         else:
             _, *imm = imm
-        return Lo(parse_immediate(imm))
+        return Lo(parse_immediate(imm, line))
     else:
         return Arithmetic(' '.join(imm))
 
@@ -2110,7 +2113,7 @@ def parse_item(line_tokens):
     # constants
     elif len(tokens) >= 3 and tokens[1] == '=':
         name, _, *imm = tokens
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return Constant(line, name, imm)
     # strings
     elif head == 'string':
@@ -2124,12 +2127,12 @@ def parse_item(line_tokens):
     # packs
     elif head == 'pack':
         _, fmt, *imm = tokens
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return Pack(line, fmt, imm)
     # shorthand packs
     elif head in SHORTHAND_PACK_NAMES:
         name, *imm = tokens
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return ShorthandPack(line, name, imm)
     # aligns
     elif head == 'align':
@@ -2159,7 +2162,7 @@ def parse_item(line_tokens):
         else:
             name, rd, rs1, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return ITypeInstruction(line, name, rd, rs1, imm)
     # ie-type instructions
     elif head in IE_TYPE_INSTRUCTIONS:
@@ -2174,7 +2177,7 @@ def parse_item(line_tokens):
         else:
             name, rs1, rs2, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return STypeInstruction(line, name, rs1, rs2, imm)
     # b-type instructions
     elif head in B_TYPE_INSTRUCTIONS:
@@ -2187,13 +2190,13 @@ def parse_item(line_tokens):
         else:
             # behavior is "offset" for branches to labels
             imm = ['%offset', reference]
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return BTypeInstruction(line, name, rs1, rs2, imm)
     # u-type instructions
     elif head in U_TYPE_INSTRUCTIONS:
         name, rd, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return UTypeInstruction(line, name, rd, imm)
     # j-type instructions
     elif head in J_TYPE_INSTRUCTIONS:
@@ -2211,7 +2214,7 @@ def parse_item(line_tokens):
         else:
             # behavior is "offset" for jumps to labels
             imm = ['%offset', reference]
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return JTypeInstruction(line, name, rd, imm)
     # fence instructions
     elif head in FENCE_INSTRUCTIONS:
@@ -2274,13 +2277,13 @@ def parse_item(line_tokens):
     elif head in CI_TYPE_INSTRUCTIONS:
         name, rd_rs1, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CITypeInstruction(line, name, rd_rs1, imm)
     # cia-type instructions
     elif head in CIA_TYPE_INSTRUCTIONS:
         name, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CIATypeInstruction(line, name, imm)
     # cin-type instructions
     elif head in CIN_TYPE_INSTRUCTIONS:
@@ -2293,13 +2296,13 @@ def parse_item(line_tokens):
     elif head in CSS_TYPE_INSTRUCTIONS:
         name, rs2, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CSSTypeInstruction(line, name, rs2, imm)
     # ciw-type instructions
     elif head in CIW_TYPE_INSTRUCTIONS:
         name, rd, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CIWTypeInstruction(line, name, rd, imm)
     # cl-type instructions (all are base offset insts)
     elif head in CL_TYPE_INSTRUCTIONS:
@@ -2309,7 +2312,7 @@ def parse_item(line_tokens):
         else:
             name, rd, rs1, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CLTypeInstruction(line, name, rd, rs1, imm)
     # cs-type instructions (all are base offset insts)
     elif head in CS_TYPE_INSTRUCTIONS:
@@ -2319,7 +2322,7 @@ def parse_item(line_tokens):
         else:
             name, rs1, rs2, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CSTypeInstruction(line, name, rs1, rs2, imm)
     # ca-type instructions
     elif head in CA_TYPE_INSTRUCTIONS:
@@ -2332,13 +2335,13 @@ def parse_item(line_tokens):
     elif head in CB_TYPE_INSTRUCTIONS:
         name, rs1, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CBTypeInstruction(line, name, rs1, imm)
     # cj-type instructions
     elif head in CJ_TYPE_INSTRUCTIONS:
         name, *imm = tokens
         name = name.lower()
-        imm = parse_immediate(imm)
+        imm = parse_immediate(imm, line)
         return CJTypeInstruction(line, name, imm)
     # pseudo instructions
     elif head in PSEUDO_INSTRUCTIONS:
@@ -2800,7 +2803,7 @@ def transform_pseudo_instructions(items, constants, labels):
             inst = ITypeInstruction(item.line, 'addi', rd='x0', rs1='x0', imm=Arithmetic('0'))
         elif item.name == 'li':
             rd, *imm = item.args
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             # check if eligible for single inst expansion
             env = ChainMap(constants, labels)
             value = imm.eval(position, env, item.line)
@@ -2849,31 +2852,31 @@ def transform_pseudo_instructions(items, constants, labels):
             names = {'beqz': 'beq', 'bnez': 'bne', 'bgez': 'bge', 'bltz': 'blt'}
             rs, reference = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             inst = BTypeInstruction(item.line, names[item.name], rs1=rs, rs2='x0', imm=imm)
         elif item.name in ['blez', 'bgtz']:
             names = {'blez': 'bge', 'bgtz': 'blt'}
             rs, reference = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             inst = BTypeInstruction(item.line, names[item.name], rs1='x0', rs2=rs, imm=imm)
 
         elif item.name in ['bgt', 'ble', 'bgtu', 'bleu']:
             names = {'bgt': 'blt', 'ble': 'bge', 'bgtu': 'bltu', 'bleu': 'bgeu'}
             rs, rt, reference = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             inst = BTypeInstruction(item.line, names[item.name], rs1=rt, rs2=rs, imm=imm)
 
         elif item.name == 'j':
             reference, = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             inst = JTypeInstruction(item.line, 'jal', rd='x0', imm=imm)
         elif item.name == 'jal':
             reference, = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             inst = JTypeInstruction(item.line, 'jal', rd='x1', imm=imm)
         elif item.name == 'jr':
             rs, = item.args
@@ -2886,7 +2889,7 @@ def transform_pseudo_instructions(items, constants, labels):
         elif item.name == 'call':
             reference, = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             # check if eligible for single inst expansion
             env = ChainMap(constants, labels)
             value = imm.eval(position, env, item.line)
@@ -2907,7 +2910,7 @@ def transform_pseudo_instructions(items, constants, labels):
         elif item.name == 'tail':
             reference, = item.args
             imm = ['%offset', reference]
-            imm = parse_immediate(imm)
+            imm = parse_immediate(imm, item.line)
             # check if eligible for single inst expansion
             env = ChainMap(constants, labels)
             value = imm.eval(position, env, item.line)
