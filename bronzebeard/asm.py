@@ -352,7 +352,7 @@ def ci_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < -32 or imm > 31:
-        raise ValueError('6-bit immediate must be between -32 (-0x20) and 31 (0x1f): {}'.format(imm))
+        raise ValueError('6-bit immediate must be between -0x20 (-32) and 0x1f (31): {}'.format(imm))
 
     # validate constraints
     for c in cs or []:
@@ -377,7 +377,7 @@ def ci_type(rd_rs1, imm, *, opcode, funct3, cs=None):
 # c.addi16sp
 def cia_type(imm, *, opcode, funct3, cs=None):
     if imm < -512 or imm > 511:
-        raise ValueError('6-bit MO16 immediate must be between -512 (-0x200) and 511 (0x1ff): {}'.format(imm))
+        raise ValueError('6-bit MO16 immediate must be between -0x200 (-512) and 0x1ff (511): {}'.format(imm))
     if imm % 16 != 0:
         raise ValueError('6-bit MO16 immediate must be a multiple of 16: {}'.format(imm))
 
@@ -389,12 +389,18 @@ def cia_type(imm, *, opcode, funct3, cs=None):
     imm = c_uint32(imm).value & 0b111111
 
     imm_9 = (imm >> 5) & 0b1
-    imm_8_4 = imm & 0b11111
+    imm_8_7 = (imm >> 3) & 0b11
+    imm_6 = (imm >> 2) & 0b1
+    imm_5 = (imm >> 1) & 0b1
+    imm_4 = imm & 0b1
 
     code = 0
     code |= opcode
-    code |= imm_8_4 << 2
-    code |= 2 << 7
+    code |= imm_5 << 2
+    code |= imm_8_7 << 3
+    code |= imm_6 << 5
+    code |= imm_4 << 6
+    code |= 0b00010 << 7
     code |= imm_9 << 12
     code |= funct3 << 13
 
@@ -411,7 +417,7 @@ def ciu_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     if imm >= 0xfffe0 and imm <= 0xfffff:
         imm = imm - 2**20
     if imm < -32 or imm > 31:
-        raise ValueError('6-bit immediate must be between -32 (-0x20) and 31 (0x1f): {}'.format(imm))
+        raise ValueError('6-bit immediate must be between -0x20 (-32) and 0x1f (31): {}'.format(imm))
 
     # validate constraints
     for c in cs or []:
@@ -438,7 +444,7 @@ def cil_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     rd_rs1 = lookup_register(rd_rs1)
 
     if imm < 0 or imm > 255:
-        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
+        raise ValueError('6-bit MO4 unsigned immediate must be between 0x00 (0) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -449,14 +455,16 @@ def cil_type(rd_rs1, imm, *, opcode, funct3, cs=None):
     imm = imm >> 2
     imm = c_uint32(imm).value & 0b111111
 
-    imm_7 = (imm >> 5) & 0b1
-    imm_6_2 = imm & 0b11111
+    imm_7_6 = (imm >> 4) & 0b11
+    imm_5 = (imm >> 3) & 0b1
+    imm_4_2 = imm & 0b111
 
     code = 0
     code |= opcode
-    code |= imm_6_2 << 2
+    code |= imm_7_6 << 2
+    code |= imm_4_2 << 4
     code |= rd_rs1 << 7
-    code |= imm_7 << 12
+    code |= imm_5 << 12
     code |= funct3 << 13
 
     return code
@@ -467,7 +475,7 @@ def css_type(rs2, imm, *, opcode, funct3, cs=None):
     rs2 = lookup_register(rs2)
 
     if imm < 0 or imm > 255:
-        raise ValueError('6-bit MO4 unsigned immediate must be between 0 (0x00) and 0xff (255): {}'.format(imm))
+        raise ValueError('6-bit MO4 unsigned immediate must be between 0x00 (0) and 0xff (255): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('6-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -496,7 +504,7 @@ def ciw_type(rd, imm, *, opcode, funct3, cs=None):
     rd = lookup_register(rd, compressed=True)
 
     if imm < 0 or imm > 1023:
-        raise ValueError('8-bit MO4 unsigned immediate must be between 0 (0x00) and 0x3ff (1023): {}'.format(imm))
+       raise ValueError('8-bit MO4 unsigned immediate must be between 0x00 (0) and 0x3ff (1023): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('8-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -530,7 +538,7 @@ def cl_type(rd, rs1, imm, *, opcode, funct3, cs=None):
     rs1 = lookup_register(rs1, compressed=True)
 
     if imm < 0 or imm > 127:
-        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
+        raise ValueError('5-bit MO4 unsigned immediate must be between 0x00 (0) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -563,7 +571,7 @@ def cs_type(rs1, rs2, imm, *, opcode, funct3, cs=None):
     rs2 = lookup_register(rs2, compressed=True)
 
     if imm < 0 or imm > 127:
-        raise ValueError('5-bit MO4 unsigned immediate must be between 0 (0x00) and 0x7f (127): {}'.format(imm))
+        raise ValueError('5-bit MO4 unsigned immediate must be between 0x00 (0) and 0x7f (127): {}'.format(imm))
     if imm % 4 != 0:
         raise ValueError('5-bit MO4 unsigned immediate must be a multiple of 4: {}'.format(imm))
 
@@ -1731,10 +1739,11 @@ class CRTypeInstruction(CompressedInstruction):
 # custom syntax for: c.jr, c.jalr
 class CRJTypeInstruction(CompressedInstruction):
 
-    def __init__(self, line, name, rd_rs1):
+    def __init__(self, line, name, rd_rs1, is_auipc_jump=False):
         super().__init__(line)
         self.name = name
         self.rd_rs1 = rd_rs1
+        self.is_auipc_jump = is_auipc_jump
 
     def __repr__(self):
         s = '{}({!r}, rd_rs1={!r})'
@@ -2051,18 +2060,24 @@ def lex_tokens(line):
 
     # strip comments
     contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
+
     # pad parens before split
     contents = contents.replace('(', ' ( ').replace(')', ' ) ')
+
     # strip whitespace
     contents = contents.strip()
+
     # skip empty lines
     if len(contents) == 0:
         return LineTokens(line, [])
+
     # split line into tokens
     tokens = re.split(r'[\s,]+', contents)
+
     # remove empty tokens
     while '' in tokens:
         tokens.remove('')
+
     # carry the line and its tokens forward
     return LineTokens(line, tokens)
 
@@ -2402,7 +2417,7 @@ def resolve_register_aliases(items, constants):
 
     new_items = []
     for item in items:
-        d = copy.deepcopy(item.__dict__)
+        d = copy.deepcopy(vars(item))
 
         # skip items without any register fields
         if not set(d.keys()) & REGS:
@@ -2411,6 +2426,7 @@ def resolve_register_aliases(items, constants):
 
         # resolve all fields that are registers
         modified = False
+        resolved_regs = {}
         for key, value in d.items():
             # skip if item field is not a register
             if key not in REGS:
@@ -2421,11 +2437,13 @@ def resolve_register_aliases(items, constants):
             # reg IS a constant
             modified = True
             reg = constants[value]
-            d[key] = reg
+            resolved_regs[key] = reg
 
         if not modified:
             new_items.append(item)
             continue
+
+        d.update(resolved_regs)
 
         # create the new item using the resolved registers
         new_item = item.__class__(*d.values())
@@ -2547,7 +2565,7 @@ def transform_compressible(items, constants, labels):
             NameEquals('jal'),
             RegEquals('rd', 1),
             ImmDivisibleBy(2),
-            ImmBetween(-2**11, 2**11 - 1),
+            ImmBetween(-2**10 * 2, 2**10 * 2 - 1),
         ],
         'c.li': [
             NameEquals('addi'),
@@ -2625,7 +2643,7 @@ def transform_compressible(items, constants, labels):
             NameEquals('jal'),
             RegEquals('rd', 0),
             ImmDivisibleBy(2),
-            ImmBetween(-2**11, 2**11 - 1),
+            ImmBetween(-2**10 * 2, 2**10 * 2 - 1),
         ],
         'c.beqz': [
             NameEquals('beq'),
@@ -2757,15 +2775,15 @@ def transform_compressible(items, constants, labels):
             elif compressed == 'c.lwsp':
                 inst = CITypeInstruction(item.line, compressed, item.rd, item.imm)
             elif compressed == 'c.jr':
-                inst = CRJTypeInstruction(item.line, compressed, item.rs1) 
+                inst = CRJTypeInstruction(item.line, compressed, item.rs1, item.is_auipc_jump)
             elif compressed == 'c.mv':
-                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2) 
+                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2)
             elif compressed == 'c.ebreak':
-                inst = CRETypeInstruction(item.line, compressed) 
+                inst = CRETypeInstruction(item.line, compressed)
             elif compressed == 'c.jalr':
-                inst = CRJTypeInstruction(item.line, compressed, item.rs1) 
+                inst = CRJTypeInstruction(item.line, compressed, item.rs1, item.is_auipc_jump)
             elif compressed == 'c.add':
-                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2) 
+                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2)
             elif compressed == 'c.swsp':
                 inst = CSSTypeInstruction(item.line, compressed, item.rs2, item.imm)
             else:
@@ -2947,7 +2965,7 @@ def resolve_immediates(items, constants, labels):
     position = 0
     new_items = []
     for item in items:
-        d = copy.deepcopy(item.__dict__)
+        d = copy.deepcopy(vars(item))
 
         # skip items without an immediate field
         if 'imm' not in d:
@@ -2963,8 +2981,14 @@ def resolve_immediates(items, constants, labels):
         # resolve the immediate field
         env = ChainMap(constants, labels)
         imm = item.imm.eval(position, env, item.line)
+
+        # account for AUIPC "PC based on previous inst" nuance
         if hasattr(item, 'is_auipc_jump') and item.is_auipc_jump:
-            imm += 4
+            if isinstance(item, CompressedInstruction):
+                imm += 2
+            else:
+                imm += 4
+
         d['imm'] = imm
 
         # create the new item using the resolved immediate
