@@ -1296,6 +1296,27 @@ class Constant(Item):
         return 0
 
 
+class IncludeBytes(Item):
+
+    def __init__(self, line, path, fsize):
+        super().__init__(line)
+        self.path = path
+        self.fsize = fsize
+
+    def __repr__(self):
+        s = '{}(path={!r}, fsize={!r})'
+        s = s.format(type(self).__name__, self.path, self.fsize)
+        return s
+
+    def __str__(self):
+        s = 'include_bytes {} {}'
+        s = s.format(self.path, self.fsize)
+        return s
+
+    def size(self):
+        return self.fsize
+
+
 class String(Item):
 
     def __init__(self, line, value):
@@ -1428,12 +1449,22 @@ class Blob(Item):
 
     def __repr__(self):
         # repr is still "correct", just wanted a more consistent hex format
-        s = ''.join(['\\x{:02x}'.format(b) for b in self.data])
+        if len(self.data) <= 16:
+            s = ''.join(['\\x{:02x}'.format(b) for b in self.data])
+        else:
+            s = ''.join(['\\x{:02x}'.format(b) for b in self.data[:16]])
+            s += '...'
+
         return "{}(b'{}')".format(type(self).__name__, s)
 
     def __str__(self):
         s = 'blob {}'
-        s = s.format(' '.join('0x{:02x}'.format(b) for b in self.data))
+        if len(self.data) <= 16:
+            s = s.format(' '.join('0x{:02x}'.format(b) for b in self.data))
+        else:
+            s = s.format(' '.join('0x{:02x}'.format(b) for b in self.data[:16]))
+            s += ' ...'
+
         return s
 
     def size(self):
@@ -2016,6 +2047,13 @@ def read_lines(path_or_source, *, include=False):
         path = '<string>'
         source = path_or_source
 
+    # detemine base path based on whether a path or source was given
+    is_path = os.path.exists(path_or_source)
+    if is_path:
+        base_path = os.path.dirname(os.path.abspath(path_or_source))
+    else:
+        base_path = os.getcwd()
+
     lines = []
     for i, raw_line in enumerate(source.splitlines(), start=1):
         # skip empty lines
@@ -2024,23 +2062,39 @@ def read_lines(path_or_source, *, include=False):
 
         line = Line(path, i, raw_line)
 
-        # handle includes in the reader
+        # handle include in the reader
         if raw_line.lower().startswith('include '):
-            _, name = raw_line.split()
-
-            is_path = os.path.exists(path_or_source)
-            if is_path:
-                base_path = os.path.dirname(os.path.abspath(path_or_source))
-            else:
-                base_path = os.getcwd()
-
-            include_file = os.path.join(base_path, name)
             try:
-                include_lines = read_lines(include_file, include=True)
+                _, name = raw_line.split()
+            except ValueError:
+                raise AssemblerError('include must specify a file', line)
+
+            # bail out here if the file doesn't exist (or can't be read)
+            include_path = os.path.join(base_path, name)
+            try:
+                include_lines = read_lines(include_path, include=True)
             except OSError:
                 raise AssemblerError('failed to include file: {}'.format(name), line)
             else:
                 lines.extend(include_lines)
+        # handle existence and size of include_bytes in the reader
+        elif raw_line.lower().startswith('include_bytes '):
+            try:
+                _, name = raw_line.split()
+            except ValueError:
+                raise AssemblerError('include_bytes must specify a file', line)
+
+            # ensure file exists
+            include_path = os.path.join(base_path, name)
+            if not os.path.exists(include_path):
+                raise AssemblerError('failed to include bytes: {}'.format(name), line)
+
+            # grab its size
+            size = os.path.getsize(include_path)
+
+            # modify the line by appending the size to the end (too hacky?)
+            line.contents = '{} {}'.format(raw_line, size)
+            lines.append(line)
         else:
             lines.append(line)
 
@@ -2134,6 +2188,13 @@ def parse_item(line_tokens):
         name, _, *imm = tokens
         imm = parse_immediate(imm, line)
         return Constant(line, name, imm)
+    # include_bytes
+    elif head == 'include_bytes':
+        if len(tokens) != 3:
+            raise AssemblerError('include_bytes must specify a file', line)
+        _, path, size = tokens
+        size = int(size, base=0)
+        return IncludeBytes(line, path, size)
     # strings
     elif head == 'string':
         _, value = tokens
@@ -2965,27 +3026,6 @@ def transform_pseudo_instructions(items, constants, labels):
     return new_items
 
 
-# foo:
-#     addi x0 x0 0
-# 
-# align 4
-# bar:
-
-# regular:
-# bar: 8
-# naive = 4
-# resol = 0
-# shrink = 4 - 0 = 4
-# bar = 4
-
-# compressed:
-# bar = 8
-# bar = 6
-# naive size = 4
-# resol size = 2
-# shrink = 4 - 2 = 2
-# bar = 4
-
 def resolve_aligns(items, labels):
     position = 0
     new_items = []
@@ -3183,6 +3223,27 @@ def resolve_packs(items):
     return new_items
 
 
+def resolve_include_bytes(items):
+    new_items = []
+    for item in items:
+        if not isinstance(item, IncludeBytes):
+            new_items.append(item)
+            continue
+
+        with open(item.path, 'rb') as f:
+            data = f.read()
+
+        # defense against the dark race conditions
+        assert len(data) == item.fsize
+
+        blob = Blob(item.line, data)
+        new_items.append(blob)
+
+        log_conversion('resolve_include_bytes', item, blob)
+
+    return new_items
+
+
 def resolve_blobs(items):
     output = bytearray()
     for item in items:
@@ -3210,6 +3271,7 @@ def resolve_blobs(items):
 #   - Resolve sequences (convert Sequence to Blob)
 #   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve packs  (convert Pack to Blob)
+#   - Resolve include_bytes  (read include_bytes files into Blobs)
 #   - Resolve blobs  (merge all Blobs into a single binary)
 def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     """
@@ -3250,13 +3312,14 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     items = resolve_sequences(items)
     items = transform_shorthand_packs(items)
     items = resolve_packs(items)
+    items = resolve_include_bytes(items)
     program = resolve_blobs(items)
 
     return program
 
 
 def cli_main():
-    # TODO: any cleaner way to handle this w/ argparse positional args?
+    # any cleaner way to handle this w/ argparse positional args?
     if len(sys.argv) >= 2 and sys.argv[1] == '--version':
         from bronzebeard import __version__
         version = 'bronzebeard {}'.format(__version__)

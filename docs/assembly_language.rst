@@ -99,7 +99,22 @@ The :code:`include` keyword can be used to include other assembly source files i
 At the moment, files are searched relative to the file containing the :code:`include` keyword.
 There are plans for a formal "include directories" feature but it isn't implemented quite yet.
 
-You can find an example of this in the `Longan Nano LED example <https://github.com/theandrew168/bronzebeard/blob/master/examples/longan_nano_led.asm>`_.
+Here is a basic example::
+
+  include gd32vf103.asm
+
+You can find another example of this in the `Longan Nano LED example <https://github.com/theandrew168/bronzebeard/blob/master/examples/longan_nano_led.asm>`_.
+
+Include Bytes
+-------------
+Similar to :code:`include`, :code:`include_bytes` can be used to embed binary files into the output binary.
+Regardless of the file's type, it will be simply be baked into the binary as raw bytes.
+
+Here are some example::
+
+  include_bytes cat.jpg
+  include_bytes prelude.forth
+  include_bytes my_random_file.dat
 
 Modifiers
 ---------
