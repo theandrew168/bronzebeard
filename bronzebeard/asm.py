@@ -1251,7 +1251,7 @@ class Item(abc.ABC):
         self.line = line
 
     @abc.abstractmethod
-    def size(self, position):
+    def size(self):
         """Check the size of this item at the given position in a program"""
 
 
@@ -1271,7 +1271,7 @@ class Label(Item):
         s = s.format(self.name)
         return s
 
-    def size(self, position):
+    def size(self):
         return 0
 
 
@@ -1292,7 +1292,7 @@ class Constant(Item):
         s = s.format(self.name, self.expr)
         return s
 
-    def size(self, position):
+    def size(self):
         return 0
 
 
@@ -1312,7 +1312,7 @@ class String(Item):
         s = s.format(self.value)
         return s
 
-    def size(self, position):
+    def size(self):
         return len(self.value.encode('utf-8'))
 
 
@@ -1333,7 +1333,7 @@ class Sequence(Item):
         s = s.format(self.name, ' '.join(self.values))
         return s
 
-    def size(self, position):
+    def size(self):
         sizes = {
             'bytes': 1,
             'shorts': 2,
@@ -1361,7 +1361,7 @@ class Pack(Item):
         s = s.format(self.fmt, self.imm)
         return s
 
-    def size(self, position):
+    def size(self):
         return struct.calcsize(self.fmt)
 
 
@@ -1382,7 +1382,7 @@ class ShorthandPack(Item):
         s = s.format(self.name, self.imm)
         return s
 
-    def size(self, position):
+    def size(self):
         sizes = {
             'db': 1,
             'dh': 2,
@@ -1408,7 +1408,11 @@ class Align(Item):
         s = s.format(self.alignment)
         return s
 
-    def size(self, position):
+    def size(self):
+        # have to be pessimistic here, will shrink later
+        return self.alignment
+
+    def resolution_size(self, position):
         padding = self.alignment - (position % self.alignment)
         if padding == self.alignment:
             return 0
@@ -1432,13 +1436,13 @@ class Blob(Item):
         s = s.format(' '.join('0x{:02x}'.format(b) for b in self.data))
         return s
 
-    def size(self, position):
+    def size(self):
         return len(self.data)
 
 
 class Instruction(Item):
 
-    def size(self, position):
+    def size(self):
         return 4
 
     @abc.abstractmethod
@@ -1468,7 +1472,7 @@ class PseudoInstruction(Instruction):
     def args(self):
         return self.args
 
-    def size(self, position):
+    def size(self):
         # intentionally pessimistic here (may get shrunk after transform)
         # some pseudo-instructions expand into 2 regular ones
         if self.name in ['li', 'call', 'tail']:
@@ -1710,7 +1714,7 @@ class ALTypeInstruction(Instruction):
 
 class CompressedInstruction(Instruction):
 
-    def size(self, position):
+    def size(self):
         return 2
 
 
@@ -2403,7 +2407,7 @@ def resolve_labels(items, labels):
     new_items = []
     for item in items:
         if not isinstance(item, Label):
-            position += item.size(position)
+            position += item.size()
             new_items.append(item)
             continue
 
@@ -2718,7 +2722,7 @@ def transform_compressible(items, constants, labels):
     for item in items:
         # skip non-instructions and pseudo-instructions
         if not isinstance(item, Instruction) or isinstance(item, PseudoInstruction):
-            position += item.size(position)
+            position += item.size()
             new_items.append(item)
             continue
 
@@ -2794,14 +2798,14 @@ def transform_compressible(items, constants, labels):
             labels.update(new_labels)
 
             # add compressed inst to items and break the search loop
-            position += inst.size(position)
+            position += inst.size()
             new_items.append(inst)
 
             log_conversion('resolve_compressible', item, inst)
 
         # if inst wasn't compressed, append to list like normal
         else:
-            position += item.size(position)
+            position += item.size()
             new_items.append(item)
 
     return new_items
@@ -2813,7 +2817,7 @@ def transform_pseudo_instructions(items, constants, labels):
     for item in items:
         # save an indent by early-exiting non PIs
         if not isinstance(item, PseudoInstruction):
-            position += item.size(position)
+            position += item.size()
             new_items.append(item)
             continue
 
@@ -2839,7 +2843,7 @@ def transform_pseudo_instructions(items, constants, labels):
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
-                position += inst.size(position)
+                position += inst.size()
                 new_items.append(inst)
                 log_conversion('transform_pseudo_instructions', item, inst)
 
@@ -2920,7 +2924,7 @@ def transform_pseudo_instructions(items, constants, labels):
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x1', imm=Hi(imm))
-                position += inst.size(position)
+                position += inst.size()
                 new_items.append(inst)
                 log_conversion('transform_pseudo_instructions', item, inst)
 
@@ -2941,7 +2945,7 @@ def transform_pseudo_instructions(items, constants, labels):
             else:
                 # expanding 1 inst into 2
                 inst = UTypeInstruction(item.line, 'auipc', rd='x6', imm=Hi(imm))
-                position += inst.size(position)
+                position += inst.size()
                 new_items.append(inst)
                 log_conversion('transform_pseudo_instructions', item, inst)
 
@@ -2953,10 +2957,61 @@ def transform_pseudo_instructions(items, constants, labels):
         else:
             raise AssemblerError('no translation for pseudo-instruction: {}'.format(item.name), item.line)
 
-        position += inst.size(position)
+        position += inst.size()
         new_items.append(inst)
 
         log_conversion('transform_pseudo_instructions', item, inst)
+
+    return new_items
+
+
+# foo:
+#     addi x0 x0 0
+# 
+# align 4
+# bar:
+
+# regular:
+# bar: 8
+# naive = 4
+# resol = 0
+# shrink = 4 - 0 = 4
+# bar = 4
+
+# compressed:
+# bar = 8
+# bar = 6
+# naive size = 4
+# resol size = 2
+# shrink = 4 - 2 = 2
+# bar = 4
+
+def resolve_aligns(items, labels):
+    position = 0
+    new_items = []
+    for item in items:
+        if not isinstance(item, Align):
+            position += item.size()
+            new_items.append(item)
+            continue
+
+        # determine actual padding and amount to shrink subsequent labels
+        padding = item.resolution_size(position)
+        shrink = item.size() - padding 
+
+        # shrink subsequent labels
+        new_labels = {k: v - shrink for k, v in labels.items() if v > position}
+        labels.update(new_labels)
+
+        # skip if already aligned
+        if padding == 0:
+            continue
+
+        position += padding
+        blob = Blob(item.line, b'\x00' * padding)
+        new_items.append(blob)
+
+        log_conversion('resolve_aligns', item, blob)
 
     return new_items
 
@@ -2969,7 +3024,7 @@ def resolve_immediates(items, constants, labels):
 
         # skip items without an immediate field
         if 'imm' not in d:
-            position += item.size(position)
+            position += item.size()
             new_items.append(item)
             continue
 
@@ -2993,7 +3048,7 @@ def resolve_immediates(items, constants, labels):
 
         # create the new item using the resolved immediate
         new_item = item.__class__(*d.values())
-        position += new_item.size(position)
+        position += new_item.size()
         new_items.append(new_item)
 
         if not trivial:
@@ -3128,29 +3183,6 @@ def resolve_packs(items):
     return new_items
 
 
-def resolve_aligns(items):
-    position = 0
-    new_items = []
-    for item in items:
-        if not isinstance(item, Align):
-            position += item.size(position)
-            new_items.append(item)
-            continue
-
-        # skip if already aligned
-        padding = item.size(position)
-        if padding == 0:
-            continue
-
-        position += padding
-        blob = Blob(item.line, b'\x00' * padding)
-        new_items.append(blob)
-
-        log_conversion('resolve_aligns', item, blob)
-
-    return new_items
-
-
 def resolve_blobs(items):
     output = bytearray()
     for item in items:
@@ -3171,13 +3203,13 @@ def resolve_blobs(items):
 #   - Transform pseudo-instructions  (expand PIs into regular instructions)
 #   - Resolve register aliases  (again)
 #   - Transform compressible  (again)
+#   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve immediates  (Arithmetic, Position, Offset, Hi, Lo)
 #   - Resolve instructions  (convert xTypeInstruction to Blob)
 #   - Resolve strings  (convert String to Blob)
 #   - Resolve sequences (convert Sequence to Blob)
 #   - Transform shorthand packs (expand shorthand pack syntax into the full syntax)
 #   - Resolve packs  (convert Pack to Blob)
-#   - Resolve aligns  (convert aligns to blobs based on position)
 #   - Resolve blobs  (merge all Blobs into a single binary)
 def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     """
@@ -3211,13 +3243,13 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     items = resolve_register_aliases(items, constants)
     if compress:
         items = transform_compressible(items, constants, labels)
+    items = resolve_aligns(items, labels)
     items = resolve_immediates(items, constants, labels)
     items = resolve_instructions(items)
     items = resolve_strings(items)
     items = resolve_sequences(items)
     items = transform_shorthand_packs(items)
     items = resolve_packs(items)
-    items = resolve_aligns(items)
     program = resolve_blobs(items)
 
     return program

@@ -341,3 +341,16 @@ def test_assemble_lui_signedness():
         asm.LUI('a4', -1),
     ])
     assert binary == target
+
+
+def test_assemble_compression_alignment():
+    source = r"""
+    foo:
+        addi x0 x0 0
+
+    align 4
+    bar:
+    """
+    labels = {}
+    asm.assemble(source, labels=labels, compress=True)
+    assert labels['bar'] == 4
