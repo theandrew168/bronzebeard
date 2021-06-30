@@ -38,8 +38,7 @@ gpio_init:
 
 gpio_init_config:
     # multiply pin number by 4 to get shift amount
-    addi t1, zero, 4
-    mul a1, a1, t1
+    slli a1,a1,2
 
     # load current config
     lw t1, 0(t0)
