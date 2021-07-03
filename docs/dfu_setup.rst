@@ -3,7 +3,6 @@ DFU Setup
 Device Firmware Upgrade is a USB-based protocol for updating the firmware on certain embedded devices.
 At the moment, the DFU implemention included with Bronzebeard only supports the `Longan Nano <https://www.seeedstudio.com/Sipeed-Longan-Nano-RISC-V-GD32VF103CBT6-DEV-Board-p-4725.html>`_ and `Wio Lite <https://www.seeedstudio.com/Wio-Lite-RISC-V-GD32VF103-p-4293.html>`_.
 
-
 Windows
 -------
 The USB-based devices that Bronzebeard targets don't work well with Windows by default.

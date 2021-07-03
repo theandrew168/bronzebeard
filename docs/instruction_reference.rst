@@ -37,7 +37,7 @@ Instruction                  Expansion                    Description
 :code:`jalr rs`              :code:`jalr x1, 0(rs)`       Jump and link register
 :code:`ret`                  :code:`jalr x0, 0(x1)`       Return from subroutine
 :code:`call offset`          See below                    Call far-away subroutine
-:code:`tail offset`          See below                    Tail call fair-away subroutine
+:code:`tail offset`          See below                    Tail call far-away subroutine
 :code:`fence`                :code:`fence iorw, iorw`     Fence on all memory and I/O
 ===========================  ===========================  ===========
 
