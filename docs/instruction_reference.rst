@@ -4,7 +4,7 @@ These tables provide summaries for the baseline RISC-V instructions and common e
 Full `specifications <https://riscv.org/technical/specifications/>`_ be found on the RISC-V website.
 Additionally, more details about each instruction can be found `here <https://msyksphinz-self.github.io/riscv-isadoc/html/index.html>`_.
 
-Psuedo Instructions
+Pseudo Instructions
 -------------------
 These pseudo-instructions represent additional actions and can be used like regular instructions.
 One of the early passes in the assembler will transform them as described in this table.

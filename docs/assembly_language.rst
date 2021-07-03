@@ -244,7 +244,7 @@ The :code:`align` keyword tells the assembler to enforce alignment to a certain 
 This alignment is achieved by padding the binary with :code:`0x00` bytes until it aligns with the boundary.
 In pseudo-code, the assembler adds zeroes until: :code:`len(binary) % alignment == 0`::
 
-  # align the current location in the binary to 2 bytes
+  # align the current location in the binary to 4 bytes
   align 4
 
 Alignment is important when mixing instructions and data into the same binary (which happens quite often).
