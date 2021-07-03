@@ -43,8 +43,7 @@ Number          Name            Alias          Suggested Usage
 :code:`2`       :code:`x2`      :code:`sp`     Stack pointer
 :code:`3`       :code:`x3`      :code:`gp`     Global pointer
 :code:`4`       :code:`x4`      :code:`tp`     Thread pointer
-:code:`5`       :code:`x5`      :code:`t0`     Temporary register
-:code:`6-7`     :code:`x6-7`    :code:`t1-2`   Temporary registers
+:code:`5-7`     :code:`x5-7`    :code:`t0-2`   Temporary registers
 :code:`8`       :code:`x8`      :code:`s0/fp`  Saved register / frame pointer
 :code:`9`       :code:`x9`      :code:`s1`     Saved register
 :code:`10-11`   :code:`x10-11`  :code:`a0-1`   Function arguments / return values
