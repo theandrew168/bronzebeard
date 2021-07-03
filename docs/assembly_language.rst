@@ -115,17 +115,6 @@ Here are some example::
   include_bytes prelude.forth
   include_bytes my_random_file.dat
 
-Modifiers
----------
-In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
-Note that the :code:`%position` modifier is NOT permitted within the value of a constant.
-
-You can think of these like simple, builtin functions:
-
-* :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
-* :strong:`%lo(value)` - Calculate the sign-adjusted bottom 12 bits of a value
-* :strong:`%position(label, addr)` - Calculate the position of a label relative to given base address
-
 String Literals
 ---------------
 String literals allow you to embed UTF-8 strings into your binary.
@@ -259,3 +248,14 @@ To fix this, we need to tell the assembler to ensure that the binary is aligned 
   bytes 0x42      # occupies 1 byte
   align 4         # will pad the binary with 3 0x00 bytes
   addi x0, x0, 0  # aligned :)
+
+Modifiers
+---------
+In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
+Note that the :code:`%position` modifier is NOT permitted within the value of a constant.
+
+You can think of these like simple, builtin functions:
+
+* :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
+* :strong:`%lo(value)` - Calculate the sign-adjusted bottom 12 bits of a value
+* :strong:`%position(label, addr)` - Calculate the position of a label relative to given base address
