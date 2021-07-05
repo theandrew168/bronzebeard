@@ -50,3 +50,13 @@ Then, with Bronzebeard installed::
   bronzebeard my_asm_file.asm
 
 By default, the assembled output binary will be placed in a file named :code:`bb.out`.
+
+Testing
+-------
+Bronzebeard's tests are written using `pytest <https://docs.pytest.org/en/6.2.x/>`_::
+
+  pip install pytest
+
+Once installed, the tests can be run via::
+
+  pytest
