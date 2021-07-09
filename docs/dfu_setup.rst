@@ -33,11 +33,8 @@ If you'd like to program and interact with the device as a normal, non-root user
 
   # Longan Nano / Wio Lite
   ATTRS{idVendor}=="28e9", ATTRS{idProduct}=="0189", MODE="0666"
-  # Adafruit USB to TTL Serial Cable
   # Silicon Labs CP2102 USB to UART Bridge
   ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
-  # SparkFun USB to TTL Serial Cable
-  ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666"
 
 After the rules file is setup, reload udev via :code:`sudo udevadm control --reload`.
 
