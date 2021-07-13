@@ -263,8 +263,9 @@ You can think of these like simple, builtin functions:
 Error
 -----
 The keyword :code:`error` can be used to abort the assembler in a human-understandable fashion.
-For example, if a given board doesn't support LCD screens but the main program requires it, an :code:`error` directive can be used to say "This device doesn't support LCD screens" instead of dropping a cryptic "symbol not found" type of error sometime later.
+For example, if a given board doesn't support visual displays but the program requires it, an :code:`error` directive can be used to explicity inform the user of the problem as soon as possible.
+This is much better user-experience than waiting for the assembler to drop a cryptic "symbol not found" type of error sometime later.
 
 This keyword captures a simple message based on the regex: :code:`error (.*)`::
 
-  error This device doesn't support LCD screens
+  error This device doesn't support displays
