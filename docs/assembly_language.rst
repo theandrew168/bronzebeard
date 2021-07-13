@@ -252,14 +252,14 @@ To fix this, we need to tell the assembler to ensure that the binary is aligned 
 Modifiers
 ---------
 In addition to basic arithmetic operations, Bronzebeard assembly supports a small number of "modifiers".
-Note that the :code:`%position` modifier is NOT permitted within the value of a constant.
+Note that the :code:`%offset` and :code:`%position` modifiers are NOT permitted within the value of a constant.
 
 You can think of these like simple, builtin functions:
 
 * :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
 * :strong:`%lo(value)` - Calculate the sign-adjusted bottom 12 bits of a value
 * :strong:`%offset(label)` - Calculate the offset of a label relative to the current item's address
-* :strong:`%position(label, addr)` - Calculate the position of a label based onto a given absolute address
+* :strong:`%position(label, addr)` - Calculate the position of a label based on a given absolute address
 
 Error
 -----
