@@ -8,6 +8,7 @@ setup(
     name='bronzebeard',
     version=import_module('bronzebeard').__version__,
     author='Andrew Dailey',
+    author_email='andrew@shallowbrooksoftware.com',
     description='Minimal ecosystem for bare-metal RISC-V development',
     long_description=readme,
     long_description_content_type='text/x-rst',
@@ -18,6 +19,7 @@ setup(
         'Issue Tracker': 'https://github.com/theandrew168/bronzebeard/issues',
     },
     packages=['bronzebeard'],
+    include_package_data=True,
     install_requires=[
         'pyserial',
         'pyusb',
@@ -38,6 +40,7 @@ setup(
     entry_points={
         'console_scripts': [
             'bronzebeard = bronzebeard.asm:cli_main',
+            'bronzebeard-dfu = bronzebeard.dfu:cli_main',
         ],
     },
 )

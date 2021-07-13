@@ -2037,9 +2037,12 @@ class CJTypeInstruction(CompressedInstruction):
 
 # TODO: impl some sort of include path
 # TODO: detect and handle / error circular includes
-def read_lines(path_or_source, *, include=False):
+def read_lines(path_or_source, *, include=False, include_dirs=None):
+    include_dirs = include_dirs or []
+
     if os.path.exists(path_or_source) or include:
         log.info('reading file: {}'.format(os.path.abspath(path_or_source)))
+        # exceptions here will be caught by the recursive parent
         path = path_or_source
         with open(path) as f:
             source = f.read()
@@ -2047,7 +2050,7 @@ def read_lines(path_or_source, *, include=False):
         path = '<string>'
         source = path_or_source
 
-    # detemine base path based on whether a path or source was given
+    # determine base path based on whether a path or source was given
     is_path = os.path.exists(path_or_source)
     if is_path:
         base_path = os.path.dirname(os.path.abspath(path_or_source))
@@ -2102,13 +2105,22 @@ def read_lines(path_or_source, *, include=False):
 
 
 def lex_tokens(line):
+    RE_ERROR = re.compile(r'\s*error (.*)')
     RE_STRING = re.compile(r'\s*string (.*)')
 
     # simplify lexing a single string
     if type(line) == str:
         line = Line('<string>', 1, line)
 
-    # check for string literals (needs custom lexing)
+    # check for error literal (needs custom lexing)
+    match = RE_ERROR.match(line.contents)
+    if match is not None:
+        message = match.group(1)
+        message = message.encode('utf-8').decode('unicode_escape')
+        tokens = ['error', message]
+        return LineTokens(line, tokens)
+
+    # check for string literal (needs custom lexing)
     match = RE_STRING.match(line.contents)
     if match is not None:
         value = match.group(1)
@@ -2188,6 +2200,10 @@ def parse_item(line_tokens):
         name, _, *imm = tokens
         imm = parse_immediate(imm, line)
         return Constant(line, name, imm)
+    # errors
+    elif head == 'error':
+        _, message = tokens
+        raise AssemblerError(message, line)
     # include_bytes
     elif head == 'include_bytes':
         if len(tokens) != 3:
@@ -3273,7 +3289,7 @@ def resolve_blobs(items):
 #   - Resolve packs  (convert Pack to Blob)
 #   - Resolve include_bytes  (read include_bytes files into Blobs)
 #   - Resolve blobs  (merge all Blobs into a single binary)
-def assemble(path_or_source, *, constants=None, labels=None, compress=False):
+def assemble(path_or_source, *, constants=None, labels=None, compress=False, include_dirs=None):
     """
     Assemble a RISC-V assembly program into a raw binary.
 
@@ -3286,7 +3302,7 @@ def assemble(path_or_source, *, constants=None, labels=None, compress=False):
     labels = labels if labels is not None else {}
 
     # read, lex, and parse the source
-    lines = read_lines(path_or_source)
+    lines = read_lines(path_or_source, include_dirs=include_dirs)
     lines = [l for l in lines if len(l) > 0]
     tokens = [lex_tokens(l) for l in lines]
     tokens = [t for t in tokens if len(t) > 0]
@@ -3325,13 +3341,23 @@ def cli_main():
         version = 'bronzebeard {}'.format(__version__)
         raise SystemExit(version)
 
+    boards = [
+        'gd32_dev_board',
+        'hifive1_rev_b',
+        'longan_nano',
+        'wio_lite',
+    ]
+
     parser = argparse.ArgumentParser(
         description='Assemble RISC-V source code',
         prog='bronzebeard',
     )
     parser.add_argument('input_asm', type=str, help='input source file')
-    parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
+    parser.add_argument('-b', '--board', choices=boards,
+        help='include feature abstractions for a given board: {}'.format(', '.join(boards)), metavar='BOARD')
     parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
+    parser.add_argument('-i', '--include', action='append', help='add a directory to the assembler search path')
+    parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
@@ -3348,10 +3374,17 @@ def cli_main():
     if not os.path.exists(args.input_asm):
         raise SystemExit('missing input file: {}'.format(args.input_asm))
 
+    # add board-specific include dirs if requested
+    include_dirs = args.include or []
+    if args.board:
+        root = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(root, 'boards', args.board)
+        include_dirs.append(path)
+
     constants = {}
     labels = {}
     try:
-        binary = assemble(args.input_asm, constants=constants, labels=labels, compress=args.compress)
+        binary = assemble(args.input_asm, constants=constants, labels=labels, compress=args.compress, include_dirs=include_dirs)
     except AssemblerError as e:
         raise SystemExit(e)
 

@@ -1,0 +1,11 @@
+include LICENCE
+include MANIFEST.in
+include README.rst
+graft bronzebeard/boards
+graft bronzebeard/chips
+graft bronzebeard/libs
+graft bronzebeard/peripherals
+graft docs
+graft examples
+graft tests
+global-exclude *.py[cod]
