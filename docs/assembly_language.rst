@@ -258,8 +258,8 @@ You can think of these like simple, builtin functions:
 
 * :strong:`%hi(value)` - Calculate the sign-adjusted top 20 bits of a value
 * :strong:`%lo(value)` - Calculate the sign-adjusted bottom 12 bits of a value
-* :strong:`%offset(label)` - Calculate the relative offset of a label from the current item's address
-* :strong:`%position(label, addr)` - Calculate the position of a label relative to given base address
+* :strong:`%offset(label)` - Calculate the offset of a label relative to the current item's address
+* :strong:`%position(label, addr)` - Calculate the position of a label based onto a given absolute address
 
 Error
 -----
