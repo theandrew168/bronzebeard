@@ -2035,10 +2035,15 @@ class CJTypeInstruction(CompressedInstruction):
         return [self.imm]
 
 
-# TODO: impl some sort of include path
-# TODO: detect and handle / error circular includes
 def read_lines(path_or_source, *, include=False, include_dirs=None):
-    include_dirs = include_dirs or []
+    def lookup(path, dirs):
+        base_path = os.path.dirname(os.path.abspath(path))
+        for dir in dirs:
+            try_path = os.path.join(dir, path)
+            if os.path.exists(try_path):
+                return try_path
+        else:
+            return None
 
     if os.path.exists(path_or_source) or include:
         log.info('reading file: {}'.format(os.path.abspath(path_or_source)))
@@ -2057,6 +2062,10 @@ def read_lines(path_or_source, *, include=False, include_dirs=None):
     else:
         base_path = os.getcwd()
 
+    # the adjacent dir is always present and include-able
+    current_dirs = copy.deepcopy(include_dirs or [])
+    current_dirs.append(base_path)
+
     lines = []
     for i, raw_line in enumerate(source.splitlines(), start=1):
         # skip empty lines
@@ -2068,29 +2077,28 @@ def read_lines(path_or_source, *, include=False, include_dirs=None):
         # handle include in the reader
         if raw_line.lower().startswith('include '):
             try:
-                _, name = raw_line.split()
+                _, path = raw_line.split()
             except ValueError:
                 raise AssemblerError('include must specify a file', line)
 
             # bail out here if the file doesn't exist (or can't be read)
-            include_path = os.path.join(base_path, name)
-            try:
-                include_lines = read_lines(include_path, include=True)
-            except OSError:
-                raise AssemblerError('failed to include file: {}'.format(name), line)
-            else:
-                lines.extend(include_lines)
+            include_path = lookup(path, current_dirs)
+            if include_path is None:
+                raise AssemblerError('failed to include file: {}'.format(path), line)
+
+            include_lines = read_lines(include_path, include=True, include_dirs=include_dirs)
+            lines.extend(include_lines)
         # handle existence and size of include_bytes in the reader
         elif raw_line.lower().startswith('include_bytes '):
             try:
-                _, name = raw_line.split()
+                _, path = raw_line.split()
             except ValueError:
                 raise AssemblerError('include_bytes must specify a file', line)
 
             # ensure file exists
-            include_path = os.path.join(base_path, name)
-            if not os.path.exists(include_path):
-                raise AssemblerError('failed to include bytes: {}'.format(name), line)
+            include_path = lookup(path, current_dirs)
+            if include_path is None:
+                raise AssemblerError('failed to include bytes: {}'.format(path), line)
 
             # grab its size
             size = os.path.getsize(include_path)
@@ -3374,8 +3382,14 @@ def cli_main():
     if not os.path.exists(args.input_asm):
         raise SystemExit('missing input file: {}'.format(args.input_asm))
 
+    # validate and expand include dirs
+    include_dirs = []
+    for inc_dir in args.include or []:
+        if not os.path.isdir(inc_dir):
+            raise SystemExit('invalid include dir: {}'.format(inc_dir))
+        include_dirs.append(os.path.abspath(inc_dir))
+
     # add board-specific include dirs if requested
-    include_dirs = args.include or []
     if args.board:
         root = os.path.abspath(os.path.dirname(__file__))
         path = os.path.join(root, 'boards', args.board)

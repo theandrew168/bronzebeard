@@ -96,7 +96,7 @@ Include
 -------
 The :code:`include` keyword can be used to include other assembly source files into the current program.
 At the moment, files are searched relative to the file containing the :code:`include` keyword.
-There are plans for a formal "include directories" feature but it isn't implemented quite yet.
+Additional include directories can be specified on the command via the :code:`-i` (or :code:`--include`) flag.
 
 Here is a basic example::
 
