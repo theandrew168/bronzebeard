@@ -3363,8 +3363,6 @@ def cli_main():
     parser.add_argument('input_asm', type=str, help='input source file')
     parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
     parser.add_argument('-i', '--include', action='append', help='add a directory to the assembler search path')
-    parser.add_argument('--include-board', choices=boards,
-        help='update the assembler search path to include feature abstractions for a given board: {}'.format(', '.join(boards)), metavar='BOARD')
     parser.add_argument('--include-chips', action='store_true', help='update the assembler search path to include common chip definitions')
     parser.add_argument('--include-peripherals', action='store_true', help='update the assembler search path to include common peripheral definitions')
     parser.add_argument('-l', '--labels', type=str, help='output resolved labels to a file')
@@ -3391,12 +3389,6 @@ def cli_main():
         if not os.path.isdir(inc_dir):
             raise SystemExit('invalid include dir: {}'.format(inc_dir))
         include_dirs.append(os.path.abspath(inc_dir))
-
-    # add board-specific feature abstractions to the search path
-    if args.include_board:
-        root = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(root, 'boards', args.include_board)
-        include_dirs.append(path)
 
     # add chip definitions to the search path
     if args.include_chips:
