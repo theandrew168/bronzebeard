@@ -1,6 +1,7 @@
 include LICENCE
 include MANIFEST.in
 include README.rst
+include setup.py
 graft bronzebeard
 graft docs
 graft examples
