@@ -42,4 +42,4 @@ Basic Usage
 -----------
 With the target device in DFU mode::
 
-  python3 -m bronzebeard.dfu 28e9:0189 bb.out
+  bronzebeard-dfu 28e9:0189 bb.out
