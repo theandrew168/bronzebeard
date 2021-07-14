@@ -1,6 +1,6 @@
 # Echo characters over serial USART (requires a USB to TTL serial cable)
 
-include gd32vf103.asm
+include ../bronzebeard/chips/GD32VF103.asm
 
 CLOCK_FREQ = 8000000  # default GD32BF103 clock freq
 USART_BAUD = 115200   # desired USART baud rate

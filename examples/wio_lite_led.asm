@@ -1,6 +1,6 @@
 # Turn on the and blue LEDs on the Wio Lite (only has the one)
 
-include gd32vf103.asm
+include ../bronzebeard/chips/GD32VF103.asm
 
 
 # jump to "main" since programs execute top to bottom

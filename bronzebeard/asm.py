@@ -3361,10 +3361,13 @@ def cli_main():
         prog='bronzebeard',
     )
     parser.add_argument('input_asm', type=str, help='input source file')
-    parser.add_argument('-b', '--board', choices=boards,
-        help='include feature abstractions for a given board: {}'.format(', '.join(boards)), metavar='BOARD')
     parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
     parser.add_argument('-i', '--include', action='append', help='add a directory to the assembler search path')
+    parser.add_argument('--include-board', choices=boards,
+        help='update the assembler search path to include feature abstractions for a given board: {}'.format(', '.join(boards)), metavar='BOARD')
+    parser.add_argument('--include-chips', action='store_true', help='update the assembler search path to include common chip definitions')
+    parser.add_argument('--include-peripherals', action='store_true', help='update the assembler search path to include common peripheral definitions')
+    parser.add_argument('-l', '--labels', type=str, help='output resolved labels to a file')
     parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
@@ -3389,10 +3392,22 @@ def cli_main():
             raise SystemExit('invalid include dir: {}'.format(inc_dir))
         include_dirs.append(os.path.abspath(inc_dir))
 
-    # add board-specific include dirs if requested
-    if args.board:
+    # add board-specific feature abstractions to the search path
+    if args.include_board:
         root = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(root, 'boards', args.board)
+        path = os.path.join(root, 'boards', args.include_board)
+        include_dirs.append(path)
+
+    # add chip definitions to the search path
+    if args.include_chips:
+        root = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(root, 'chips')
+        include_dirs.append(path)
+
+    # add peripheral definitions to the search path
+    if args.include_peripherals:
+        root = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(root, 'peripherals')
         include_dirs.append(path)
 
     constants = {}
@@ -3407,6 +3422,13 @@ def cli_main():
             log.info('constant: {:<25} = 0x{:08x} ({})'.format(k, v, v))
         for k, v in labels.items():
             log.info('label: {:<25} = 0x{:08x} ({})'.format(k, v, v))
+        for d in include_dirs:
+            log.info('search: {}'.format(d))
+
+    if args.labels:
+        lines = ['{} 0x{:08x}\n'.format(k, v) for k, v in labels.items()]
+        with open(args.labels, 'w') as f:
+            f.writelines(lines)
 
     with open(args.output, 'wb') as out_bin:
         out_bin.write(binary)

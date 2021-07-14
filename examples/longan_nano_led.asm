@@ -1,6 +1,6 @@
 # Turn on the red, green, and blue LEDs on the Longan Nano
 
-include gd32vf103.asm
+include ../bronzebeard/chips/GD32VF103.asm
 
 
 # jump to "main" since programs execute top to bottom
