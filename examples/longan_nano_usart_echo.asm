@@ -71,7 +71,7 @@ usart_init:
     sw a1, USART_BAUD_OFFSET(a0)
 
     # enable USART (enable RX, enable TX, enable USART)
-    li t0, (1 << USART_CTL0_REN_BIT) | (1 << USART_CTL0_TEN_BIT) | (1 << USART_CTL0_UEN_BIT)
+    li t0, USART_CTL0_UEN | USART_CTL0_TEN | USART_CTL0_REN
     sw t0, USART_CTL0_OFFSET(a0)
 
     ret
@@ -82,7 +82,7 @@ usart_init:
 # Ret: a1 = character received (a1 here for simpler getc + putc loops)
 getc:
     lw t0, USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0, t0, (1 << USART_STAT_RBNE_BIT)  # isolate read buffer not empty (RBNE) bit
+    andi t0, t0, USART_STAT_RBNE  # isolate read buffer not empty (RBNE) bit
     beqz t0, getc                 # keep looping until ready to recv
     lw a1, USART_DATA_OFFSET(a0)  # load char into a1
 
@@ -95,7 +95,7 @@ getc:
 # Ret: none
 putc:
     lw t0, USART_STAT_OFFSET(a0)  # load status into t0
-    andi t0, t0, (1 << USART_STAT_TBE_BIT)  # isolate transmit buffer empty (TBE) bit
+    andi t0, t0, USART_STAT_TBE   # isolate transmit buffer empty (TBE) bit
     beqz t0, putc                 # keep looping until ready to send
     sw a1, USART_DATA_OFFSET(a0)  # write char from a1
 
@@ -111,18 +111,18 @@ main:
     # enable TX pin
     li a0, GPIO_BASE_ADDR_A
     li a1, 9
-    li a2, (GPIO_CTL_OUT_ALT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
+    li a2, GPIO_CONFIG_AF_PP_50MHZ
     call gpio_init
 
     # enable RX pin
     li a0, GPIO_BASE_ADDR_A
     li a1, 10
-    li a2, (GPIO_CTL_IN_FLOATING << 2 | GPIO_MODE_IN)
+    li a2, GPIO_CONFIG_IN_FLOAT
     call gpio_init
 
     # enable USART0
     li a0, USART_BASE_ADDR_0
-    li a1, (CLOCK_FREQ // USART_BAUD)
+    li a1, CLOCK_FREQ // USART_BAUD
     call usart_init
 
 # main loop (read a char, write a char, repeat)

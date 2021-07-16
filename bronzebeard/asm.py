@@ -2077,28 +2077,28 @@ def read_lines(path_or_source, *, include=False, include_dirs=None):
         # handle include in the reader
         if raw_line.lower().startswith('include '):
             try:
-                _, path = raw_line.split()
+                _, rel_path = raw_line.split()
             except ValueError:
                 raise AssemblerError('include must specify a file', line)
 
             # bail out here if the file doesn't exist (or can't be read)
-            include_path = lookup(path, current_dirs)
+            include_path = lookup(rel_path, current_dirs)
             if include_path is None:
-                raise AssemblerError('failed to include file: {}'.format(path), line)
+                raise AssemblerError('failed to include file: {}'.format(rel_path), line)
 
             include_lines = read_lines(include_path, include=True, include_dirs=include_dirs)
             lines.extend(include_lines)
         # handle existence and size of include_bytes in the reader
         elif raw_line.lower().startswith('include_bytes '):
             try:
-                _, path = raw_line.split()
+                _, rel_path = raw_line.split()
             except ValueError:
                 raise AssemblerError('include_bytes must specify a file', line)
 
             # ensure file exists
-            include_path = lookup(path, current_dirs)
+            include_path = lookup(rel_path, current_dirs)
             if include_path is None:
-                raise AssemblerError('failed to include bytes: {}'.format(path), line)
+                raise AssemblerError('failed to include bytes: {}'.format(rel_path), line)
 
             # grab its size
             size = os.path.getsize(include_path)
@@ -3349,13 +3349,6 @@ def cli_main():
         version = 'bronzebeard {}'.format(__version__)
         raise SystemExit(version)
 
-    boards = [
-        'gd32_dev_board',
-        'hifive1_rev_b',
-        'longan_nano',
-        'wio_lite',
-    ]
-
     parser = argparse.ArgumentParser(
         description='Assemble RISC-V source code',
         prog='bronzebeard',
@@ -3405,7 +3398,8 @@ def cli_main():
     constants = {}
     labels = {}
     try:
-        binary = assemble(args.input_asm, constants=constants, labels=labels, compress=args.compress, include_dirs=include_dirs)
+        input_asm = os.path.abspath(args.input_asm)
+        binary = assemble(input_asm, constants=constants, labels=labels, compress=args.compress, include_dirs=include_dirs)
     except AssemblerError as e:
         raise SystemExit(e)
 

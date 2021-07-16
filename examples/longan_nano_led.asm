@@ -69,25 +69,25 @@ gpio_init_config:
 main:
     # enable RCU (GPIO ports A and C)
     li a0, RCU_BASE_ADDR
-    li a1, (1 << RCU_APB2EN_PAEN_BIT) | (1 << RCU_APB2EN_PCEN_BIT)
+    li a1, RCU_APB2EN_PCEN | RCU_APB2EN_PAEN
     call rcu_init
 
     # enable red LED
     li a0, GPIO_BASE_ADDR_C
     li a1, 13
-    li a2, (GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
+    li a2, GPIO_CONFIG_PP_50MHZ
     call gpio_init
 
     # enable green LED
     li a0, GPIO_BASE_ADDR_A
     li a1, 1
-    li a2, (GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
+    li a2, GPIO_CONFIG_PP_50MHZ
     call gpio_init
 
     # enable blue LED
     li a0, GPIO_BASE_ADDR_A
     li a1, 2
-    li a2, (GPIO_CTL_OUT_PUSH_PULL << 2 | GPIO_MODE_OUT_50MHZ)
+    li a2, GPIO_CONFIG_PP_50MHZ
     call gpio_init
 
     # NOTE: no need to explicitly turn the LEDs on because they are
