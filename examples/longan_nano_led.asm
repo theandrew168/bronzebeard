@@ -15,7 +15,7 @@ j main
 rcu_init:
     # store config
     sw a1, RCU_APB2EN_OFFSET(a0)
-
+rcu_init_done:
     ret
 
 
@@ -56,6 +56,7 @@ gpio_init_config:
     # store updated config
     sw t1, 0(t0)
 
+gpio_init_done:
     ret
 
 

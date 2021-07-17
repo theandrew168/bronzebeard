@@ -1,4 +1,4 @@
-# Echo characters over serial USART (requires a USB to TTL serial cable)
+# Echo characters over serial (requires a USB to UART cable)
 
 include ../bronzebeard/definitions/GD32VF103.asm
 
@@ -18,7 +18,7 @@ j main
 rcu_init:
     # store config
     sw a1, RCU_APB2EN_OFFSET(a0)
-
+rcu_init_done:
     ret
 
 
@@ -59,6 +59,7 @@ gpio_init_config:
     # store updated config
     sw t1, 0(t0)
 
+gpio_init_done:
     ret
 
 
@@ -69,11 +70,10 @@ gpio_init_config:
 usart_init:
     # store clkdiv
     sw a1, USART_BAUD_OFFSET(a0)
-
     # enable USART (enable RX, enable TX, enable USART)
     li t0, USART_CTL0_UEN | USART_CTL0_TEN | USART_CTL0_REN
     sw t0, USART_CTL0_OFFSET(a0)
-
+usart_init_done:
     ret
 
 
@@ -85,7 +85,7 @@ getc:
     andi t0, t0, USART_STAT_RBNE  # isolate read buffer not empty (RBNE) bit
     beqz t0, getc                 # keep looping until ready to recv
     lw a1, USART_DATA_OFFSET(a0)  # load char into a1
-
+getc_done:
     ret
 
 
@@ -98,14 +98,14 @@ putc:
     andi t0, t0, USART_STAT_TBE   # isolate transmit buffer empty (TBE) bit
     beqz t0, putc                 # keep looping until ready to send
     sw a1, USART_DATA_OFFSET(a0)  # write char from a1
-
+putc_done:
     ret
 
 
 main:
     # enable RCU (AFIO, GPIO port A, and USART0)
     li a0, RCU_BASE_ADDR
-    li a1, 0b0100000000000101
+    li a1, RCU_APB2EN_USART0EN | RCU_APB2EN_PAEN | RCU_APB2EN_AFEN
     call rcu_init
 
     # enable TX pin
