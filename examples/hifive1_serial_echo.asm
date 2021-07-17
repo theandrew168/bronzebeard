@@ -11,7 +11,7 @@ j main
 
 
 # Func: serial_init
-# Arg: a0 = UART baud rate
+# Arg: a0 = baud rate
 serial_init:
     # enable IOF0 for pins 16 (UART0_RX) and 17 (UART0_TX)
     li t0, GPIO_BASE_ADDR
