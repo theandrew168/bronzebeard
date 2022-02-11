@@ -306,6 +306,7 @@ def test_assemble_pseudo_instructions(pseudo, transformed):
     ('slli x1 x1 1',   'c.slli x1 1'),
     ('lw x1 0(x2)',    'c.lwsp x1 0'),
     ('jalr x0 0(x1)',  'c.jr x1'),
+    ('addi x1 x2 0',   'c.mv x1 x2'),
     ('add x1 x0 x2',   'c.mv x1 x2'),
     ('ebreak',         'c.ebreak'),
     ('jalr x1 0(x1)',  'c.jalr x1'),
