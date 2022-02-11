@@ -239,7 +239,7 @@ def test_assemble_alternate_offset_syntax_compressed():
     ('li t0 0xffffffff', 'addi t0 x0 %lo(0xffffffff)'),
     ('li t0 -2048',      'addi t0 x0 %lo(-2048)'),
     ('li t0 2047',       'addi t0 x0 %lo(2047)'),
-    ('li t0 0x4000',     'lui t0 %hi(0x4000)'),
+    ('li t0 0x4000',     'lui t0 %hi(0x4000)\n addi t0 t0 0'),
     ('li t0 -2049',      'lui t0 %hi(-2049)\n addi t0 t0 %lo(-2049)'),
     ('li t0 2048',       'lui t0 %hi(2048)\n addi t0 t0 %lo(2048)'),
     ('mv t0 t1',         'addi t0 t1 0'),

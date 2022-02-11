@@ -2545,6 +2545,9 @@ def resolve_register_aliases(items, constants):
 
 def transform_compressible(items, constants, labels):
 
+    # signature of inner functions:
+    # inner(instruction, position, env)
+
     def NameEquals(value):
         def inner(i, p, e):
             return i.name == value
@@ -2925,11 +2928,6 @@ def transform_pseudo_instructions(items, constants, labels):
             value = c_int32(value).value  # signed imm
             if value >= (-2**11) and value <= (2**11 - 1):
                 inst = ITypeInstruction(item.line, 'addi', rd=rd, rs1='x0', imm=Lo(imm))
-                # shrink all subsequent labels by 4
-                new_labels = {k: v - 4 for k, v in labels.items() if v > position}
-                labels.update(new_labels)
-            elif (value & 0xfff) == 0:
-                inst = UTypeInstruction(item.line, 'lui', rd=rd, imm=Hi(imm))
                 # shrink all subsequent labels by 4
                 new_labels = {k: v - 4 for k, v in labels.items() if v > position}
                 labels.update(new_labels)
