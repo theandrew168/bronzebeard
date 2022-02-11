@@ -2778,7 +2778,7 @@ def transform_compressible(items, constants, labels):
             RegEquals('rs1', 0),
             RegNotEquals('rs2', 0),
         ],
-        'c.mv.alt': [
+        'c.mv_alt': [
             NameEquals('addi'),
             RegNotEquals('rd', 0),
             RegNotEquals('rs1', 0),
@@ -2876,8 +2876,9 @@ def transform_compressible(items, constants, labels):
                 inst = CRJTypeInstruction(item.line, compressed, item.rs1, item.is_auipc_jump)
             elif compressed == 'c.mv':
                 inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs2)
-            elif compressed == 'c.mv.alt':
-                inst = CRTypeInstruction(item.line, 'c.mv', item.rd, item.rs1)
+            elif compressed == 'c.mv_alt':
+                compressed = 'c.mv'
+                inst = CRTypeInstruction(item.line, compressed, item.rd, item.rs1)
             elif compressed == 'c.ebreak':
                 inst = CRETypeInstruction(item.line, compressed)
             elif compressed == 'c.jalr':
