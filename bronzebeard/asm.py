@@ -3360,13 +3360,14 @@ def cli_main():
         description='Assemble RISC-V source code',
         prog='bronzebeard',
     )
-    parser.add_argument('input_asm', type=str, help='input source file')
-    parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
-    parser.add_argument('-i', '--include', action='append', help='add a directory to the assembler search path')
-    parser.add_argument('--include-definitions', action='store_true', help='update the assembler search path to include common chip and peripheral definitions')
-    parser.add_argument('-l', '--labels', type=str, help='output resolved labels to a file')
-    parser.add_argument('-o', '--output', type=str, default='bb.out', help='output binary file (default "bb.out")')
+    parser.add_argument('input_asm', help='input source file')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose assembler output')
+    parser.add_argument('-c', '--compress', action='store_true', help='identify and compress eligible instructions')
+    parser.add_argument('-i', '--include', metavar='DIR', action='append', help='add a directory to the assembler search path')
+    parser.add_argument('-o', '--output', metavar='FILE', default='bb.out', help='output binary file (default "bb.out")')
+    parser.add_argument('-l', '--labels', metavar='FILE', help='output resolved labels and their addresses')
+    parser.add_argument('--hex-offset', metavar='OFFSET', help='output an additional Intel HEX file with the given offset')
+    parser.add_argument('--include-definitions', action='store_true', help='update the assembler search path to include common chip and peripheral definitions')
     parser.add_argument('--version', action='store_true', help='print assembler version and exit')
     args = parser.parse_args()
 
@@ -3418,6 +3419,17 @@ def cli_main():
 
     with open(args.output, 'wb') as out_bin:
         out_bin.write(binary)
+
+    # output an additional file in the Intel HEX format at the given offset
+    if args.hex_offset:
+        from intelhex import bin2hex
+
+        try:
+            offset = int(args.hex_offset, base=0)
+        except:
+            raise SystemExit('invalid hex offset: {}'.format(args.hex_offset))
+
+        bin2hex(args.output, args.output + '.hex', offset)
 
 
 if __name__ == '__main__':

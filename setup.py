@@ -21,6 +21,7 @@ setup(
     packages=['bronzebeard'],
     include_package_data=True,
     install_requires=[
+        'intelhex',
         'pyserial',
         'pyusb',
     ],
