@@ -22,16 +22,9 @@ def test_fence_i(rd, rs1, imm, code):
 
 @pytest.mark.parametrize(
     'source,            expected', [
-    ('fence.i x0  x0  0', asm.FENCE_I('x0',  'x0',  0)),
-    ('fence.i x0  x0  1', asm.FENCE_I('x0',  'x0',  1)),
-    ('fence.i x31 x0  0', asm.FENCE_I('x31', 'x0',  0)),
-    ('fence.i x0  x31 0', asm.FENCE_I('x0',  'x31', 0)),
-    ('fence.i x31 x31 0', asm.FENCE_I('x31', 'x31', 0)),
-    ('fence.i x31 x0  1', asm.FENCE_I('x31', 'x0',  1)),
-    ('fence.i x0  x31 1', asm.FENCE_I('x0',  'x31', 1)),
-    ('fence.i x31 x31 1', asm.FENCE_I('x31', 'x31', 1)),
+    ('fence.i x0 x1 0', asm.FENCE_I('x0', 'x1', 0)),
 ])
-def test_assemble_ext_a(source, expected):
+def test_assemble_ext_zifencei(source, expected):
     binary = asm.assemble(source)
     target = struct.pack('<I', expected)
     assert binary == target

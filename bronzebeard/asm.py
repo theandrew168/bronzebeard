@@ -755,6 +755,14 @@ EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=
 # RV32/RV64 "Zifencei" Instruction-Fetch Fence
 FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001)
 
+# RV32/RV64 "Zicsr" Control and Status Register (CSR) Instructions
+CSRRW      = partial(i_type,   opcode=0b1110011, funct3=0b001)
+CSRRS      = partial(i_type,   opcode=0b1110011, funct3=0b010)
+CSRRC      = partial(i_type,   opcode=0b1110011, funct3=0b011)
+CSRRWI     = partial(i_type,   opcode=0b1110011, funct3=0b101)
+CSRRSI     = partial(i_type,   opcode=0b1110011, funct3=0b110)
+CSRRCI     = partial(i_type,   opcode=0b1110011, funct3=0b111)
+
 # RV32M Standard Extension for Integer Multiplication and Division
 MUL        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0000001)
 MULH       = partial(r_type,   opcode=0b0110011, funct3=0b001, funct7=0b0000001)
@@ -846,6 +854,12 @@ I_TYPE_INSTRUCTIONS = {
     'ori':        ORI,
     'andi':       ANDI,
     'fence.i':    FENCE_I,
+    'csrrw':      CSRRW,
+    'csrrs':      CSRRS,
+    'csrrc':      CSRRC,
+    'csrrwi':     CSRRWI,
+    'csrrsi':     CSRRSI,
+    'csrrci':     CSRRCI,
 }
 
 IE_TYPE_INSTRUCTIONS = {
