@@ -752,6 +752,9 @@ FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0
 ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
 EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
 
+# RV32/RV64 "Zifencei" Instruction-Fetch Fence
+FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001)
+
 # RV32M Standard Extension for Integer Multiplication and Division
 MUL        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0000001)
 MULH       = partial(r_type,   opcode=0b0110011, funct3=0b001, funct7=0b0000001)
@@ -842,6 +845,7 @@ I_TYPE_INSTRUCTIONS = {
     'xori':       XORI,
     'ori':        ORI,
     'andi':       ANDI,
+    'fence.i':    FENCE_I,
 }
 
 IE_TYPE_INSTRUCTIONS = {
