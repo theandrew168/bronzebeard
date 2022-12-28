@@ -24,6 +24,6 @@ jobs:
         pip install wheel
         pip install pytest
         pip install -e .
-    - name: test ${{ matrix.os }} - ${{ matrix-python-version }}
+    - name: test ${{ matrix.os }} - ${{ matrix.python-version }}
       run: |
         pytest
