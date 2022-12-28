@@ -753,7 +753,7 @@ ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=
 EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
 
 # RV32/RV64 "Zifencei" Instruction-Fetch Fence
-FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001)
+FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001, rd=0, rs1=0, imm=0)  # special syntax
 
 # RV32/RV64 "Zicsr" Control and Status Register (CSR) Instructions
 CSRRW      = partial(i_type,   opcode=0b1110011, funct3=0b001)
@@ -853,7 +853,6 @@ I_TYPE_INSTRUCTIONS = {
     'xori':       XORI,
     'ori':        ORI,
     'andi':       ANDI,
-    'fence.i':    FENCE_I,
     'csrrw':      CSRRW,
     'csrrs':      CSRRS,
     'csrrc':      CSRRC,
@@ -865,6 +864,7 @@ I_TYPE_INSTRUCTIONS = {
 IE_TYPE_INSTRUCTIONS = {
     'ecall':      ECALL,
     'ebreak':     EBREAK,
+    'fence.i':    FENCE_I,
 }
 
 S_TYPE_INSTRUCTIONS = {
@@ -1577,7 +1577,7 @@ class ITypeInstruction(Instruction):
         return [self.rd, self.rs1, self.imm]
 
 
-# custom syntax for: ecall, ebreak
+# custom syntax for: ecall, ebreak, fence.i
 class IETypeInstruction(Instruction):
 
     def __init__(self, line, name):

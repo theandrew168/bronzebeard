@@ -211,3 +211,26 @@ Instruction                       Description
 :code:`c.add rd/rs1!=0, rs2!=0`   add :code:`rs2` to :code:`rd/rs1` and store into :code:`rd/rs1`
 :code:`c.swsp rs2, uimm`          store 32-bit value from :code:`rs2` into addr in :code:`x2/sp` plus 6-bit MO4 :code:`uimm`
 ================================  ===========
+
+"Zifencei" Standard Extension
+-----------------------------
+
+===============  ===========
+Instruction      Description
+===============  ===========
+:code:`fence.i`  synchronize the instruction and data streams
+===============  ===========
+
+"Zicsr" Standard Extension
+--------------------------
+
+============================  ===========
+Instruction                   Description
+============================  ===========
+:code:`csrrw rd, rs1, csr`    atomically swap values in CSRs
+:code:`csrrs rd, rs1, csr`    atomically read and set bits in CSRs
+:code:`csrrc rd, rs1, csr`    atomically read and clear bits in CSRs
+:code:`csrrwi rd, uimm, csr`  atomically swap values in CSRs (immediate)
+:code:`csrrsi rd, uimm, csr`  atomically read and set bits in CSRs (immediate)
+:code:`csrrci rd, uimm, csr`  atomically read and clear bits in CSRs (immediate)
+============================  ===========

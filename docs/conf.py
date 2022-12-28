@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'bronzebeard'
-copyright = '2021, Andrew Dailey'
+copyright = '2022, Andrew Dailey'
 author = 'Andrew Dailey'
 
 # The full version, including alpha/beta/rc tags
