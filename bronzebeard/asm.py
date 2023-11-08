@@ -2093,9 +2093,12 @@ def read_lines(path_or_source, *, include=False, include_dirs=None):
         line = Line(path, i, raw_line)
 
         # handle include in the reader
+        # Note that includes are processed before comment stripping, so any trailing
+        # comments on the include line need special processing
         if raw_line.lower().startswith('include '):
             try:
-                _, rel_path = raw_line.split()
+                rel_path, _ = raw_line[8:].split('#')
+                rel_path = rel_path.strip()
             except ValueError:
                 raise AssemblerError('include must specify a file', line)
 
