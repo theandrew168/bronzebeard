@@ -16,14 +16,14 @@ def test_read_assembly():
 
 
 def test_lex_assembly():
-    line = r'addi t0 zero 1'
+    line = r'addi t0 zero 1# comment'
     tokens = asm.lex_tokens(line)
     assert len(tokens) == 4
     assert tokens.tokens == ['addi', 't0', 'zero', '1']
 
 
 def test_parse_assembly():
-    line = r'addi t0 zero 1'
+    line = r'addi t0 zero 1 # comment'
     tokens = asm.lex_tokens(line)
     item = asm.parse_item(tokens)
     assert isinstance(item, asm.ITypeInstruction)

@@ -2095,7 +2095,12 @@ def read_lines(path_or_source, *, include=False, include_dirs=None):
         # handle include in the reader
         if raw_line.lower().startswith('include '):
             try:
-                _, rel_path = raw_line.split()
+                # strip any comments from the include line
+                raw_include = re.sub(r'#.*$', r'', raw_line)
+                # isolate the path
+                _, rel_path = raw_include.split()
+                # strip any leading / trailing quotes
+                rel_path = rel_path.strip('"\'')
             except ValueError:
                 raise AssemblerError('include must specify a file', line)
 
@@ -2155,7 +2160,7 @@ def lex_tokens(line):
         return LineTokens(line, tokens)
 
     # strip comments
-    contents = re.sub(r'#.*$', r'', line.contents, flags=re.MULTILINE)
+    contents = re.sub(r'#.*$', r'', line.contents)
 
     # pad parens before split
     contents = contents.replace('(', ' ( ').replace(')', ' ) ')
