@@ -124,6 +124,8 @@ Instruction                  Description
 :code:`fence succ, pred`     order device I/O and memory accesses
 :code:`ecall`                make a service request to the execution environment
 :code:`ebreak`               return control to a debugging environment
+:code:`mret`                 return execution from a trap
+:code:`wfi`                  wait for interrupt
 ===========================  ===========
 
 RV32M Standard Extension

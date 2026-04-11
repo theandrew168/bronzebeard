@@ -574,10 +574,14 @@ def test_fence(succ, pred, code):
 def test_ecall():
     assert asm.ECALL() == 0b00000000000000000000000001110011
 
-
 def test_ebreak():
     assert asm.EBREAK() == 0b00000000000100000000000001110011
 
+def test_wfi():
+    assert asm.WFI() == 0b0001000_00101_0000000000000_1110011
+
+def test_mret():
+    assert asm.MRET() == 0b0011000_00010_0000000000000_1110011
 
 @pytest.mark.parametrize(
     'source,           expected', [

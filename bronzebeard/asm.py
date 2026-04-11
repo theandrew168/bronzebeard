@@ -751,6 +751,8 @@ AND        = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000000)
 FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax*
 ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
 EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
+MRET       = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0b001100000010)  # special syntax
+WFI        = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0b000100000101)  # special syntax
 
 # RV32/RV64 "Zifencei" Instruction-Fetch Fence
 FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001, rd=0, rs1=0, imm=0)  # special syntax
@@ -864,6 +866,8 @@ I_TYPE_INSTRUCTIONS = {
 IE_TYPE_INSTRUCTIONS = {
     'ecall':      ECALL,
     'ebreak':     EBREAK,
+    'mret':       MRET,
+    'wfi':        WFI,
     'fence.i':    FENCE_I,
 }
 
@@ -2460,16 +2464,29 @@ def parse_item(line_tokens):
         return CATypeInstruction(line, name, rd_rs1, rs2)
     # cb-type instructions
     elif head in CB_TYPE_INSTRUCTIONS:
-        name, rs1, *imm = tokens
+        if len(tokens) != 3:
+            raise AssemblerError('cb-type instructions require exactly 3 args', line)
+        name, rs1, reference = tokens
         name = name.lower()
+        if is_int(reference):
+            imm = [reference]
+        else:
+            imm = ['%offset', reference]
         imm = parse_immediate(imm, line)
         return CBTypeInstruction(line, name, rs1, imm)
     # cj-type instructions
     elif head in CJ_TYPE_INSTRUCTIONS:
-        name, *imm = tokens
+        if len(tokens) != 2:
+            raise AssemblerError('cj-type instructions require exactly 2 args', line)
+        name, reference = tokens
         name = name.lower()
+        if is_int(reference):
+            imm = [reference]
+        else:
+            imm = ['%offset', reference]
         imm = parse_immediate(imm, line)
         return CJTypeInstruction(line, name, imm)
+
     # pseudo instructions
     elif head in PSEUDO_INSTRUCTIONS:
         name, *args = tokens
