@@ -163,6 +163,7 @@ def r_type(rd, rs1, rs2, *, opcode, funct3, funct7):
 
     return code
 
+
 # r-type variation for privileged instructions
 def rp_type(rs1, rs2, *, rd, opcode, funct3, funct7):
     rd = lookup_register(rd)
@@ -832,15 +833,15 @@ C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero, 
 C_SWSP     = partial(css_type, opcode=0b10, funct3=0b110)
 
 # RV32 Priv: Trap-Return Instructions
-SRET  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0001000)  # special syntax
-MRET  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0011000)  # special syntax
-MNRET = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0111000)  # special syntax
+SRET  = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b000100000010)  # special syntax
+MRET  = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b001100000010)  # special syntax
+MNRET = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b011100000010)  # special syntax
 
 # RV32 Priv: Interrupt-Management Instructions
-WFI = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00101, funct7=0b0001000)  # special syntax
+WFI = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b000100000101)  # special syntax
 
 # RV32 Priv: Control Transfer Records Management Instructions
-SCTRCLR = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00100, funct7=0b0001000)  # special syntax
+SCTRCLR = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b000100000100)  # special syntax
 
 # RV32 Priv: Supervisor Memory-Management Instructions
 SFENCE_VMA = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000,funct7=0b0001001)  # special syntax
@@ -863,8 +864,8 @@ HSV_W   = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b100, funct7=0b011010
 
 # RV32 Priv: Svinval Memory-Management Extension
 SINVAL_VMA      = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0001011)  # special syntax
-SFENCE_W_INVAL  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0, funct7=0b0001100)  # special syntax
-SFENCE_INVAL_IR = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=1, funct7=0b0001100)  # special syntax
+SFENCE_W_INVAL  = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b000110000000)  # special syntax
+SFENCE_INVAL_IR = partial(i_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, imm=0b000110000001)  # special syntax
 HINVAL_VVMA     = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0010011)  # special syntax
 HINVAL_GVMA     = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0110011)  # special syntax
 
@@ -892,6 +893,19 @@ R_TYPE_INSTRUCTIONS = {
     'remu':   REMU,
 }
 
+RP_TYPE_INSTRUCTIONS = {
+    # Privileged Instructions
+    'sfence.vma':  SFENCE_VMA,
+    'hfence.vvma': HFENCE_VVMA,
+    'hfence.gvma': HFENCE_GVMA,
+    'hsv.b':       HSV_B,
+    'hsv.h':       HSV_H,
+    'hsv.w':       HSV_W,
+    'sinval.vma':  SINVAL_VMA,
+    'hinval.vvma': HINVAL_VVMA,
+    'hinval.gvma': HINVAL_GVMA,
+}
+
 I_TYPE_INSTRUCTIONS = {
     'jalr':   JALR,
     'lb':     LB,
@@ -913,10 +927,30 @@ I_TYPE_INSTRUCTIONS = {
     'csrrci': CSRRCI,
 }
 
+IP_TYPE_INSTRUCTIONS = {
+    # Privileged Instructions
+    'hlv.b':   HLV_B,
+    'hlv.bu':  HLV_BU,
+    'hlv.h':   HLV_H,
+    'hlv.hu':  HLV_HU,
+    'hlv.w':   HLV_W,
+    'hlvx.hu': HLVX_HU,
+    'hlvx.wu': HLVX_WU,
+}
+
 IE_TYPE_INSTRUCTIONS = {
     'ecall':   ECALL,
     'ebreak':  EBREAK,
     'fence.i': FENCE_I,
+
+    # Privileged Instructions
+    'sret':            SRET,
+    'mret':            MRET,
+    'mnret':           MNRET,
+    'wfi':             WFI,
+    'sctrclr':         SCTRCLR,
+    'sfence.w.inval':  SFENCE_W_INVAL,
+    'sfence.inval.ir': SFENCE_INVAL_IR,
 }
 
 S_TYPE_INSTRUCTIONS = {
@@ -1030,41 +1064,11 @@ CJ_TYPE_INSTRUCTIONS = {
     'c.j':   C_J,
 }
 
-PRIV_INSTRUCTIONS = {
-    'sret': SRET,
-    'mret': MRET,
-    'mnret': MNRET,
-
-    'wfi': WFI,
-
-    'sctrclr': SCTRCLR,
-
-    'sfence.vma': SFENCE_VMA,
-
-    'hfence.vvma': HFENCE_VVMA,
-    'hfence.gvma': HFENCE_GVMA,
-
-    'hlv.b':   HLV_B,
-    'hlv.bu':  HLV_BU,
-    'hlv.h':   HLV_H,
-    'hlv.hu':  HLV_HU,
-    'hlv.w':   HLV_W,
-    'hlvx.hu': HLVX_HU,
-    'hlvx.wu': HLVX_WU,
-    'hsv.b':   HSV_B,
-    'hsv.h':   HSV_H,
-    'hsv.w':   HSV_W,
-
-    'sinval.vma':      SINVAL_VMA,
-    'sfence.w.inval':  SFENCE_W_INVAL,
-    'sfence.inval.ir': SFENCE_INVAL_IR,
-    'hinval.vvma':     HINVAL_VVMA,
-    'hinval.gvma':     HINVAL_GVMA,
-}
-
 INSTRUCTIONS = {}
 INSTRUCTIONS.update(R_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(RP_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(I_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(IP_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(IE_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(S_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(B_TYPE_INSTRUCTIONS)
@@ -1086,7 +1090,6 @@ INSTRUCTIONS.update(CS_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CA_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
-INSTRUCTIONS.update(PRIV_INSTRUCTIONS)
 
 PSEUDO_INSTRUCTIONS = {
     'nop',
@@ -1638,6 +1641,29 @@ class RTypeInstruction(Instruction):
         return [self.rd, self.rs1, self.rs2]
 
 
+# custom syntax for privileged instructions
+class RPTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rs1, rs2):
+        super().__init__(line)
+        self.name = name
+        self.rs1 = rs1
+        self.rs2 = rs2
+
+    def __repr__(self):
+        s = '{}({!r}, rs1={!r}, rs2={!r})'
+        s = s.format(type(self).__name__, self.name, self.rs1, self.rs2)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rs1, self.rs2)
+        return s
+
+    def args(self):
+        return [self.rs1, self.rs2]
+
+
 class ITypeInstruction(Instruction):
 
     def __init__(self, line, name, rd, rs1, imm, is_auipc_jump=False):
@@ -1660,6 +1686,29 @@ class ITypeInstruction(Instruction):
 
     def args(self):
         return [self.rd, self.rs1, self.imm]
+
+
+# custom syntax for privileged instructions
+class IPTypeInstruction(Instruction):
+
+    def __init__(self, line, name, rd, rs1):
+        super().__init__(line)
+        self.name = name
+        self.rd = rd
+        self.rs1 = rs1
+
+    def __repr__(self):
+        s = '{}({!r}, rd={!r}, rs1={!r})'
+        s = s.format(type(self).__name__, self.name, self.rd, self.rs1)
+        return s
+
+    def __str__(self):
+        s = '{} {}, {}'
+        s = s.format(self.name, self.rd, self.rs1)
+        return s
+
+    def args(self):
+        return [self.rd, self.rs1]
 
 
 # custom syntax for: ecall, ebreak, fence.i
@@ -2361,6 +2410,13 @@ def parse_item(line_tokens):
         name, rd, rs1, rs2 = tokens
         name = name.lower()
         return RTypeInstruction(line, name, rd, rs1, rs2)
+    # rp-type instructions
+    elif head in RP_TYPE_INSTRUCTIONS:
+        if len(tokens) != 3:
+            raise AssemblerError('rp-type instructions require exactly 2 args', line)
+        name, rs1, rs2 = tokens
+        name = name.lower()
+        return RPTypeInstruction(line, name, rs1, rs2)
     # i-type instructions
     elif head in I_TYPE_INSTRUCTIONS:
         # check for jalr PI
@@ -2376,6 +2432,13 @@ def parse_item(line_tokens):
         name = name.lower()
         imm = parse_immediate(imm, line)
         return ITypeInstruction(line, name, rd, rs1, imm)
+    # ip-type instructions
+    elif head in IP_TYPE_INSTRUCTIONS:
+        if len(tokens) != 3:
+            raise AssemblerError('ip-type instructions require exactly 2 args', line)
+        name, rd, rs1 = tokens
+        name = name.lower()
+        return IPTypeInstruction(line, name, rd, rs1)
     # ie-type instructions
     elif head in IE_TYPE_INSTRUCTIONS:
         name, = tokens
@@ -2567,7 +2630,6 @@ def parse_item(line_tokens):
             imm = ['%offset', reference]
         imm = parse_immediate(imm, line)
         return CJTypeInstruction(line, name, imm)
-
     # pseudo instructions
     elif head in PSEUDO_INSTRUCTIONS:
         name, *args = tokens

@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 
 from bronzebeard import asm
@@ -205,3 +207,33 @@ def test_hinval_vvma(rs1, rs2, code):
 ])
 def test_hinval_gvma(rs1, rs2, code):
     assert asm.HINVAL_GVMA(rs1, rs2) == code
+
+
+@pytest.mark.parametrize(
+    'source,              expected', [
+    ('sret',              asm.SRET()),
+    ('mret',              asm.MRET()),
+    ('mnret',             asm.MNRET()),
+    ('wfi',               asm.WFI()),
+    ('sctrclr',           asm.SCTRCLR()),
+    ('sfence.vma x0 x1',  asm.SFENCE_VMA('x0', 'x1')),
+    ('hfence.vvma x0 x1', asm.HFENCE_VVMA('x0', 'x1')),
+    ('hfence.gvma x0 x1', asm.HFENCE_GVMA('x0', 'x1')),
+    ('hlv.b x0 x1',       asm.HLV_B('x0', 'x1')),
+    ('hlv.bu x0 x1',      asm.HLV_BU('x0', 'x1')),
+    ('hlv.h x0 x1',       asm.HLV_H('x0', 'x1')),
+    ('hlv.hu x0 x1',      asm.HLV_HU('x0', 'x1')),
+    ('hlv.w x0 x1',       asm.HLV_W('x0', 'x1')),
+    ('hlvx.hu x0 x1',     asm.HLVX_HU('x0', 'x1')),
+    ('hlvx.wu x0 x1',     asm.HLVX_WU('x0', 'x1')),
+    ('hsv.b x0 x1',       asm.HSV_B('x0', 'x1')),
+    ('hsv.h x0 x1',       asm.HSV_H('x0', 'x1')),
+    ('hsv.w x0 x1',       asm.HSV_W('x0', 'x1')),
+    ('sinval.vma x0 x1',  asm.SINVAL_VMA('x0', 'x1')),
+    ('sfence.w.inval',    asm.SFENCE_W_INVAL()),
+    ('sfence.inval.ir',   asm.SFENCE_INVAL_IR()),
+])
+def test_assemble_priv(source, expected):
+    binary = asm.assemble(source)
+    target = struct.pack('<I', expected)
+    assert binary == target
