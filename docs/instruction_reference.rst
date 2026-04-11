@@ -240,30 +240,30 @@ Instruction                   Description
 RV32 Privileged Instruction Set
 -------------------------------
 
-===========================  ===========
-Instruction                  Description
-===========================  ===========
-:code:`sret`                 return execution from a supervisor-mode trap
-:code:`mret`                 return execution from a machine-mode trap
-:code:`mnret`                return execution from an RNMI handler
-:code:`wfi`                  wait for interrupt
-:code:`sctrclr`              clear recorded branch/control transfer history
-:code:`sfence.vma rs1, rs2`  synchronize updates to in-memory memory-management data structures
-:code:`hfence.vvma rs1, rs2` flush local address translation caches
-:code:`hfence.gvma rs1, rs2` flush guest address translation caches
-:code:`hlv.b rd, rs1`        load signed byte from a virtual machine's memory
-:code:`hlv.bu rd, rs1`       load unsigned byte from a virtual machine's memory
-:code:`hlv.h rd, rs1`        load signed halfword from a virtual machine's memory
-:code:`hlv.hu rd, rs1`       load unsigned halfword from a virtual machine's memory
-:code:`hlv.w rd, rs1`        load signed word from a virtual machine's memory
-:code:`hlvx.hu rd, rs1`      load unsigned halfword from a virtual machine's memory (executable)
-:code:`hlvx.wu rd, rs1`      load unsigned word from a virtual machine's memory (executable)
-:code:`hsv.b rs1, rs2`       store byte to a virtual machine's memory
-:code:`hsv.h rs1, rs2`       store halfword to a virtual machine's memory
-:code:`hsv.w rs1, rs2`       store word to a virtual machine's memory
-:code:`sinval.vma rs1, rs2`  invalidates translation entries for specific virtual addresses and ASIDs
-:code:`sfence.w.inval`       manages ordering between page table updates and cache invalidation
-:code:`sfence.inval.ir`      guarantees that TLB invalidations are observed before new page table entries are used
-:code:`hinval.vvma`          invalidate virtual address translation entries within a hypervisor context
-:code:`hinval.gvma`          invalidate guest address translation entries within a hypervisor context
-===========================  ===========
+============================  ===========
+Instruction                   Description
+============================  ===========
+:code:`sret`                  return execution from a supervisor-mode trap
+:code:`mret`                  return execution from a machine-mode trap
+:code:`mnret`                 return execution from an RNMI handler
+:code:`wfi`                   wait for interrupt
+:code:`sctrclr`               clear recorded branch/control transfer history
+:code:`sfence.vma rs1, rs2`   synchronize updates to in-memory memory-management data structures
+:code:`hfence.vvma rs1, rs2`  flush local address translation caches
+:code:`hfence.gvma rs1, rs2`  flush guest address translation caches
+:code:`hlv.b rd, rs1`         load signed byte from a virtual machine's memory
+:code:`hlv.bu rd, rs1`        load unsigned byte from a virtual machine's memory
+:code:`hlv.h rd, rs1`         load signed halfword from a virtual machine's memory
+:code:`hlv.hu rd, rs1`        load unsigned halfword from a virtual machine's memory
+:code:`hlv.w rd, rs1`         load signed word from a virtual machine's memory
+:code:`hlvx.hu rd, rs1`       load unsigned halfword from a virtual machine's memory (executable)
+:code:`hlvx.wu rd, rs1`       load unsigned word from a virtual machine's memory (executable)
+:code:`hsv.b rs1, rs2`        store byte to a virtual machine's memory
+:code:`hsv.h rs1, rs2`        store halfword to a virtual machine's memory
+:code:`hsv.w rs1, rs2`        store word to a virtual machine's memory
+:code:`sinval.vma rs1, rs2`   invalidates translation entries for specific virtual addresses and ASIDs
+:code:`sfence.w.inval`        manages ordering between page table updates and cache invalidation
+:code:`sfence.inval.ir`       guarantees that TLB invalidations are observed before new page table entries are used
+:code:`hinval.vvma`           invalidate virtual address translation entries within a hypervisor context
+:code:`hinval.gvma`           invalidate guest address translation entries within a hypervisor context
+============================  ===========
