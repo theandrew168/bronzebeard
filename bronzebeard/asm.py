@@ -2615,6 +2615,7 @@ def parse_item(line_tokens):
         if is_int(reference):
             imm = [reference]
         else:
+            # behavior is "offset" for jumps to labels
             imm = ['%offset', reference]
         imm = parse_immediate(imm, line)
         return CBTypeInstruction(line, name, rs1, imm)
@@ -2627,6 +2628,7 @@ def parse_item(line_tokens):
         if is_int(reference):
             imm = [reference]
         else:
+            # behavior is "offset" for jumps to labels
             imm = ['%offset', reference]
         imm = parse_immediate(imm, line)
         return CJTypeInstruction(line, name, imm)

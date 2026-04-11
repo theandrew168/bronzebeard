@@ -192,6 +192,27 @@ def test_assemble_labels_and_jumps():
     assert binary == target
 
 
+def test_assemble_compressed_labels_and_jumps():
+    source = r"""
+    start:
+        c.j end
+        c.jal end
+        c.nop
+    end:
+        c.beqz x8 start
+        c.bnez x8 start
+    """
+    binary = asm.assemble(source)
+    target = b''.join(struct.pack('<H', inst) for inst in [
+        asm.C_J(6),
+        asm.C_JAL(4),
+        asm.C_NOP(),
+        asm.C_BEQZ('x8', -6),
+        asm.C_BNEZ('x8', -8),
+    ])
+    assert binary == target
+
+
 def test_assemble_alternate_offset_syntax():
     source = r"""
     jalr x0, x1, 0
