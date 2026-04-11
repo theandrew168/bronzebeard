@@ -163,6 +163,22 @@ def r_type(rd, rs1, rs2, *, opcode, funct3, funct7):
 
     return code
 
+# r-type variation for privileged instructions
+def rp_type(rs1, rs2, *, rd, opcode, funct3, funct7):
+    rd = lookup_register(rd)
+    rs1 = lookup_register(rs1)
+    rs2 = lookup_register(rs2)
+
+    code = 0
+    code |= opcode
+    code |= rd << 7
+    code |= funct3 << 12
+    code |= rs1 << 15
+    code |= rs2 << 20
+    code |= funct7 << 25
+
+    return code
+
 
 def i_type(rd, rs1, imm, *, opcode, funct3):
     rd = lookup_register(rd)
@@ -711,82 +727,80 @@ def cj_type(imm, *, opcode, funct3, cs=None):
 
 
 # RV32I Base Integer Instruction Set
-LUI        = partial(u_type,   opcode=0b0110111)
-AUIPC      = partial(u_type,   opcode=0b0010111)
-JAL        = partial(j_type,   opcode=0b1101111)
-JALR       = partial(ij_type,  opcode=0b1100111, funct3=0b000)
-BEQ        = partial(b_type,   opcode=0b1100011, funct3=0b000)
-BNE        = partial(b_type,   opcode=0b1100011, funct3=0b001)
-BLT        = partial(b_type,   opcode=0b1100011, funct3=0b100)
-BGE        = partial(b_type,   opcode=0b1100011, funct3=0b101)
-BLTU       = partial(b_type,   opcode=0b1100011, funct3=0b110)
-BGEU       = partial(b_type,   opcode=0b1100011, funct3=0b111)
-LB         = partial(i_type,   opcode=0b0000011, funct3=0b000)
-LH         = partial(i_type,   opcode=0b0000011, funct3=0b001)
-LW         = partial(i_type,   opcode=0b0000011, funct3=0b010)
-LBU        = partial(i_type,   opcode=0b0000011, funct3=0b100)
-LHU        = partial(i_type,   opcode=0b0000011, funct3=0b101)
-SB         = partial(s_type,   opcode=0b0100011, funct3=0b000)
-SH         = partial(s_type,   opcode=0b0100011, funct3=0b001)
-SW         = partial(s_type,   opcode=0b0100011, funct3=0b010)
-ADDI       = partial(i_type,   opcode=0b0010011, funct3=0b000)
-SLTI       = partial(i_type,   opcode=0b0010011, funct3=0b010)
-SLTIU      = partial(i_type,   opcode=0b0010011, funct3=0b011)
-XORI       = partial(i_type,   opcode=0b0010011, funct3=0b100)
-ORI        = partial(i_type,   opcode=0b0010011, funct3=0b110)
-ANDI       = partial(i_type,   opcode=0b0010011, funct3=0b111)
-SLLI       = partial(r_type,   opcode=0b0010011, funct3=0b001, funct7=0b0000000)
-SRLI       = partial(r_type,   opcode=0b0010011, funct3=0b101, funct7=0b0000000)
-SRAI       = partial(r_type,   opcode=0b0010011, funct3=0b101, funct7=0b0100000)
-ADD        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0000000)
-SUB        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0100000)
-SLL        = partial(r_type,   opcode=0b0110011, funct3=0b001, funct7=0b0000000)
-SLT        = partial(r_type,   opcode=0b0110011, funct3=0b010, funct7=0b0000000)
-SLTU       = partial(r_type,   opcode=0b0110011, funct3=0b011, funct7=0b0000000)
-XOR        = partial(r_type,   opcode=0b0110011, funct3=0b100, funct7=0b0000000)
-SRL        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0000000)
-SRA        = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0100000)
-OR         = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000000)
-AND        = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000000)
-FENCE      = partial(fence,    opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax*
-ECALL      = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
-EBREAK     = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
-MRET       = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0b001100000010)  # special syntax
-WFI        = partial(i_type,   opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0b000100000101)  # special syntax
+LUI    = partial(u_type, opcode=0b0110111)
+AUIPC  = partial(u_type, opcode=0b0010111)
+JAL    = partial(j_type, opcode=0b1101111)
+JALR   = partial(ij_type,opcode=0b1100111, funct3=0b000)
+BEQ    = partial(b_type, opcode=0b1100011, funct3=0b000)
+BNE    = partial(b_type, opcode=0b1100011, funct3=0b001)
+BLT    = partial(b_type, opcode=0b1100011, funct3=0b100)
+BGE    = partial(b_type, opcode=0b1100011, funct3=0b101)
+BLTU   = partial(b_type, opcode=0b1100011, funct3=0b110)
+BGEU   = partial(b_type, opcode=0b1100011, funct3=0b111)
+LB     = partial(i_type, opcode=0b0000011, funct3=0b000)
+LH     = partial(i_type, opcode=0b0000011, funct3=0b001)
+LW     = partial(i_type, opcode=0b0000011, funct3=0b010)
+LBU    = partial(i_type, opcode=0b0000011, funct3=0b100)
+LHU    = partial(i_type, opcode=0b0000011, funct3=0b101)
+SB     = partial(s_type, opcode=0b0100011, funct3=0b000)
+SH     = partial(s_type, opcode=0b0100011, funct3=0b001)
+SW     = partial(s_type, opcode=0b0100011, funct3=0b010)
+ADDI   = partial(i_type, opcode=0b0010011, funct3=0b000)
+SLTI   = partial(i_type, opcode=0b0010011, funct3=0b010)
+SLTIU  = partial(i_type, opcode=0b0010011, funct3=0b011)
+XORI   = partial(i_type, opcode=0b0010011, funct3=0b100)
+ORI    = partial(i_type, opcode=0b0010011, funct3=0b110)
+ANDI   = partial(i_type, opcode=0b0010011, funct3=0b111)
+SLLI   = partial(r_type, opcode=0b0010011, funct3=0b001, funct7=0b0000000)
+SRLI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0000000)
+SRAI   = partial(r_type, opcode=0b0010011, funct3=0b101, funct7=0b0100000)
+ADD    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000000)
+SUB    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0100000)
+SLL    = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000000)
+SLT    = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000000)
+SLTU   = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000000)
+XOR    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000000)
+SRL    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000000)
+SRA    = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0100000)
+OR     = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000000)
+AND    = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000000)
+FENCE  = partial(fence,  opcode=0b0001111, funct3=0b000, rd=0, rs1=0, fm=0)  # special syntax*
+ECALL  = partial(i_type, opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=0)  # special syntax
+EBREAK = partial(i_type, opcode=0b1110011, funct3=0b000, rd=0, rs1=0, imm=1)  # special syntax
 
-# RV32/RV64 "Zifencei" Instruction-Fetch Fence
-FENCE_I    = partial(i_type,   opcode=0b0001111, funct3=0b001, rd=0, rs1=0, imm=0)  # special syntax
+# RV32 "Zifencei" Instruction-Fetch Fence
+FENCE_I = partial(i_type, opcode=0b0001111, funct3=0b001, rd=0, rs1=0, imm=0)  # special syntax
 
-# RV32/RV64 "Zicsr" Control and Status Register (CSR) Instructions
-CSRRW      = partial(i_type,   opcode=0b1110011, funct3=0b001)
-CSRRS      = partial(i_type,   opcode=0b1110011, funct3=0b010)
-CSRRC      = partial(i_type,   opcode=0b1110011, funct3=0b011)
-CSRRWI     = partial(i_type,   opcode=0b1110011, funct3=0b101)
-CSRRSI     = partial(i_type,   opcode=0b1110011, funct3=0b110)
-CSRRCI     = partial(i_type,   opcode=0b1110011, funct3=0b111)
+# RV32 "Zicsr" Control and Status Register (CSR) Instructions
+CSRRW  = partial(i_type, opcode=0b1110011, funct3=0b001)
+CSRRS  = partial(i_type, opcode=0b1110011, funct3=0b010)
+CSRRC  = partial(i_type, opcode=0b1110011, funct3=0b011)
+CSRRWI = partial(i_type, opcode=0b1110011, funct3=0b101)
+CSRRSI = partial(i_type, opcode=0b1110011, funct3=0b110)
+CSRRCI = partial(i_type, opcode=0b1110011, funct3=0b111)
 
 # RV32M Standard Extension for Integer Multiplication and Division
-MUL        = partial(r_type,   opcode=0b0110011, funct3=0b000, funct7=0b0000001)
-MULH       = partial(r_type,   opcode=0b0110011, funct3=0b001, funct7=0b0000001)
-MULHSU     = partial(r_type,   opcode=0b0110011, funct3=0b010, funct7=0b0000001)
-MULHU      = partial(r_type,   opcode=0b0110011, funct3=0b011, funct7=0b0000001)
-DIV        = partial(r_type,   opcode=0b0110011, funct3=0b100, funct7=0b0000001)
-DIVU       = partial(r_type,   opcode=0b0110011, funct3=0b101, funct7=0b0000001)
-REM        = partial(r_type,   opcode=0b0110011, funct3=0b110, funct7=0b0000001)
-REMU       = partial(r_type,   opcode=0b0110011, funct3=0b111, funct7=0b0000001)
+MUL    = partial(r_type, opcode=0b0110011, funct3=0b000, funct7=0b0000001)
+MULH   = partial(r_type, opcode=0b0110011, funct3=0b001, funct7=0b0000001)
+MULHSU = partial(r_type, opcode=0b0110011, funct3=0b010, funct7=0b0000001)
+MULHU  = partial(r_type, opcode=0b0110011, funct3=0b011, funct7=0b0000001)
+DIV    = partial(r_type, opcode=0b0110011, funct3=0b100, funct7=0b0000001)
+DIVU   = partial(r_type, opcode=0b0110011, funct3=0b101, funct7=0b0000001)
+REM    = partial(r_type, opcode=0b0110011, funct3=0b110, funct7=0b0000001)
+REMU   = partial(r_type, opcode=0b0110011, funct3=0b111, funct7=0b0000001)
 
 # RV32A Standard Extension for Atomic Instructions
-LR_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax
-SC_W       = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00011)
-AMOSWAP_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00001)
-AMOADD_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00000)
-AMOXOR_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b00100)
-AMOAND_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b01100)
-AMOOR_W    = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b01000)
-AMOMIN_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b10000)
-AMOMAX_W   = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b10100)
-AMOMINU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11000)
-AMOMAXU_W  = partial(a_type,   opcode=0b0101111, funct3=0b010, funct5=0b11100)
+LR_W      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00010, rs2=0)  # special syntax
+SC_W      = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00011)
+AMOSWAP_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00001)
+AMOADD_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00000)
+AMOXOR_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b00100)
+AMOAND_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01100)
+AMOOR_W   = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b01000)
+AMOMIN_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10000)
+AMOMAX_W  = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b10100)
+AMOMINU_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11000)
+AMOMAXU_W = partial(a_type, opcode=0b0101111, funct3=0b010, funct5=0b11100)
 
 # RV32C Standard Extension for Compressed Instructions
 C_ADDI4SPN = partial(ciw_type, opcode=0b00, funct3=0b000, cs=[ImmNotZero])
@@ -817,125 +831,159 @@ C_JALR     = partial(cr_type,  opcode=0b10, funct4=0b1001, rs2=0, cs=[RegRdRs1No
 C_ADD      = partial(cr_type,  opcode=0b10, funct4=0b1001, cs=[RegRdRs1NotZero, RegRs2NotZero])
 C_SWSP     = partial(css_type, opcode=0b10, funct3=0b110)
 
+# RV32 Priv: Trap-Return Instructions
+SRET  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0001000)  # special syntax
+MRET  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0011000)  # special syntax
+MNRET = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00010, funct7=0b0111000)  # special syntax
+
+# RV32 Priv: Interrupt-Management Instructions
+WFI = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00101, funct7=0b0001000)  # special syntax
+
+# RV32 Priv: Control Transfer Records Management Instructions
+SCTRCLR = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0b00100, funct7=0b0001000)  # special syntax
+
+# RV32 Priv: Supervisor Memory-Management Instructions
+SFENCE_VMA = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000,funct7=0b0001001)  # special syntax
+
+# RV32 Priv: Hypervisor Memory-Management Instructions
+HFENCE_VVMA = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0010001)  # special syntax
+HFENCE_GVMA = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0110001)  # special syntax
+
+# RV32 Priv: Hypervisor Virtual-Machine Load and Store Instructions
+HLV_B   = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011000000000)  # special syntax
+HLV_BU  = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011000000001)  # special syntax
+HLV_H   = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011001000000)  # special syntax
+HLV_HU  = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011001000001)  # special syntax
+HLV_W   = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011010000000)  # special syntax
+HLVX_HU = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011001000011)  # special syntax
+HLVX_WU = partial(i_type, opcode=0b1110011, funct3=0b100, imm=0b011010000011)  # special syntax
+HSV_B   = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b100, funct7=0b0110001)  # special syntax
+HSV_H   = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b100, funct7=0b0110011)  # special syntax
+HSV_W   = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b100, funct7=0b0110101)  # special syntax
+
+# RV32 Priv: Svinval Memory-Management Extension
+SINVAL_VMA      = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0001011)  # special syntax
+SFENCE_W_INVAL  = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=0, funct7=0b0001100)  # special syntax
+SFENCE_INVAL_IR = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, rs1=0, rs2=1, funct7=0b0001100)  # special syntax
+HINVAL_VVMA     = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0010011)  # special syntax
+HINVAL_GVMA     = partial(rp_type, opcode=0b1110011, rd=0, funct3=0b000, funct7=0b0110011)  # special syntax
 
 R_TYPE_INSTRUCTIONS = {
-    'slli':       SLLI,
-    'srli':       SRLI,
-    'srai':       SRAI,
-    'add':        ADD,
-    'sub':        SUB,
-    'sll':        SLL,
-    'slt':        SLT,
-    'sltu':       SLTU,
-    'xor':        XOR,
-    'srl':        SRL,
-    'sra':        SRA,
-    'or':         OR,
-    'and':        AND,
-    'mul':        MUL,
-    'mulh':       MULH,
-    'mulhsu':     MULHSU,
-    'mulhu':      MULHU,
-    'div':        DIV,
-    'divu':       DIVU,
-    'rem':        REM,
-    'remu':       REMU,
+    'slli':   SLLI,
+    'srli':   SRLI,
+    'srai':   SRAI,
+    'add':    ADD,
+    'sub':    SUB,
+    'sll':    SLL,
+    'slt':    SLT,
+    'sltu':   SLTU,
+    'xor':    XOR,
+    'srl':    SRL,
+    'sra':    SRA,
+    'or':     OR,
+    'and':    AND,
+    'mul':    MUL,
+    'mulh':   MULH,
+    'mulhsu': MULHSU,
+    'mulhu':  MULHU,
+    'div':    DIV,
+    'divu':   DIVU,
+    'rem':    REM,
+    'remu':   REMU,
 }
 
 I_TYPE_INSTRUCTIONS = {
-    'jalr':       JALR,
-    'lb':         LB,
-    'lh':         LH,
-    'lw':         LW,
-    'lbu':        LBU,
-    'lhu':        LHU,
-    'addi':       ADDI,
-    'slti':       SLTI,
-    'sltiu':      SLTIU,
-    'xori':       XORI,
-    'ori':        ORI,
-    'andi':       ANDI,
-    'csrrw':      CSRRW,
-    'csrrs':      CSRRS,
-    'csrrc':      CSRRC,
-    'csrrwi':     CSRRWI,
-    'csrrsi':     CSRRSI,
-    'csrrci':     CSRRCI,
+    'jalr':   JALR,
+    'lb':     LB,
+    'lh':     LH,
+    'lw':     LW,
+    'lbu':    LBU,
+    'lhu':    LHU,
+    'addi':   ADDI,
+    'slti':   SLTI,
+    'sltiu':  SLTIU,
+    'xori':   XORI,
+    'ori':    ORI,
+    'andi':   ANDI,
+    'csrrw':  CSRRW,
+    'csrrs':  CSRRS,
+    'csrrc':  CSRRC,
+    'csrrwi': CSRRWI,
+    'csrrsi': CSRRSI,
+    'csrrci': CSRRCI,
 }
 
 IE_TYPE_INSTRUCTIONS = {
-    'ecall':      ECALL,
-    'ebreak':     EBREAK,
-    'mret':       MRET,
-    'wfi':        WFI,
-    'fence.i':    FENCE_I,
+    'ecall':   ECALL,
+    'ebreak':  EBREAK,
+    'fence.i': FENCE_I,
 }
 
 S_TYPE_INSTRUCTIONS = {
-    'sb':         SB,
-    'sh':         SH,
-    'sw':         SW,
+    'sb': SB,
+    'sh': SH,
+    'sw': SW,
 }
 
 B_TYPE_INSTRUCTIONS = {
-    'beq':        BEQ,
-    'bne':        BNE,
-    'blt':        BLT,
-    'bge':        BGE,
-    'bltu':       BLTU,
-    'bgeu':       BGEU,
+    'beq':  BEQ,
+    'bne':  BNE,
+    'blt':  BLT,
+    'bge':  BGE,
+    'bltu': BLTU,
+    'bgeu': BGEU,
 }
 
 U_TYPE_INSTRUCTIONS = {
-    'lui':        LUI,
-    'auipc':      AUIPC,
+    'lui':   LUI,
+    'auipc': AUIPC,
 }
 
 J_TYPE_INSTRUCTIONS = {
-    'jal':        JAL,
+    'jal': JAL,
 }
 
 FENCE_INSTRUCTIONS = {
-    'fence':      FENCE,
+    'fence': FENCE,
 }
 
 A_TYPE_INSTRUCTIONS = {
-    'sc.w':       SC_W,
-    'amoswap.w':  AMOSWAP_W,
-    'amoadd.w':   AMOADD_W,
-    'amoxor.w':   AMOXOR_W,
-    'amoand.w':   AMOAND_W,
-    'amoor.w':    AMOOR_W,
-    'amomin.w':   AMOMIN_W,
-    'amomax.w':   AMOMAX_W,
-    'amominu.w':  AMOMINU_W,
-    'amomaxu.w':  AMOMAXU_W,
+    'sc.w':      SC_W,
+    'amoswap.w': AMOSWAP_W,
+    'amoadd.w':  AMOADD_W,
+    'amoxor.w':  AMOXOR_W,
+    'amoand.w':  AMOAND_W,
+    'amoor.w':   AMOOR_W,
+    'amomin.w':  AMOMIN_W,
+    'amomax.w':  AMOMAX_W,
+    'amominu.w': AMOMINU_W,
+    'amomaxu.w': AMOMAXU_W,
 }
 
 AL_TYPE_INSTRUCTIONS = {
-    'lr.w':       LR_W,
+    'lr.w': LR_W,
 }
 
 CR_TYPE_INSTRUCTIONS = {
-    'c.mv':       C_MV,
-    'c.add':      C_ADD,
+    'c.mv':  C_MV,
+    'c.add': C_ADD,
 }
 
 CRJ_TYPE_INSTRUCTIONS = {
-    'c.jr':       C_JR,
-    'c.jalr':     C_JALR,
+    'c.jr':   C_JR,
+    'c.jalr': C_JALR,
 }
 
 CRE_TYPE_INSTRUCTIONS = {
-    'c.ebreak':   C_EBREAK,
+    'c.ebreak': C_EBREAK,
 }
 
 CI_TYPE_INSTRUCTIONS = {
-    'c.addi':     C_ADDI,
-    'c.li':       C_LI,
-    'c.lui':      C_LUI,
-    'c.slli':     C_SLLI,
-    'c.lwsp':     C_LWSP,
+    'c.addi': C_ADDI,
+    'c.li':   C_LI,
+    'c.lui':  C_LUI,
+    'c.slli': C_SLLI,
+    'c.lwsp': C_LWSP,
 }
 
 CIA_TYPE_INSTRUCTIONS = {
@@ -943,11 +991,11 @@ CIA_TYPE_INSTRUCTIONS = {
 }
 
 CIN_TYPE_INSTRUCTIONS = {
-    'c.nop':      C_NOP,
+    'c.nop': C_NOP,
 }
 
 CSS_TYPE_INSTRUCTIONS = {
-    'c.swsp':     C_SWSP,
+    'c.swsp': C_SWSP,
 }
 
 CIW_TYPE_INSTRUCTIONS = {
@@ -955,31 +1003,63 @@ CIW_TYPE_INSTRUCTIONS = {
 }
 
 CL_TYPE_INSTRUCTIONS = {
-    'c.lw':       C_LW,
+    'c.lw': C_LW,
 }
 
 CS_TYPE_INSTRUCTIONS = {
-    'c.sw':       C_SW,
+    'c.sw': C_SW,
 }
 
 CA_TYPE_INSTRUCTIONS = {
-    'c.sub':      C_SUB,
-    'c.xor':      C_XOR,
-    'c.or':       C_OR,
-    'c.and':      C_AND,
+    'c.sub': C_SUB,
+    'c.xor': C_XOR,
+    'c.or':  C_OR,
+    'c.and': C_AND,
 }
 
 CB_TYPE_INSTRUCTIONS = {
-    'c.srli':     C_SRLI,
-    'c.srai':     C_SRAI,
-    'c.andi':     C_ANDI,
-    'c.beqz':     C_BEQZ,
-    'c.bnez':     C_BNEZ,
+    'c.srli': C_SRLI,
+    'c.srai': C_SRAI,
+    'c.andi': C_ANDI,
+    'c.beqz': C_BEQZ,
+    'c.bnez': C_BNEZ,
 }
 
 CJ_TYPE_INSTRUCTIONS = {
-    'c.jal':      C_JAL,
-    'c.j':        C_J,
+    'c.jal': C_JAL,
+    'c.j':   C_J,
+}
+
+PRIV_INSTRUCTIONS = {
+    'sret': SRET,
+    'mret': MRET,
+    'mnret': MNRET,
+
+    'wfi': WFI,
+
+    'sctrclr': SCTRCLR,
+
+    'sfence.vma': SFENCE_VMA,
+
+    'hfence.vvma': HFENCE_VVMA,
+    'hfence.gvma': HFENCE_GVMA,
+
+    'hlv.b':   HLV_B,
+    'hlv.bu':  HLV_BU,
+    'hlv.h':   HLV_H,
+    'hlv.hu':  HLV_HU,
+    'hlv.w':   HLV_W,
+    'hlvx.hu': HLVX_HU,
+    'hlvx.wu': HLVX_WU,
+    'hsv.b':   HSV_B,
+    'hsv.h':   HSV_H,
+    'hsv.w':   HSV_W,
+
+    'sinval.vma':      SINVAL_VMA,
+    'sfence.w.inval':  SFENCE_W_INVAL,
+    'sfence.inval.ir': SFENCE_INVAL_IR,
+    'hinval.vvma':     HINVAL_VVMA,
+    'hinval.gvma':     HINVAL_GVMA,
 }
 
 INSTRUCTIONS = {}
@@ -1006,6 +1086,7 @@ INSTRUCTIONS.update(CS_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CA_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CB_TYPE_INSTRUCTIONS)
 INSTRUCTIONS.update(CJ_TYPE_INSTRUCTIONS)
+INSTRUCTIONS.update(PRIV_INSTRUCTIONS)
 
 PSEUDO_INSTRUCTIONS = {
     'nop',

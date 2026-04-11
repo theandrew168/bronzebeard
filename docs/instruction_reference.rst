@@ -236,3 +236,13 @@ Instruction                   Description
 :code:`csrrsi rd, uimm, csr`  atomically read and set bits in CSRs (immediate)
 :code:`csrrci rd, uimm, csr`  atomically read and clear bits in CSRs (immediate)
 ============================  ===========
+
+RV32 Privileged Instruction Set
+-------------------------------
+
+===========================  ===========
+Instruction                  Description
+===========================  ===========
+:code:`mret`                 return execution from a trap
+:code:`wfi`                  wait for interrupt
+===========================  ===========
